@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ja" data-theme="day" data-event="none">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="YukimiWorks 平成レトロ・ピクセルWeb HTMLサンプル">
+  <title>YukimiWorks | HTMLデザインサンプル</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">本文へ移動</a>
+
+  <div class="page-shell" id="siteRoot">
+    <header class="hero-banner" aria-labelledby="site-title">
+      <span class="header-snow header-snow-large header-snow-left" aria-hidden="true">❄</span>
+      <span class="header-snow header-snow-small header-snow-left-small" aria-hidden="true">❄</span>
+      <span class="header-snow header-snow-large header-snow-right" aria-hidden="true">❄</span>
+      <span class="header-snow header-snow-small header-snow-right-small" aria-hidden="true">❄</span>
+
+      <h1 id="site-title">YukimiWorks</h1>
+      <p class="tagline" id="tagline">小さなアイデアを形にする</p>
+      <div class="dotted-rule" aria-hidden="true"></div>
+    </header>
+
+    <div class="layout-grid">
+      <aside class="sidebar" aria-label="サイドメニュー">
+        <section class="window-panel menu-panel">
+          <h2 class="window-title">
+            <span class="title-deco" aria-hidden="true">❄</span>
+            <span>Menu</span>
+            <span class="title-deco" aria-hidden="true">❄</span>
+          </h2>
+          <nav>
+            <a class="nav-link active" href="#welcome"><span class="nav-mark">⌂</span>Top<span class="current-mark" aria-hidden="true">◆</span></a>
+            <a class="nav-link" href="#about"><span class="nav-mark">❄</span>About</a>
+            <a class="nav-link" href="#service"><span class="nav-mark">❄</span>Service</a>
+            <a class="nav-link" href="./works.html"><span class="nav-mark">❄</span>Works</a>
+            <a class="nav-link" href="#profile"><span class="nav-mark">❄</span>Profile</a>
+            <a class="nav-link" href="#links"><span class="nav-mark">❄</span>Link</a>
+            <a class="nav-link" href="#contact"><span class="nav-mark">❄</span>Contact</a>
+          </nav>
+        </section>
+
+        <section class="window-panel news-panel">
+          <h2 class="window-title">
+            <span class="title-deco" aria-hidden="true">❄</span>
+            <span>What’s New</span>
+            <span class="title-deco" aria-hidden="true">❄</span>
+          </h2>
+          <div class="sidebar-content">
+            <article class="news-item">
+              <time datetime="2026-07-10">2026/07/10</time>
+              <p>新しいサイトデザインを公開しました。</p>
+            </article>
+            <article class="news-item">
+              <time datetime="2026-07-04">2026/07/04</time>
+              <p>制作実績を1件追加しました。</p>
+            </article>
+            <a class="more-link" href="#">過去の更新履歴 »</a>
+          </div>
+        </section>
+
+        <section class="window-panel counter-panel" aria-label="サイト情報">
+          <h2 class="window-title">
+            <span class="title-deco" aria-hidden="true">❄</span>
+            <span>Counter</span>
+          </h2>
+          <div class="counter-body">
+            <div class="counter-digits" aria-label="装飾用カウンター">001234</div>
+            <img src="./assets/character-default.png" alt="YukimiWorksのミニキャラクター" width="37" height="45" class="tiny-character pixel-image">
+          </div>
+          <p>Since 2026.03.04</p>
+        </section>
+      </aside>
+
+      <main id="main" class="main-column">
+        <section id="welcome" class="window-panel welcome-panel">
+          <h2 class="window-title">
+            <span class="title-deco" aria-hidden="true">❄</span>
+            <span>Welcome</span>
+            <span class="title-deco" aria-hidden="true">❄</span>
+          </h2>
+          <div class="welcome-content">
+            <div class="character-stage">
+              <div id="characterBubble" class="speech-bubble" role="status" aria-live="polite" hidden></div>
+              <button id="characterButton" class="character-button" type="button" aria-label="キャラクターに話しかける">
+                <img id="characterImage" src="./assets/character-default.png" alt="YukimiWorksのキャラクター" width="37" height="45" class="main-character pixel-image">
+              </button>
+            </div>
+            <div class="welcome-copy">
+              <p>YukimiWorksのホームページへようこそ。</p>
+              <p>当サイトでは小さなコンテンツから大きなサービスまで、</p>
+              <p>たくさんのアイデアを形にし、残しています。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="service" class="window-panel service-panel">
+          <h2 class="window-title">
+            <span class="title-deco" aria-hidden="true">❄</span>
+            <span>Service</span>
+            <span class="title-deco" aria-hidden="true">❄</span>
+          </h2>
+          <div class="service-list">
+            <article class="service-row">
+              <span class="row-snow" aria-hidden="true">❄</span>
+              <img class="service-icon pixel-image" data-icon="contents" src="./assets/icons/default/contents.png" alt="コンテンツの仮アイコン">
+              <div><h3>コンテンツ</h3><p>Web記事・企画・ガイドなどのコンテンツを制作します。</p></div>
+            </article>
+            <article class="service-row">
+              <span class="row-snow" aria-hidden="true">❄</span>
+              <img class="service-icon pixel-image" data-icon="tools" src="./assets/icons/default/tools.png" alt="ツール開発の仮アイコン">
+              <div><h3>ツール開発</h3><p>業務効率化や日常をサポートするツールを開発します。</p></div>
+            </article>
+            <article class="service-row">
+              <span class="row-snow" aria-hidden="true">❄</span>
+              <img class="service-icon pixel-image" data-icon="apps" src="./assets/icons/default/apps.png" alt="アプリサービスの仮アイコン">
+              <div><h3>アプリサービス</h3><p>便利で使いやすいWebサービス・アプリを提供します。</p></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="links" class="window-panel link-panel">
+          <h2 class="window-title">
+            <span class="title-deco" aria-hidden="true">❄</span>
+            <span>Link</span>
+            <span class="title-deco" aria-hidden="true">❄</span>
+          </h2>
+          <div class="link-grid">
+            <a class="social-link" href="#">
+              <img class="social-icon pixel-image" data-icon="sns" src="./assets/icons/default/sns.png" alt="SNSの仮アイコン">
+              <span><strong>X</strong><small>最新情報やお知らせを投稿しています。</small></span>
+            </a>
+            <a class="social-link" href="#">
+              <span class="placeholder-social" aria-hidden="true">◎</span>
+              <span><strong>Instagram</strong><small>制作物や日常の記録を投稿しています。</small></span>
+            </a>
+          </div>
+        </section>
+
+        <section id="about" class="sr-only" aria-label="About"></section>
+        <section id="profile" class="sr-only" aria-label="Profile"></section>
+        <section id="contact" class="sr-only" aria-label="Contact"></section>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <p><span aria-hidden="true">❄</span> YukimiWorks <span aria-hidden="true">❄</span></p>
+      <small>Copyright (C) 2026 YukimiWorks All Rights Reserved.</small>
+      <small>当サイト内の文章・画像の無断転載を禁じます。</small>
+    </footer>
+  </div>
+
+  <details class="debug-panel" id="debugPanel">
+    <summary>Theme Debug</summary>
+    <div class="debug-grid">
+      <label>時間帯テーマ
+        <select id="themeSelect">
+          <option value="auto">自動</option>
+          <option value="early-morning">早朝</option>
+          <option value="morning">朝</option>
+          <option value="day">昼</option>
+          <option value="evening">夕方</option>
+          <option value="night">夜</option>
+          <option value="late-night">深夜</option>
+        </select>
+      </label>
+      <label>イベント
+        <select id="eventSelect">
+          <option value="auto">自動</option>
+          <option value="none">なし</option>
+          <option value="lunch">昼食</option>
+          <option value="snack">お菓子</option>
+          <option value="sleep-warning">深夜警告</option>
+        </select>
+      </label>
+    </div>
+  </details>
+
+  <script src="./app.js"></script>
+</body>
+</html>

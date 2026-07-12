@@ -5,7 +5,7 @@ import { RetroPanel } from '@/components/panels/RetroPanel';
 export default function PrivacyPolicyPage() {
   return (
     <SiteFrame>
-      <RetroPanel title="プライバシーポリシー" titleAside="Privacy Policy" contentClassName="single-panel-body detail-body">
+      <RetroPanel title="cocoa プライバシーポリシー" titleAside="Privacy Policy" contentClassName="single-panel-body detail-body">
         <hr className="content-rule" />
         <p>本アプリは、ユーザーの個人情報を収集しません。</p>
         <p>本アプリは完全オフラインで動作し、入力されたデータは端末内にのみ保存されます。</p>

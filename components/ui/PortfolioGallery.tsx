@@ -1,7 +1,7 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import type { PortfolioItem } from '@/data/portfolio';
 
 export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
@@ -23,7 +23,7 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
       <div className="card-grid">
         {items.map((item) => (
           <button key={item.id} type="button" className="retro-card retro-card-button" onClick={() => setSelected(item)}>
-            <Image src={item.image} alt={item.alt} width={560} height={560} className="retro-card-image" />
+            <SleepWarningImage src={item.image} alt={item.alt} width={560} height={560} className="retro-card-image" />
             <div className="retro-card-body">
               <h3>{item.title}</h3>
               {item.description ? <p>{item.description}</p> : null}
@@ -41,7 +41,7 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
             <button type="button" className="modal-close" onClick={() => setSelected(null)} aria-label="閉じる">
               ×
             </button>
-            <Image src={selected.image} alt={selected.alt} width={960} height={960} className="modal-image" />
+            <SleepWarningImage src={selected.image} alt={selected.alt} width={960} height={960} className="modal-image" />
             <h3>{selected.title}</h3>
             {selected.description ? <p>{selected.description}</p> : null}
           </div>

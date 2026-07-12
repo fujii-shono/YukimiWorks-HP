@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
+import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { formatJapaneseDate } from '@/lib/format';
 import { news, newsCategoryLabels } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
@@ -76,7 +77,7 @@ export default function NewsDetailPage({ params }: { params: { id: string } }) {
           </p>
           <hr />
         </div>
-        <Image src={article.thumbnail} alt={`${article.title}のサムネイル`} width={800} height={450} className="detail-media" />
+        <SleepWarningImage src={article.thumbnail} alt={`${article.title}のサムネイル`} width={800} height={450} className="detail-media" />
         <div className="detail-body">
           {typeof article.body === 'string' || !article.body ? (
             <p>{article.body ?? article.summary}</p>

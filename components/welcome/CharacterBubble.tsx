@@ -5,16 +5,20 @@ import { AnimatePresence, motion } from 'framer-motion';
 export function CharacterBubble({
   message,
   polite,
+  bubbleTail = true,
+  centered = false,
 }: {
   message: string | null;
   polite: boolean;
+  bubbleTail?: boolean;
+  centered?: boolean;
 }) {
   return (
     <AnimatePresence>
       {message ? (
         <motion.div
           key={message}
-          className="speech-bubble"
+          className={`speech-bubble${bubbleTail ? '' : ' no-tail'}${centered ? ' centered' : ''}`}
           role="status"
           aria-live={polite ? 'polite' : 'off'}
           initial={{ opacity: 0, y: 4 }}

@@ -3,6 +3,7 @@ export type PortfolioItem = {
   title: string;
   image: string;
   alt: string;
+  href: string;
   description?: string;
   year?: number;
   tags?: string[];
@@ -15,6 +16,7 @@ export const portfolioItems: PortfolioItem[] = [
     title: 'サンプルイラスト',
     image: '/portfolio/placeholder.svg',
     alt: 'サンプルイラスト',
+    href: '/works/pixel-guide-collection',
     description: '後から実際の作品へ差し替えます。',
     year: 2026,
     tags: ['イラスト'],
@@ -24,6 +26,7 @@ export const portfolioItems: PortfolioItem[] = [
     title: '雪のドットポスター',
     image: '/portfolio/placeholder.svg',
     alt: '雪のドットポスター',
+    href: '/works/cocoa-app',
     description: 'ドット表現を基調にしたポスター作品です。',
     year: 2025,
     tags: ['ドット絵', 'ポスター'],

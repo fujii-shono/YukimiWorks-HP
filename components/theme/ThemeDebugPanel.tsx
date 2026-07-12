@@ -1,10 +1,11 @@
 'use client';
 
-import { eventOptions, themeOptions } from '@/data/themeConfig';
+import { debugTimeOptions, eventOptions, themeOptions } from '@/data/themeConfig';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 
 export function ThemeDebugPanel() {
-  const { isDevelopment, forcedEvent, forcedTheme, setForcedEvent, setForcedTheme } = useTimeTheme();
+  const { isDevelopment, forcedEvent, forcedTheme, forcedTime, setForcedEvent, setForcedTheme, setForcedTime } =
+    useTimeTheme();
 
   if (!isDevelopment) return null;
 
@@ -13,7 +14,27 @@ export function ThemeDebugPanel() {
       <summary>Theme Debug</summary>
       <div className="debug-grid">
         <label>
-          時間帯テーマ
+          時間帯プリセット
+          <select
+            value={forcedTime}
+            onChange={(event) => {
+              const nextValue = event.target.value as typeof forcedTime;
+              setForcedTime(nextValue);
+              if (nextValue !== 'auto') {
+                setForcedTheme('auto');
+                setForcedEvent('auto');
+              }
+            }}
+          >
+            {debugTimeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          テーマ手動上書き
           <select value={forcedTheme} onChange={(event) => setForcedTheme(event.target.value as typeof forcedTheme)}>
             {themeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -23,7 +44,7 @@ export function ThemeDebugPanel() {
           </select>
         </label>
         <label>
-          イベント
+          イベント手動上書き
           <select value={forcedEvent} onChange={(event) => setForcedEvent(event.target.value as typeof forcedEvent)}>
             {eventOptions.map((option) => (
               <option key={option.value} value={option.value}>

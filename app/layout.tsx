@@ -30,12 +30,31 @@ const themeBootstrapScript = `
     };
   };
   const resolveTheme = (hour) => {
-    if (hour >= 5 && hour < 7) return 'early-morning';
-    if (hour >= 7 && hour < 11) return 'morning';
+    if (hour >= 5 && hour < 11) return 'early-morning';
     if (hour >= 11 && hour < 17) return 'day';
     if (hour >= 17 && hour < 19) return 'evening';
     if (hour >= 19) return 'night';
     return 'late-night';
+  };
+  const setSleepWarningPersistence = (dateKey) => {
+    try {
+      localStorage.setItem('yukimi-sleep-warning-active', JSON.stringify({ dateKey, untilMinute: 150 }));
+    } catch {
+      return;
+    }
+  };
+  const getPersistedSleepWarning = (dateKey, hour, minute) => {
+    try {
+      const stored = localStorage.getItem('yukimi-sleep-warning-active');
+      if (!stored) return false;
+      const parsed = JSON.parse(stored);
+      const nowMinute = hour * 60 + minute;
+      if (parsed.dateKey === dateKey && typeof parsed.untilMinute === 'number' && nowMinute <= parsed.untilMinute) return true;
+      localStorage.removeItem('yukimi-sleep-warning-active');
+      return false;
+    } catch {
+      return false;
+    }
   };
   const stored = (dateKey, eventName, probability) => {
     const key = \`yukimi-event:\${dateKey}:\${eventName}\`;
@@ -50,9 +69,16 @@ const themeBootstrapScript = `
     }
   };
   const resolveEvent = (parts) => {
-    if (parts.hour === 2 && parts.minute <= 30 && stored(parts.dateKey, 'sleep-warning', 0.01)) return 'sleep-warning';
-    if (parts.hour === 15 && parts.minute <= 30 && stored(parts.dateKey, 'snack', 0.05)) return 'snack';
-    if (parts.hour === 12 && parts.minute <= 30 && stored(parts.dateKey, 'lunch', 0.05)) return 'lunch';
+    if (getPersistedSleepWarning(parts.dateKey, parts.hour, parts.minute)) return 'sleep-warning';
+    if (parts.hour === 2 && parts.minute <= 30 && Math.random() < 0.01) {
+      setSleepWarningPersistence(parts.dateKey);
+      return 'sleep-warning';
+    }
+    if (parts.hour === 15 && parts.minute <= 30 && stored(parts.dateKey, 'snack', 0.01)) return 'snack';
+    if (parts.hour === 12 && parts.minute <= 30 && stored(parts.dateKey, 'lunch', 0.01)) return 'lunch';
+    if (parts.hour >= 0 && parts.hour < 2 && stored(parts.dateKey, 'late-night-away', 0.005)) return 'late-night-away';
+    if (parts.hour >= 0 && parts.hour < 5) return 'none';
+    if (stored(parts.dateKey, 'away', 0.005)) return stored(parts.dateKey, 'busy', 0.2) ? 'busy' : 'away';
     return 'none';
   };
   const parts = getParts();
@@ -72,7 +98,7 @@ export const metadata: Metadata = {
   title: 'YukimiWorks | アプリ・コンテンツ制作',
   description: siteConfig.description,
   icons: {
-    icon: '/logo/yukimi_works_favicon.svg',
+    icon: '/logo/yukimi_works_favicon.png',
   },
   openGraph: {
     title: 'YukimiWorks | アプリ・コンテンツ制作',

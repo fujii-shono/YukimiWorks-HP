@@ -3,25 +3,93 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
+import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { news } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { cn } from '@/lib/format';
 
 const navItems = [
-  { href: '/', label: 'Top', icon: '⌂' },
-  { href: '/about', label: 'About', icon: '❄' },
-  { href: '/works', label: 'Works', icon: '❄' },
-  { href: '/portfolio', label: 'Portfolio', icon: '❄' },
-  { href: '/news', label: 'News', icon: '❄' },
-  { href: '/links', label: 'Link', icon: '❄' },
-  { href: '/contact', label: 'Contact', icon: '❄' },
+  { href: '/', label: 'Top', icon: '⌂', iconImage: '/icons/default/top.png' },
+  { href: '/about', label: 'About', icon: '❄', iconImage: null },
+  { href: '/works', label: 'Works', icon: '❄', iconImage: null },
+  { href: '/portfolio', label: 'Portfolio', icon: '❄', iconImage: null },
+  { href: '/news', label: 'News', icon: '❄', iconImage: null },
+  { href: '/links', label: 'Link', icon: '❄', iconImage: null },
+  { href: '/contact', label: 'Contact', icon: '❄', iconImage: null },
 ] as const;
+
+function formatCounterDisplay(value: number) {
+  const minimumDigits = siteConfig.decorativeCounter.length;
+  return String(Math.max(0, Math.floor(value))).padStart(minimumDigits, '0');
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [counterDisplay, setCounterDisplay] = useState<string>(siteConfig.decorativeCounter);
+  const { absent, event, sleepMode } = useTimeTheme();
   const latestNews = news.slice(0, 3);
+  const counterCharacterSrc = sleepMode ? '/character/sleeping.png' : '/character/default.png';
+  const counterCharacterMask = event === 'sleep-warning' ? '/effects/eyes.png' : counterCharacterSrc;
+  const absentLabel = event === 'lunch' ? '食事中' : event === 'late-night-away' ? '....' : 'お出かけ中';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const getTokyoDateKey = () =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+
+    const syncCounter = async () => {
+      const todayKey = getTokyoDateKey();
+      const storageKey = 'yukimi-counter-last-counted-date';
+      let shouldCount = true;
+
+      try {
+        shouldCount = window.localStorage.getItem(storageKey) !== todayKey;
+      } catch {
+        shouldCount = true;
+      }
+
+      const response = await fetch('/api/counter', {
+        method: shouldCount ? 'POST' : 'GET',
+        cache: 'no-store',
+      });
+
+      if (!response.ok) throw new Error(`[counter] ${response.status}`);
+      const json = (await response.json()) as { count?: number };
+      if (typeof json.count === 'number' && isMounted) setCounterDisplay(formatCounterDisplay(json.count));
+
+      if (shouldCount) {
+        try {
+          window.localStorage.setItem(storageKey, todayKey);
+        } catch {
+          return;
+        }
+      }
+    };
+
+    void syncCounter().catch(async () => {
+      try {
+        const fallback = await fetch('/api/counter', { cache: 'no-store' });
+        if (!fallback.ok) return;
+        const json = (await fallback.json()) as { count?: number };
+        if (typeof json.count === 'number' && isMounted) setCounterDisplay(formatCounterDisplay(json.count));
+      } catch {
+        return;
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <aside className="sidebar" aria-label="サイドメニュー">
@@ -49,7 +117,19 @@ export function Sidebar() {
             const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             return (
               <Link key={item.href} className={cn('nav-link', isActive && 'active')} href={item.href}>
-                <span className="nav-mark">{item.icon}</span>
+                {item.iconImage ? (
+                  <Image
+                    src={item.iconImage}
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="nav-mark-image pixel-image"
+                    unoptimized
+                    draggable={false}
+                  />
+                ) : (
+                  <span className="nav-mark">{item.icon}</span>
+                )}
                 {item.label}
                 {isActive ? (
                   <span className="current-mark" aria-hidden="true">
@@ -100,17 +180,26 @@ export function Sidebar() {
         </h2>
         <div className="counter-body">
           <div className="counter-digits" aria-label="装飾用カウンター">
-            {siteConfig.decorativeCounter}
+            {counterDisplay}
           </div>
-          <Image
-            src="/character/default.png"
-            alt="YukimiWorksのミニキャラクター"
-            width={37}
-            height={45}
-            className="tiny-character pixel-image pixel-art-silhouette"
-            unoptimized
-            draggable={false}
-          />
+          {absent ? (
+            <span className="counter-absent">{absentLabel}</span>
+          ) : (
+            <span
+              className="pixel-tint-frame pixel-tint-frame-counter"
+              style={{ '--pixel-mask': `url("${counterCharacterMask}")` } as CSSProperties}
+            >
+              <SleepWarningImage
+                src={counterCharacterSrc}
+                alt="YukimiWorksのミニキャラクター"
+                width={37}
+                height={45}
+                className={cn('tiny-character pixel-image tinted-pixel-art', event !== 'sleep-warning' && 'pixel-art-silhouette')}
+                unoptimized
+                draggable={false}
+              />
+            </span>
+          )}
         </div>
         <p>Since {siteConfig.since}</p>
       </section>

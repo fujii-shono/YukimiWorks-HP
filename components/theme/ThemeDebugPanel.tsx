@@ -1,13 +1,13 @@
 'use client';
 
-import { debugTimeOptions, eventOptions, themeOptions } from '@/data/themeConfig';
+import { debugControlsEnabled, debugTimeOptions, eventOptions, themeOptions } from '@/data/themeConfig';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 
 export function ThemeDebugPanel() {
   const { isDevelopment, forcedEvent, forcedTheme, forcedTime, setForcedEvent, setForcedTheme, setForcedTime } =
     useTimeTheme();
 
-  if (!isDevelopment) return null;
+  if (!isDevelopment || !debugControlsEnabled) return null;
 
   return (
     <details className="debug-panel">

@@ -29,6 +29,9 @@ export const debugTimeOptions = [
   { value: '02:15', label: '警告 02:15' },
 ] as const;
 
+// 公開時は false のままにしておく。検証時だけ true にすると、デバッグUIとクエリ上書きを有効化できる。
+export const debugControlsEnabled = false as const;
+
 export const iconFolderByEvent = {
   none: 'default',
   away: 'default',

@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { debugTimeOptions, eventOptions, themeOptions, type DebugTimeValue } from '@/data/themeConfig';
+import { debugControlsEnabled, debugTimeOptions, eventOptions, themeOptions, type DebugTimeValue } from '@/data/themeConfig';
 import { getTagline, getTokyoParts, isEventEligibleAtTime, resolveEvent, resolveTheme, type ResolvedEvent, type ResolvedTheme } from '@/lib/japanTime';
 
 type ForcedTheme = (typeof themeOptions)[number]['value'];
@@ -132,7 +132,7 @@ export function TimeThemeProvider({ children }: { children: ReactNode }) {
   const rolledEventRef = useRef<ResolvedEvent | null>(null);
 
   useEffect(() => {
-    if (!isDevelopment) return;
+    if (!isDevelopment || !debugControlsEnabled) return;
     const params = new URLSearchParams(window.location.search);
     const themeParam = params.get('theme');
     const eventParam = params.get('event');
@@ -149,7 +149,7 @@ export function TimeThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const update = () => {
       const actualParts = getTokyoParts();
-      const debugParts = isDevelopment ? getDebugParts(forcedTime) : null;
+      const debugParts = isDevelopment && debugControlsEnabled ? getDebugParts(forcedTime) : null;
       const parts = debugParts ?? actualParts;
 
       setHour(parts.hour);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
+import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import type { PortfolioItem } from '@/data/portfolio';
 
 export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
@@ -39,7 +39,7 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
       <div className="card-grid">
         {items.map((item) => (
           <button key={item.id} type="button" className="retro-card retro-card-button portfolio-card" onClick={() => setSelected(item)}>
-            <SleepWarningImage src={item.image} alt={item.alt} width={560} height={560} className="retro-card-image portfolio-card-image" />
+            <PortfolioMedia item={item} variant="card" className="portfolio-card-image" />
             <div className="retro-card-body portfolio-card-body">
               <h3>{item.title}</h3>
             </div>
@@ -54,7 +54,7 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
             </button>
             <div className="portfolio-modal-content">
               <div className="portfolio-modal-image-wrap">
-                <SleepWarningImage src={selected.image} alt={selected.alt} width={960} height={960} className="modal-image portfolio-modal-image" />
+                <PortfolioMedia item={selected} variant="modal" className="modal-image portfolio-modal-image" />
               </div>
               <div className="portfolio-modal-title-row">
                 <h3>{selected.title}</h3>

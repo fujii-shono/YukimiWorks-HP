@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { RetroPanel } from '@/components/panels/RetroPanel';
-import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
+import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { portfolioItems } from '@/data/portfolio';
 
 export function PortfolioPreviewSection() {
@@ -11,7 +11,7 @@ export function PortfolioPreviewSection() {
       <div className="portfolio-preview-list">
         {latestItems.map((item) => (
           <Link key={item.id} href={item.href} className="portfolio-preview-item">
-            <SleepWarningImage src={item.image} alt={item.alt} width={96} height={96} className="portfolio-preview-thumb" />
+            <PortfolioMedia item={item} variant="preview" className="portfolio-preview-thumb" />
             <span className="portfolio-preview-title">{item.title}</span>
           </Link>
         ))}

@@ -64,16 +64,16 @@
 
 ### 実装方針
 
-- カウンター総数は Vercel KV に保存する
+- カウンター総数は Upstash Redis に保存する
 - クライアント側は `localStorage` に東京日付キーを保持し、その日未送信のときだけ `/api/counter` へ加算リクエストを送る
-- KV 未設定環境では `data/siteConfig.ts` の初期値を返して動作を壊さない
+- Redis 未設定環境では `data/siteConfig.ts` の初期値を返して動作を壊さない
 
 ### 変更予定のファイルと理由
 
 - `app/api/counter/route.ts`: 現在値取得と加算 API
-- `lib/counter.ts`: KV REST アクセスと初期値・表示整形の共通化
+- `lib/counter.ts`: Redis REST アクセスと初期値・表示整形の共通化
 - `components/layout/Sidebar.tsx`: 表示更新と 1 日 1 回送信ロジック
-- `README.md`: Vercel KV の接続手順と環境変数設定
+- `README.md`: Redis の接続手順と環境変数設定
 - `SPEC.md`: カウンター仕様の正式化
 
 ### 検証方法

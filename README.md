@@ -28,26 +28,28 @@ CONTACT_TO_APP=app-support@yukimiworks.com
 MAIL_FROM_NAME=YukimiWorks
 MAIL_FROM_DOMAIN=yukimiworks.com
 NEXT_PUBLIC_SITE_URL=https://yukimiworks.com
-KV_REST_API_URL=https://<your-kv-endpoint>.upstash.io
-KV_REST_API_TOKEN=<your-kv-rest-token>
+UPSTASH_REDIS_REST_URL=https://<your-redis-endpoint>.upstash.io
+UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
 ```
 
-`KV_REST_API_URL` と `KV_REST_API_TOKEN` は、カウンターを Vercel KV に保存するために使用します。
+`UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` は、カウンターを Redis に保存するために使用します。
+既存の接続情報をそのまま使う場合は、`KV_REST_API_URL` と `KV_REST_API_TOKEN` も後方互換で読み込みます。
+Vercel の Redis integration が `UPSTASH_REDIS_REST_KV_REST_API_URL` のような長い名前を作っても、コード側で読み込めるようにしてあります。
 
 ## カウンターの仕組み
 
-- カウンター総数は Vercel KV の `site:counter:total` に保存します
+- カウンター総数は Redis の `site:counter:total` に保存します
 - 同じブラウザからは 1 日に 1 回だけ加算します
 - 1 日判定は `localStorage` の `yukimi-counter-last-counted-date` に保存した東京日付キーで行います
 - `localStorage` を消した場合、別ブラウザ、別端末は別訪問として扱います
-- Vercel KV 未設定環境では `data/siteConfig.ts` の初期値を表示し、加算は行いません
+- Redis 未設定環境では `data/siteConfig.ts` の初期値を表示し、加算は行いません
 
 ## Vercel 本番設定
 
 1. Vercel ダッシュボードで対象プロジェクトを開きます。
-2. `Storage` から `KV` データベースを作成します。
-3. 作成した KV をこのプロジェクトへ接続します。
-4. 接続後、Vercel の Environment Variables に `KV_REST_API_URL` と `KV_REST_API_TOKEN` が入っていることを確認します。
+2. `Storage` ではなく、Marketplace から Redis integration を追加します。
+3. 作成した Redis をこのプロジェクトへ接続します。
+4. 接続後、Vercel の Environment Variables に `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` が入っていることを確認します。
 5. あわせて以下も Environment Variables に登録します。
 
 ```text
@@ -57,14 +59,14 @@ CONTACT_TO_APP
 MAIL_FROM_NAME
 MAIL_FROM_DOMAIN
 NEXT_PUBLIC_SITE_URL
-KV_REST_API_URL
-KV_REST_API_TOKEN
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
 ```
 
 6. 必要なら `siteConfig.decorativeCounter` を開始値として調整します。
-7. 再デプロイすると、初回アクセス時に KV へ `site:counter:total` が作成されます。
+7. 再デプロイすると、初回アクセス時に Redis へ `site:counter:total` が作成されます。
 
 ## 備考
 
 - カウンター API は `app/api/counter/route.ts` にあります
-- KV アクセス処理は `lib/counter.ts` にあります
+- Redis アクセス処理は `lib/counter.ts` にあります

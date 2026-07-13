@@ -1,39 +1,22 @@
+import { Redis } from '@upstash/redis';
 import { siteConfig } from '@/data/siteConfig';
 
 const COUNTER_KEY = 'site:counter:total';
-const kvRestUrl = process.env.KV_REST_API_URL;
-const kvRestToken = process.env.KV_REST_API_TOKEN;
+const redisRestUrl = pickEnv(
+  process.env.UPSTASH_REDIS_REST_URL,
+  process.env.UPSTASH_REDIS_REST_REDIS_URL,
+  process.env.UPSTASH_REDIS_REST_KV_REST_API_URL,
+  process.env.KV_REST_API_URL,
+);
+const redisRestToken = pickEnv(
+  process.env.UPSTASH_REDIS_REST_TOKEN,
+  process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN,
+  process.env.KV_REST_API_TOKEN,
+);
 
 function getInitialCounterValue() {
   const numeric = Number.parseInt(siteConfig.decorativeCounter, 10);
   return Number.isFinite(numeric) ? numeric : 0;
-}
-
-function getRequestHeaders() {
-  const headers = new Headers();
-  if (kvRestToken) headers.set('Authorization', `Bearer ${kvRestToken}`);
-  return headers;
-}
-
-async function kvFetch<T>(path: string, init?: RequestInit) {
-  if (!kvRestUrl || !kvRestToken) return null;
-
-  const headers = getRequestHeaders();
-  const customHeaders = new Headers(init?.headers);
-  customHeaders.forEach((value, key) => headers.set(key, value));
-
-  const response = await fetch(`${kvRestUrl}${path}`, {
-    cache: 'no-store',
-    ...init,
-    headers,
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`[counter] KV request failed: ${response.status} ${body}`);
-  }
-
-  return (await response.json()) as T;
 }
 
 function toCounterNumber(value: unknown) {
@@ -46,36 +29,60 @@ function toCounterNumber(value: unknown) {
 }
 
 export function isCounterConfigured() {
-  return Boolean(kvRestUrl && kvRestToken);
+  return Boolean(redisRestUrl && redisRestToken);
+}
+
+function pickEnv(...values: Array<string | undefined>) {
+  return values.find((value): value is string => typeof value === 'string' && value.length > 0);
+}
+
+function createRedisClient() {
+  if (!redisRestUrl || !redisRestToken) return null;
+  return new Redis({
+    url: redisRestUrl,
+    token: redisRestToken,
+  });
+}
+
+function isSeededCounterValue(value: number | null, minimum: number) {
+  return value !== null && value >= minimum;
+}
+
+async function seedCounterValue(redis: Redis, fallback: number) {
+  await redis.set(COUNTER_KEY, fallback);
+  return fallback;
 }
 
 export async function getCounterValue() {
   const fallback = getInitialCounterValue();
-  if (!isCounterConfigured()) return fallback;
+  const redis = createRedisClient();
+  if (!redis) return fallback;
 
-  const result = await kvFetch<{ result: unknown }>(`/get/${COUNTER_KEY}`);
-  const parsed = toCounterNumber(result?.result);
+  const result = await redis.get<unknown>(COUNTER_KEY);
+  const parsed = toCounterNumber(result);
 
-  if (parsed !== null) return parsed;
+  if (isSeededCounterValue(parsed, fallback)) return parsed;
 
-  await kvFetch(`/set/${COUNTER_KEY}/${fallback}`, { method: 'POST' });
-  return fallback;
+  return seedCounterValue(redis, fallback);
 }
 
 export async function incrementCounterValue() {
   const fallback = getInitialCounterValue();
-  if (!isCounterConfigured()) return fallback;
+  const redis = createRedisClient();
+  if (!redis) return fallback;
 
-  const current = await kvFetch<{ result: unknown }>(`/get/${COUNTER_KEY}`);
-  const parsedCurrent = toCounterNumber(current?.result);
+  const incremented = await redis.incr(COUNTER_KEY);
+  const parsedIncremented = toCounterNumber(incremented);
 
-  if (parsedCurrent === null) {
-    await kvFetch(`/set/${COUNTER_KEY}/${fallback}`, { method: 'POST' });
+  if (isSeededCounterValue(parsedIncremented, fallback)) {
+    return parsedIncremented;
   }
 
-  const incremented = await kvFetch<{ result: unknown }>(`/incr/${COUNTER_KEY}`, { method: 'POST' });
-  const parsedIncremented = toCounterNumber(incremented?.result);
-  return parsedIncremented ?? fallback + 1;
+  await seedCounterValue(redis, fallback);
+
+  const retried = await redis.incr(COUNTER_KEY);
+  const parsedRetried = toCounterNumber(retried);
+  return isSeededCounterValue(parsedRetried, fallback) ? parsedRetried : fallback + 1;
 }
 
 export function formatCounterValue(value: number) {

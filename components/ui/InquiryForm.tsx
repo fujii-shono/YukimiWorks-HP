@@ -49,11 +49,11 @@ export function InquiryForm() {
 
   return (
     <>
-      <form className="contact-form" onSubmit={onSubmit}>
+      <form className="contact-form" onSubmit={onSubmit} noValidate>
         {formError ? <p className="form-global-error">{formError}</p> : null}
         <label>
           メールアドレス
-          <input type="email" {...register('email')} />
+          <input type="text" inputMode="email" autoComplete="email" spellCheck={false} {...register('email')} />
           {errors.email ? <span className="field-error">{errors.email.message}</span> : null}
         </label>
         <label>

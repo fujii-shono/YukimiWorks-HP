@@ -18,7 +18,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
   const title = article.seoTitle ?? `${article.title} | YukimiWorks`;
   const description = article.seoDescription ?? article.summary.slice(0, 160);
-  const ogImage = article.ogImage ?? (article.thumbnail.startsWith('http') ? article.thumbnail : `${siteConfig.siteUrl}${article.thumbnail}`);
+  const ogImage = article.ogImage
+    ?? (article.thumbnail.trim()
+      ? (article.thumbnail.startsWith('http') ? article.thumbnail : `${siteConfig.siteUrl}${article.thumbnail}`)
+      : undefined);
 
   return {
     title,
@@ -33,13 +36,13 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       url: `${siteConfig.siteUrl}/news/${article.id}`,
       type: 'article',
       publishedTime: article.date,
-      images: [{ url: ogImage }],
+      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: [ogImage],
+      ...(ogImage ? { images: [ogImage] } : {}),
     },
   };
 }
@@ -48,14 +51,17 @@ export default function NewsDetailPage({ params }: { params: { id: string } }) {
   const article = news.find((entry) => entry.id === params.id);
   if (!article) notFound();
 
-  const ogImage = article.ogImage ?? (article.thumbnail.startsWith('http') ? article.thumbnail : `${siteConfig.siteUrl}${article.thumbnail}`);
+  const ogImage = article.ogImage
+    ?? (article.thumbnail.trim()
+      ? (article.thumbnail.startsWith('http') ? article.thumbnail : `${siteConfig.siteUrl}${article.thumbnail}`)
+      : undefined);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: article.title,
     description: article.seoDescription ?? article.summary,
     datePublished: article.date,
-    image: ogImage,
+    ...(ogImage ? { image: ogImage } : {}),
     publisher: {
       '@type': 'Organization',
       name: 'YukimiWorks',
@@ -77,7 +83,9 @@ export default function NewsDetailPage({ params }: { params: { id: string } }) {
           </p>
           <hr />
         </div>
-        <SleepWarningImage src={article.thumbnail} alt={`${article.title}のサムネイル`} width={800} height={450} className="detail-media" />
+        {article.thumbnail.trim() ? (
+          <SleepWarningImage src={article.thumbnail} alt={`${article.title}のサムネイル`} width={800} height={450} className="detail-media" />
+        ) : null}
         <div className="detail-body">
           {typeof article.body === 'string' || !article.body ? (
             <p>{article.body ?? article.summary}</p>

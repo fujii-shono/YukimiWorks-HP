@@ -86,8 +86,8 @@ export const works: Work[] = [
     ],
     category: 'apps',
     tags: ['スマホアプリ', 'iOS'],
-    thumbnail: '/works/placeholder.svg',
-    media: [{ type: 'image', src: '/works/placeholder.svg', alt: 'Cocoa のダミー画像' }],
+    thumbnail: '/cocoa/hero.png',
+    media: [{ type: 'image', src: '/cocoa/hero.png', alt: 'アプリ紹介' }],
     featured: true,
   },
 ];

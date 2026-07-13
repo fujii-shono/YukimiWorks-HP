@@ -5,6 +5,7 @@ export type PortfolioItem = {
   alt: string;
   href: string;
   description?: string;
+  date?: string;
   year?: number;
   tags?: string[];
   featured?: boolean;
@@ -18,6 +19,7 @@ export const portfolioItems: PortfolioItem[] = [
     alt: 'サンプルイラスト',
     href: '/works/pixel-guide-collection',
     description: '後から実際の作品へ差し替えます。',
+    date: '2026-07-01',
     year: 2026,
     tags: ['イラスト'],
   },
@@ -28,6 +30,7 @@ export const portfolioItems: PortfolioItem[] = [
     alt: '雪のドットポスター',
     href: '/works/cocoa-app',
     description: 'ドット表現を基調にしたポスター作品です。',
+    date: '2025-12-01',
     year: 2025,
     tags: ['ドット絵', 'ポスター'],
   },

@@ -5,8 +5,8 @@ import { siteLinks } from '@/data/links';
 
 const hubItems = [
   {
-    title: '仕事のご依頼',
-    description: 'アプリ・サービス開発・デザインなどのご依頼はこちら',
+    title: 'ご意見・ご要望',
+    description: 'YukimiWorksへのご意見・ご要望はこちら',
     href: '/contact/inquiry',
   },
   {

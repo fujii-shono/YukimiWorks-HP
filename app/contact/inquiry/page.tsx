@@ -11,7 +11,7 @@ export default function InquiryPage() {
           &larr; お問い合わせトップへ戻る
         </Link>
         <div className="page-intro">
-          <h2>仕事のご依頼</h2>
+          <h2>ご意見・ご要望</h2>
         </div>
         <InquiryForm />
       </section>

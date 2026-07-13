@@ -7,5 +7,5 @@ export const siteConfig = {
   snackTagline: '甘いものでもいかが？',
   sleepWarningTagline: 'はやく寝ろ',
   since: '2026.03.04',
-  decorativeCounter: '001234',
+  decorativeCounter: '000000',
 } as const;

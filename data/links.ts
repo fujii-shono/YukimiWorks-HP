@@ -13,7 +13,7 @@ export const siteLinks: SiteLink[] = [
   {
     id: 'x',
     label: 'X',
-    url: 'https://x.com/yukimiworks',
+    url: 'https://x.com/fujii_shino',
     description: '最新情報やお知らせを投稿しています。',
     icon: '/icons/default/x.png',
     showOnHome: true,
@@ -23,7 +23,7 @@ export const siteLinks: SiteLink[] = [
   {
     id: 'instagram',
     label: 'Instagram',
-    url: 'https://www.instagram.com/yukimiworks/',
+    url: 'https://www.instagram.com/yukimisino/',
     description: '制作物や日常の記録を投稿しています。',
     icon: '/icons/default/instagram.png',
     showOnHome: true,
@@ -32,7 +32,7 @@ export const siteLinks: SiteLink[] = [
   {
     id: 'discord',
     label: 'Discord',
-    url: 'https://discord.gg/example',
+    url: 'https://discord.com/users/fujiishino',
     description: 'サポートや交流用のコミュニティです。',
     order: 30,
     supportContact: true,

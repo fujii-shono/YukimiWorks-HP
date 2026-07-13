@@ -35,6 +35,7 @@ UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
 `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` は、カウンターを Redis に保存するために使用します。
 既存の接続情報をそのまま使う場合は、`KV_REST_API_URL` と `KV_REST_API_TOKEN` も後方互換で読み込みます。
 Vercel の Redis integration が `UPSTASH_REDIS_REST_KV_REST_API_URL` のような長い名前を作っても、コード側で読み込めるようにしてあります。
+カウンターは更新するので、`READ_ONLY_TOKEN` ではなく書き込み用 token を使います。
 
 ## カウンターの仕組み
 

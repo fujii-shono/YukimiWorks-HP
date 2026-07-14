@@ -1,9 +1,9 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import Link from 'next/link';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { getIconPath } from '@/data/iconSets';
 import { cn } from '@/lib/format';

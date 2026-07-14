@@ -1,7 +1,7 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { formatJapaneseDate } from '@/lib/format';
 import { works } from '@/data/works';
 
@@ -48,9 +48,9 @@ export default function WorkDetailPage({ params }: { params: { id: string } }) {
                 <p key={index}>{segment.value}</p>
               ) : (
                 <p key={index}>
-                  <a href={segment.href} target="_blank" rel="noopener noreferrer">
+                  <Link href={segment.href} target="_blank" rel="noopener noreferrer">
                     {segment.label}
-                  </a>
+                  </Link>
                 </p>
               ),
             )

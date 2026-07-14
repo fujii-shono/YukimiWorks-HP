@@ -86,6 +86,19 @@ export const news: News[] = [
   //   featured: true,
   // },
   {
+    id: 'announcement-tarif',
+    title: 'Tarifベータ版を公開しました',
+    date: '2026-07-14',
+    category: 'release',
+    thumbnail: '/tarif/hero.png',
+    summary: 'オンライン料金表サービスTarifを公開しました。',
+    body:
+      'オンライン料金表サービスTarif(タリフ)を公開しました。\n\nTarifでは、依頼時のプラン説明の手間・見積書作成の手間を省くことができます。\n非常に便利なのでぜひお使いください。',
+    seoTitle: 'オンライン料金表サービスTarif公開のお知らせ | YukimiWorks',
+    seoDescription: 'オンライン料金表サービスTarifを公開しました。料金表・見積もり書作成ならTarif。',
+    featured: true,
+  },
+  {
     id: 'announcement-sample-site-launch',
     title: 'YukimiWorks コーポレートサイトを公開しました',
     date: '2026-07-13',

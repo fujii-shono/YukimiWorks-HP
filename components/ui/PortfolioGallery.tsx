@@ -54,7 +54,13 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
             </button>
             <div className="portfolio-modal-content">
               <div className="portfolio-modal-image-wrap">
-                <PortfolioMedia item={selected} variant="modal" className="modal-image portfolio-modal-image" />
+                {/* HTML作品に画像用の `width: auto` / `max-width` を流用すると、モーダル幅が内容に引っ張られて縮む。
+                    画像と HTML でサイズ制御を分け、モーダルの幅は親が決める。 */}
+                <PortfolioMedia
+                  item={selected}
+                  variant="modal"
+                  className={selected.content.kind === 'image' ? 'modal-image portfolio-modal-image' : 'portfolio-html-modal'}
+                />
               </div>
               <div className="portfolio-modal-title-row">
                 <h3>{selected.title}</h3>

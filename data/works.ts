@@ -64,6 +64,28 @@ export const works: Work[] = [
   //   media: [{ type: 'image', src: '/works/placeholder.svg', alt: 'Mini Ops Tool のダミー画像' }],
   // },
   {
+    id: 'tarif-web',
+    title: 'Tarif -オンライン料金表-',
+    description: 'オンラインで料金表を作れるサービスです。',
+    body: [
+      {
+        type: 'text',
+        value:
+          'Tarif(タリフ)はオンライン上で料金表を作りURLで共有できるサービスです。\n\n共有した料金表からそのまま見積書を作成できます。',
+      },
+      {
+        type: 'link',
+        label: 'サービスリンク',
+        href: 'https://tarif.jp',
+      },
+    ],
+    category: 'apps',
+    tags: ['webサービス'],
+    thumbnail: '/tarif/hero.png',
+    media: [{ type: 'image', src: '/tarif/hero.png', alt: 'サービス紹介' }],
+    featured: true,
+  },
+  {
     id: 'cocoa-app',
     title: 'Cocoa',
     description: 'まるでSNSのように使える、オフラインの写真管理アプリです。',

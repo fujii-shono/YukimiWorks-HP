@@ -81,3 +81,62 @@
 - `npm run lint`
 - `npx tsc --noEmit`
 - `npm run build`
+
+---
+
+## 追加対応: 深夜警告中のリンク制御
+
+### 対応する仕様
+
+- `SPEC.md` の深夜警告イベント
+- ユーザー依頼: 深夜警告状態では `/` 以外の遷移先をトップページへ集約する
+
+### 実装方針
+
+- 深夜警告状態を参照する共通リンクコンポーネントを追加し、通常のページ遷移リンクは `/` 以外なら `/` へ向け替える
+- すでに `/` 以外のページにいる状態で深夜警告へ切り替わった場合や直接アクセスした場合に備えて、共通レイアウトで `/` へ戻すガードを追加する
+- ページ内アンカーや `mailto:` などの非ページ遷移リンクは対象外にして、アクセシビリティと基本操作を維持する
+
+### 変更予定のファイルと理由
+
+- `components/ui/RestrictedLink.tsx`: 深夜警告時の遷移先制御を共通化するため
+- `components/theme/SleepWarningRouteGuard.tsx`: 深夜警告中の非トップページ滞在を防ぐため
+- `components/layout/SiteFrame.tsx`: 全ページへガードを適用するため
+- `app/**`, `components/**`: 既存のページ遷移リンクを共通リンクへ置き換えるため
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+
+---
+
+## 追加対応: ポートフォリオ HTML 作品
+
+### 対応する仕様
+
+- ユーザー依頼: `public/portfolio/hikage.png` を使い、時間帯で背景色と装飾が切り替わる HTML 作品を追加する
+
+### 実装方針
+
+- `data/portfolio.ts` に HTML 作品として 1 件追加する
+- `components/portfolio/` に専用レンダラーを追加し、夜間は暗い背景と月・星、昼間は白背景と下部の十字星を描画する
+- 背景粒はランダム配置だが、表示が安定するように時間帯ごとの決定的シードで生成する
+- HTML 作品は画像と違って自然なサイズを持たないため、一覧とモーダルで専用の表示枠を必ず与える
+- `fill` と `height: 100%` の連鎖に頼らず、作品側が `aspect-ratio` か `width` / `height` を持つようにする
+- 背景演出は前面 PNG と同じ実寸フレームを共有する 4 層構造にし、背景用マスクと前面用マスクを分離して位置ずれを防ぐ
+
+### 変更予定のファイルと理由
+
+- `data/portfolio.ts`: 作品データを登録するため
+- `components/portfolio/PortfolioHtmlComponents.tsx`: HTML 作品レンダラーの登録先として使うため
+- `components/portfolio/HikageScene.tsx`: 作品本体の描画ロジックを実装するため
+- `app/globals.css`: 背景、月、星、十字星の見た目を定義するため
+- `public/portfolio/hikage-mask.png`: 背景演出を前面 PNG と同じ矩形に制限するため
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`

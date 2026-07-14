@@ -1,5 +1,6 @@
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { NewsCard } from '@/components/ui/NewsCard';
 import { news, newsCategoryLabels, type NewsCategory } from '@/data/news';
 
@@ -20,13 +21,13 @@ export default function NewsPage({
     <SiteFrame>
       <RetroPanel title="お知らせ" titleAside="News" contentClassName="listing-panel-body">
         <div className="filter-tabs">
-          <a href="/news" className={!validCategory ? 'active' : undefined}>
+          <Link href="/news" className={!validCategory ? 'active' : undefined}>
             すべて
-          </a>
+          </Link>
           {visibleCategories.map((category) => (
-            <a key={category} href={`/news?category=${category}`} className={validCategory === category ? 'active' : undefined}>
+            <Link key={category} href={`/news?category=${category}`} className={validCategory === category ? 'active' : undefined}>
               {newsCategoryLabels[category]}
-            </a>
+            </Link>
           ))}
         </div>
         {filteredNews.length ? (

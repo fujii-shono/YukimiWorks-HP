@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { AppServiceForm } from '@/components/ui/AppServiceForm';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { appServices } from '@/data/appServices';
 
 export default function AppInquiryPage() {

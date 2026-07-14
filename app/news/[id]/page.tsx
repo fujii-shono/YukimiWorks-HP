@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { formatJapaneseDate } from '@/lib/format';
 import { news, newsCategoryLabels } from '@/data/news';
@@ -95,9 +95,9 @@ export default function NewsDetailPage({ params }: { params: { id: string } }) {
               if (segment.type === 'link') {
                 return (
                   <p key={index}>
-                    <a href={segment.href} target="_blank" rel="noopener noreferrer">
+                    <Link href={segment.href} target="_blank" rel="noopener noreferrer">
                       {segment.label}
-                    </a>
+                    </Link>
                   </p>
                 );
               }

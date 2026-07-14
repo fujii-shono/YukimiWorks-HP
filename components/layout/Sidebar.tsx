@@ -1,10 +1,8 @@
 'use client';
-
-import Image from 'next/image';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { news } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
@@ -118,7 +116,7 @@ export function Sidebar() {
             return (
               <Link key={item.href} className={cn('nav-link', isActive && 'active')} href={item.href}>
                 {item.iconImage ? (
-                  <Image
+                  <SleepWarningImage
                     src={item.iconImage}
                     alt=""
                     width={16}

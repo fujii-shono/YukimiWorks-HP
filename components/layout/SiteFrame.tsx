@@ -1,6 +1,7 @@
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { SleepWarningRouteGuard } from '@/components/theme/SleepWarningRouteGuard';
 import { ThemeDebugPanel } from '@/components/theme/ThemeDebugPanel';
 import { TimeThemeProvider } from '@/components/theme/TimeThemeProvider';
 
@@ -11,6 +12,7 @@ export function SiteFrame({
 }) {
   return (
     <TimeThemeProvider>
+      <SleepWarningRouteGuard />
       <a className="skip-link" href="#main">
         本文へ移動
       </a>

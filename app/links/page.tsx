@@ -1,5 +1,6 @@
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { siteLinks } from '@/data/links';
 
 export default function LinksPage() {
@@ -10,10 +11,10 @@ export default function LinksPage() {
       <RetroPanel title="Link" contentClassName="listing-panel-body">
         <div className="links-list-page">
           {links.map((link) => (
-            <a key={link.id} className="list-link-card" href={link.url} target="_blank" rel="noopener noreferrer">
+            <Link key={link.id} className="list-link-card" href={link.url} target="_blank" rel="noopener noreferrer">
               <strong>{link.label}</strong>
               {link.description ? <p>{link.description}</p> : null}
-            </a>
+            </Link>
           ))}
         </div>
       </RetroPanel>

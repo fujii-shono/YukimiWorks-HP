@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { getIconPath } from '@/data/iconSets';
 import { siteLinks } from '@/data/links';
@@ -26,7 +27,7 @@ export function LinkPanel() {
           const iconPath = getLinkIconPath(item.icon);
 
           return (
-            <a key={item.id} className="social-link" href={item.url} target="_blank" rel="noopener noreferrer">
+            <Link key={item.id} className="social-link" href={item.url} target="_blank" rel="noopener noreferrer">
               {item.icon ? (
                 <span
                   className="pixel-tint-frame pixel-tint-frame-icon"
@@ -51,7 +52,7 @@ export function LinkPanel() {
                 <strong>{item.label}</strong>
                 <small>{item.description}</small>
               </span>
-            </a>
+            </Link>
           );
         })}
       </div>

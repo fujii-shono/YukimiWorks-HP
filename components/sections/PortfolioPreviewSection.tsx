@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { portfolioItems } from '@/data/portfolio';
 
 export function PortfolioPreviewSection() {

@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 
 export default function PrivacyPolicyPage() {
   return (

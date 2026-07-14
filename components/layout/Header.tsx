@@ -1,9 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 
 export function Header() {
   const { event, tagline, absent, canPeek, peekActive, triggerPeek, peekImageSrc, showPeekBubble } = useTimeTheme();

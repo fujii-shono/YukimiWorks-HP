@@ -1,6 +1,6 @@
 export type PortfolioMediaVariant = 'preview' | 'card' | 'modal';
 
-export type PortfolioHtmlComponentId = 'pixel-window';
+export type PortfolioHtmlComponentId = 'pixel-window' | 'hikage-scene';
 
 export type PortfolioImageContent = {
   kind: 'image';
@@ -11,6 +11,7 @@ export type PortfolioImageContent = {
 export type PortfolioHtmlContent = {
   kind: 'html';
   componentId: PortfolioHtmlComponentId;
+  thumbnail?: string;
 };
 
 export type PortfolioContent = PortfolioImageContent | PortfolioHtmlContent;
@@ -28,31 +29,19 @@ export type PortfolioItem = {
 };
 
 export const portfolioItems: PortfolioItem[] = [
-  // {
-  //   id: 'sample-illustration-01',
-  //   title: 'サンプルイラスト',
-  //   href: '/works/pixel-guide-collection',
-  //   content: {
-  //     kind: 'image',
-  //     src: '/portfolio/placeholder.svg',
-  //     alt: 'サンプルイラスト',
-  //   },
-  //   description: '後から実際の作品へ差し替えます。',
-  //   date: '2026-07-01',
-  //   year: 2026,
-  //   tags: ['イラスト'],
-  // },
-  // {
-  //   id: 'sample-html-01',
-  //   title: 'HTML展示サンプル',
-  //   href: '/works/cocoa-app',
-  //   content: {
-  //     kind: 'html',
-  //     componentId: 'pixel-window',
-  //   },
-  //   description: '専用コンポーネントで描画する展示用ポートフォリオです。',
-  //   date: '2025-12-01',
-  //   year: 2025,
-  //   tags: ['HTML', '展示'],
-  // },
+  {
+    id: 'hikage',
+    title: 'HTMLアート試作1号',
+    href: '/portfolio',
+    content: {
+      kind: 'html',
+      componentId: 'hikage-scene',
+      thumbnail: '/portfolio/hikage.png',
+    },
+    description: '習作です。時間帯による背景の変化とエフェクトを加えてみました。昼 / 夜にまた来てください。背景が変化します。',
+    date: '2026-07-14',
+    year: 2026,
+    tags: ['HTML', '時間変化', 'イラスト'],
+    featured: true,
+  },
 ];

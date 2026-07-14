@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { workCategoryLabels, type Work } from '@/data/works';
 import { cn } from '@/lib/format';

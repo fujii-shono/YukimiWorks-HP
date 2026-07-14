@@ -1,5 +1,6 @@
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { WorkCard } from '@/components/ui/WorkCard';
 import { workCategoryLabels, works, type WorkCategory } from '@/data/works';
 
@@ -20,13 +21,13 @@ export default function WorksPage({
     <SiteFrame>
       <RetroPanel title="成果物" titleAside="Works" contentClassName="listing-panel-body">
         <div className="filter-tabs">
-          <a href="/works" className={!validCategory ? 'active' : undefined}>
+          <Link href="/works" className={!validCategory ? 'active' : undefined}>
             すべて
-          </a>
+          </Link>
           {visibleCategories.map((category) => (
-            <a key={category} href={`/works?category=${category}`} className={validCategory === category ? 'active' : undefined}>
+            <Link key={category} href={`/works?category=${category}`} className={validCategory === category ? 'active' : undefined}>
               {workCategoryLabels[category]}
-            </a>
+            </Link>
           ))}
         </div>
         {filteredWorks.length ? (

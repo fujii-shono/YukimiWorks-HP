@@ -18,9 +18,8 @@ const imageSizes: Record<PortfolioMediaVariant, { width: number; height: number 
 };
 
 export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps) {
-  const outerClassName = cn('portfolio-media-shell', `portfolio-media-shell-${variant}`, className);
-
   if (item.content.kind === 'image') {
+    const outerClassName = cn('portfolio-media-shell', `portfolio-media-shell-${variant}`, className);
     const { width, height } = imageSizes[variant];
 
     return (
@@ -36,11 +35,31 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
     );
   }
 
+  const hasThumbnail = item.content.thumbnail?.trim().length ? true : false;
   const Renderer = portfolioHtmlComponents[item.content.componentId];
+  const outerClassName = cn('portfolio-media-shell', `portfolio-media-shell-${variant}`, 'portfolio-html-shell', `portfolio-html-shell-${variant}`, className);
+
+  if (hasThumbnail && variant !== 'modal') {
+    const { width, height } = imageSizes[variant];
+
+    return (
+      <div className={outerClassName}>
+        <SleepWarningImage
+          src={item.content.thumbnail as string}
+          alt={`${item.title}のサムネイル`}
+          width={width}
+          height={height}
+          className="portfolio-media-image"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={outerClassName}>
-      <div className="portfolio-media-html">
+      {/* HTML作品は画像と違い自然な高さを持たないので、ここで必ず専用ステージを与える。
+          `fill` や `height: 100%` の連鎖に依存しないこと。 */}
+      <div className="portfolio-html-stage">
         {Renderer ? <Renderer item={item} variant={variant} /> : <p>表示コンポーネントが見つかりません。</p>}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { formatJapaneseDate } from '@/lib/format';
 import { newsCategoryLabels, type News } from '@/data/news';

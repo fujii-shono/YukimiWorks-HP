@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { siteLinks } from '@/data/links';
 
 const hubItems = [
@@ -37,9 +37,9 @@ export default function ContactHubPage() {
           <h3>その他連絡先</h3>
           <div className="support-links-row">
             {supportLinks.map((link) => (
-              <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer">
+              <Link key={link.id} href={link.url} target="_blank" rel="noopener noreferrer">
                 {link.label}
-              </a>
+              </Link>
             ))}
           </div>
         </div>

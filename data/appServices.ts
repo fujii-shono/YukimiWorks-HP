@@ -3,4 +3,7 @@ export type AppService = {
   label: string;
 };
 
-export const appServices: AppService[] = [{ value: 'cocoa', label: 'Cocoa' }];
+export const appServices: AppService[] = [
+  { value: 'cocoa', label: 'Cocoa' },
+  { value: 'tarif', label: 'Tarif' }
+];

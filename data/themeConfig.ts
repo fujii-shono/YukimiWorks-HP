@@ -30,7 +30,7 @@ export const debugTimeOptions = [
 ] as const;
 
 // 公開時は false のままにしておく。検証時だけ true にすると、デバッグUIとクエリ上書きを有効化できる。
-export const debugControlsEnabled = false as const;
+export const debugControlsEnabled = true as const;
 
 export const iconFolderByEvent = {
   none: 'default',

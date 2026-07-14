@@ -902,8 +902,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
 .hikage-scene {
   --hikage-sky: #ffffff;
-  --hikage-figure-width: 56%;
-  --hikage-moon-size: 22px;
   position: relative;
   display: block;
   width: 100%;
@@ -916,14 +914,10 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .hikage-scene-card {
-  --hikage-figure-width: 49%;
-  --hikage-moon-size: 34px;
   width: 100%;
 }
 
 .hikage-scene-modal {
-  --hikage-figure-width: 38%;
-  --hikage-moon-size: 46px;
   width: 100%;
   height: auto;
   min-height: 0;
@@ -940,8 +934,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
 .hikage-backdrop,
 .hikage-asset-stage,
-.hikage-mask-layer,
-.hikage-particle-layer {
+.hikage-canvas-layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -957,37 +950,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   background:
     radial-gradient(circle at 50% 40%, rgba(112, 154, 227, 0.08), transparent 45%),
     linear-gradient(180deg, #ffffff, #ffffff);
-}
-
-.hikage-moon {
-  position: absolute;
-  z-index: 2;
-  left: clamp(6px, 4%, 18px);
-  top: clamp(6px, 4%, 18px);
-  width: var(--hikage-moon-size);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #ffffff;
-  box-shadow: 0 0 10px rgba(219, 234, 255, 0.86);
-  animation: hikage-moon-glow 7.5s ease-in-out infinite;
-}
-
-.hikage-moon::before {
-  content: "";
-  position: absolute;
-  inset: 8%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 1) 0 40%, rgba(245, 247, 255, 0.95) 41% 70%, rgba(229, 236, 250, 0.45) 71% 100%);
-}
-
-.hikage-moon::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  left: 37%;
-  border-radius: 50%;
-  background: var(--hikage-sky);
 }
 
 .hikage-asset-stage {
@@ -1016,219 +978,19 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   object-position: center bottom;
 }
 
-.hikage-mask-layer-background {
-  z-index: 1;
-  overflow: hidden;
-  -webkit-mask-image: url('/portfolio/hikage-mask.png');
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center bottom;
-  -webkit-mask-size: 100% 100%;
-  mask-image: url('/portfolio/hikage-mask.png');
-  mask-repeat: no-repeat;
-  mask-position: center bottom;
-  mask-size: 100% 100%;
-}
-
-.hikage-mask-layer-front {
-  z-index: 3;
-  overflow: hidden;
-  -webkit-mask-image: url('/portfolio/hikage.png');
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center bottom;
-  -webkit-mask-size: 100% 100%;
-  mask-image: url('/portfolio/hikage.png');
-  mask-repeat: no-repeat;
-  mask-position: center bottom;
-  mask-size: 100% 100%;
-}
-
-.hikage-particle-layer-background {
-  z-index: 1;
-}
-
-.hikage-particle-layer-day {
-  z-index: 1;
-}
-
-.hikage-particle-layer-front {
-  z-index: 1;
-}
-
-.hikage-particle {
-  position: absolute;
+.hikage-canvas-layer {
+  width: 100%;
+  height: 100%;
   display: block;
-  transform: translate(-50%, -50%);
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-.hikage-particle-dot {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 0 3px rgba(186, 214, 255, 0.38);
-}
-
-.hikage-particle-back-star {
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 0 3px rgba(196, 220, 255, 0.35));
   image-rendering: pixelated;
 }
 
-.hikage-particle-back-star-background {
-  animation-name: hikage-twinkle;
+.hikage-canvas-layer-background {
+  z-index: 1;
 }
 
-.hikage-particle-back-star-day {
-  animation-name: hikage-day-twinkle;
-}
-
-.hikage-particle-layer-background .hikage-particle-dot {
-  animation-name: hikage-twinkle;
-}
-
-.hikage-particle-layer-front .hikage-particle-back-star {
-  animation-name: hikage-drift-twinkle;
-  border-radius: 0;
-}
-
-.hikage-particle-layer-front .hikage-particle-cross {
-  animation-name: hikage-twinkle;
-}
-
-.hikage-particle-layer-day .hikage-particle-cross {
-  animation-name: hikage-twinkle;
-}
-
-.hikage-particle-cross {
-  border-radius: 999px;
-}
-
-.hikage-particle-cross::before,
-.hikage-particle-cross::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 100%;
-  height: 1px;
-  border-radius: 999px;
-  background: rgba(167, 203, 255, 0.98);
-  box-shadow: 0 0 4px rgba(201, 224, 255, 0.52);
-  transform: translate(-50%, -50%);
-}
-
-.hikage-particle-cross::after {
-  transform: translate(-50%, -50%) rotate(90deg);
-}
-
-.hikage-particle-cross-day-back::before,
-.hikage-particle-cross-day-back::after {
-  background: rgba(127, 171, 237, 0.95);
-  box-shadow: 0 0 3px rgba(191, 220, 255, 0.42);
-}
-
-.hikage-particle-cross-day-front::before,
-.hikage-particle-cross-day-front::after {
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.42);
-}
-
-@keyframes hikage-twinkle {
-  0%,
-  12% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.5);
-  }
-
-  18%,
-  84% {
-    opacity: var(--twinkle-min, 0.42);
-    transform: translate(-50%, -50%) scale(0.96);
-  }
-
-  55% {
-    opacity: var(--twinkle-max, 1);
-    transform: translate(-50%, -50%) scale(1.12);
-  }
-
-  92% {
-    opacity: var(--twinkle-max, 1);
-    transform: translate(-50%, -50%) scale(1.02);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.5);
-  }
-}
-
-@keyframes hikage-day-twinkle {
-  0%,
-  18% {
-    opacity: 0.15;
-    transform: translate(-50%, -50%) scale(0.92);
-  }
-
-  45% {
-    opacity: var(--twinkle-max, 0.72);
-    transform: translate(-50%, -50%) scale(1.02);
-  }
-
-  80% {
-    opacity: var(--twinkle-min, 0.22);
-    transform: translate(-50%, -50%) scale(0.96);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.9);
-  }
-}
-
-@keyframes hikage-drift-twinkle {
-  0%,
-  10% {
-    opacity: 0;
-    transform: translate(-50%, -50%) translate(0px, 0px) scale(0.45);
-  }
-
-  18%,
-  78% {
-    opacity: var(--twinkle-min, 0.3);
-    transform: translate(-50%, -50%) translate(0px, 0px) scale(0.92);
-  }
-
-  54% {
-    opacity: var(--twinkle-max, 0.9);
-    transform: translate(-50%, -50%) translate(calc(var(--drift-x, 0px) * 0.5), calc(var(--drift-y, 0px) * 0.5))
-      scale(1.05);
-  }
-
-  90% {
-    opacity: var(--twinkle-max, 0.9);
-    transform: translate(-50%, -50%) translate(var(--drift-x, 0px), var(--drift-y, 0px)) scale(1);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) translate(calc(var(--drift-x, 0px) * 1.08), calc(var(--drift-y, 0px) * 1.08))
-      scale(0.45);
-  }
-}
-
-@keyframes hikage-moon-glow {
-  0%,
-  100% {
-    opacity: 0.88;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
+.hikage-canvas-layer-front {
+  z-index: 3;
 }
 
 .portfolio-preview-title {
@@ -1714,6 +1476,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   width: min(98vw, 1680px);
   max-height: calc(100vh - 24px);
   overflow: auto;
+  box-sizing: border-box;
   padding: 20px;
   background: var(--site-surface);
   border: 1px solid var(--site-border);
@@ -2024,6 +1787,12 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
   .portfolio-modal-content {
     gap: 16px;
+  }
+
+  .portfolio-modal-panel {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    padding: 16px;
   }
 
   .portfolio-modal-image {

@@ -800,9 +800,9 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .portfolio-html-shell-modal {
-  width: min(100%, calc((100vh - 200px) * 719 / 1200));
+  width: min(100%, calc((100vh - 200px) * var(--portfolio-html-width, 719) / var(--portfolio-html-height, 1200)));
   height: auto;
-  aspect-ratio: 719 / 1200;
+  aspect-ratio: var(--portfolio-html-aspect-ratio, 719 / 1200);
   max-width: 100%;
   align-self: center;
 }
@@ -976,6 +976,184 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   height: auto;
   object-fit: contain;
   object-position: center bottom;
+}
+
+.rainy-day-scene {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 240px;
+  aspect-ratio: 1623 / 1200;
+  height: auto;
+  overflow: hidden;
+  isolation: isolate;
+  background: #ffffff;
+}
+
+.rainy-day-scene-card {
+  width: 100%;
+}
+
+.rainy-day-scene-modal {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 1623 / 1200;
+}
+
+.rainy-day-backdrop,
+.rainy-day-asset-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rainy-day-backdrop {
+  background: linear-gradient(180deg, #ffffff, #ffffff);
+}
+
+.rainy-day-asset-stage {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rainy-day-asset-frame {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1623 / 1200;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.rainy-day-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.rainy-day-snail {
+  position: absolute;
+  z-index: 0;
+  display: block;
+  height: auto;
+  transform: translate(-50%, -50%);
+  transition:
+    left 50s linear,
+    top 50s linear;
+  object-fit: contain;
+  object-position: center center;
+}
+
+.rainy-day-figure {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center center;
+}
+
+.rainy-day-frog {
+  position: absolute;
+  z-index: 3;
+  display: block;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  object-position: center center;
+  pointer-events: none;
+}
+
+.rainy-day-mouth {
+  position: absolute;
+  z-index: 3;
+  display: block;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  object-position: center center;
+  pointer-events: none;
+}
+
+.rainy-day-zzz {
+  position: absolute;
+  z-index: 5;
+  display: block;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  object-position: center center;
+  pointer-events: none;
+  animation: rainy-day-zzz-float 2.4s ease-in-out infinite;
+}
+
+.rainy-day-note {
+  position: absolute;
+  z-index: 4;
+  display: block;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  object-position: center center;
+  pointer-events: none;
+}
+
+.rainy-day-note-one {
+  animation: rainy-day-note-one 2s step-end infinite;
+}
+
+.rainy-day-note-two {
+  animation: rainy-day-note-two 2s step-end infinite;
+}
+
+.rainy-day-canvas-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+.rainy-day-canvas-layer-background {
+  z-index: 1;
+}
+
+@keyframes rainy-day-note-one {
+  0%, 44% {
+    opacity: 1;
+  }
+  45%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes rainy-day-note-two {
+  0%, 44% {
+    opacity: 0;
+  }
+  45%, 100% {
+    opacity: 1;
+  }
+}
+
+@keyframes rainy-day-zzz-float {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-8%);
+  }
 }
 
 .hikage-canvas-layer {
@@ -1517,6 +1695,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .portfolio-modal-panel {
+  --portfolio-modal-media-max-height: calc(100vh - 220px);
   width: min(98vw, 1680px);
 }
 
@@ -1552,7 +1731,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
 .portfolio-modal-image-wrap {
   width: 100%;
-  max-height: min(calc(100vh - 200px), 860px);
+  max-height: min(var(--portfolio-modal-media-max-height), 860px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1561,12 +1740,12 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 .portfolio-modal-image {
   width: auto;
   max-width: 100%;
-  max-height: calc(100vh - 200px);
+  max-height: var(--portfolio-modal-media-max-height);
   object-fit: contain;
 }
 
 .portfolio-html-modal {
-  width: min(100%, calc((100vh - 200px) * 719 / 1200));
+  width: min(100%, calc(var(--portfolio-modal-media-max-height) * var(--portfolio-html-width, 719) / var(--portfolio-html-height, 1200)));
   height: auto;
   max-width: 100%;
 }
@@ -1835,13 +2014,10 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   }
 
   .portfolio-modal-panel {
+    --portfolio-modal-media-max-height: calc(100vh - 240px);
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
     padding: 16px;
-  }
-
-  .portfolio-modal-image {
-    max-height: calc(100vh - 220px);
   }
 
   .portfolio-modal-title-row {

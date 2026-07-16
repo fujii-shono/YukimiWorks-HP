@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { portfolioHtmlComponents } from '@/components/portfolio/PortfolioHtmlComponents';
 import type { PortfolioItem, PortfolioMediaVariant } from '@/data/portfolio';
@@ -38,12 +39,19 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
   const hasThumbnail = item.content.thumbnail?.trim().length ? true : false;
   const Renderer = portfolioHtmlComponents[item.content.componentId];
   const outerClassName = cn('portfolio-media-shell', `portfolio-media-shell-${variant}`, 'portfolio-html-shell', `portfolio-html-shell-${variant}`, className);
+  const htmlWidth = item.content.width ?? 719;
+  const htmlHeight = item.content.height ?? 1200;
+  const htmlStyle = {
+    '--portfolio-html-width': String(htmlWidth),
+    '--portfolio-html-height': String(htmlHeight),
+    '--portfolio-html-aspect-ratio': `${htmlWidth} / ${htmlHeight}`,
+  } as CSSProperties;
 
   if (hasThumbnail && variant !== 'modal') {
     const { width, height } = imageSizes[variant];
 
     return (
-      <div className={outerClassName}>
+      <div className={outerClassName} style={htmlStyle}>
         <SleepWarningImage
           src={item.content.thumbnail as string}
           alt={`${item.title}のサムネイル`}
@@ -56,7 +64,7 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
   }
 
   return (
-    <div className={outerClassName}>
+    <div className={outerClassName} style={htmlStyle}>
       {/* HTML作品は画像と違い自然な高さを持たないので、ここで必ず専用ステージを与える。
           `fill` や `height: 100%` の連鎖に依存しないこと。 */}
       <div className="portfolio-html-stage">

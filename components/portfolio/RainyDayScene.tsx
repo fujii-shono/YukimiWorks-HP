@@ -66,7 +66,7 @@ const FROG_POSITION = {
 };
 
 const ZZZ_POSITION = {
-  left: 0.03,
+  left: 0.06,
   top: 0.69,
   width: 0.12,
 };

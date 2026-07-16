@@ -41,7 +41,7 @@ type MoonDefinition = {
 
 const FIGURE_WIDTH = 719;
 const FIGURE_HEIGHT = 1200;
-const FIGURE_IMAGE_SRC = '/portfolio/hikage.png';
+const FIGURE_IMAGE_SRC = '/portfolio/hikage/hikage.png';
 
 function particle(definition: ParticleDefinition) {
   return definition;

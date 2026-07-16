@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import type { PortfolioItem } from '@/data/portfolio';
 
 export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
@@ -79,6 +80,11 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
                   {selected.date || selected.year ? (
                     <p className="card-meta portfolio-modal-date">{selected.date ?? String(selected.year)}</p>
                   ) : null}
+                  <div className="portfolio-modal-actions">
+                    <Link href={selected.href} className="pixel-button portfolio-browser-link">
+                      ブラウザで見る
+                    </Link>
+                  </div>
                 </div>
               ) : null}
             </div>

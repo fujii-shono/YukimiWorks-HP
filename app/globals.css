@@ -1346,6 +1346,40 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   text-align: center;
 }
 
+.portfolio-detail-panel {
+  display: grid;
+  gap: 22px;
+}
+
+.portfolio-detail-intro {
+  margin-bottom: 0;
+}
+
+.portfolio-detail-media {
+  width: min(100%, 960px);
+  margin: 0 auto;
+}
+
+.portfolio-detail-image {
+  width: auto;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.portfolio-detail-html {
+  width: min(100%, 960px);
+  margin: 0 auto;
+}
+
+.portfolio-detail-body {
+  margin-top: 0;
+}
+
+.portfolio-detail-tags {
+  justify-content: center;
+  margin-top: 0;
+}
+
 .links-list-page,
 .contact-hub-list {
   display: grid;
@@ -1583,6 +1617,17 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   margin: 0;
 }
 
+.portfolio-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.portfolio-browser-link {
+  min-width: 180px;
+  text-align: center;
+}
+
 .portfolio-modal-date {
   margin-top: 4px;
 }
@@ -1811,6 +1856,20 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
   .portfolio-modal-body {
     text-align: left;
+  }
+
+  .portfolio-browser-link {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .portfolio-detail-panel {
+    gap: 18px;
+  }
+
+  .portfolio-detail-media,
+  .portfolio-detail-html {
+    width: 100%;
   }
 
   .portfolio-preview-list {

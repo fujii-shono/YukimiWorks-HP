@@ -32,11 +32,11 @@ export const portfolioItems: PortfolioItem[] = [
   {
     id: 'hikage',
     title: 'HTMLアート試作1号',
-    href: '/portfolio',
+    href: '/portfolio/hikage',
     content: {
       kind: 'html',
       componentId: 'hikage-scene',
-      thumbnail: '/portfolio/hikage.png',
+      thumbnail: '/portfolio/hikage/hikage.png',
     },
     description: '習作です。時間帯による背景の変化とエフェクトを加えてみました。昼 / 夜にまた来てください。背景が変化します。',
     date: '2026-07-14',
@@ -45,3 +45,7 @@ export const portfolioItems: PortfolioItem[] = [
     featured: true,
   },
 ];
+
+export function getPortfolioItemById(id: string) {
+  return portfolioItems.find((item) => item.id === id);
+}

@@ -144,16 +144,6 @@ const MAIN_RAIN_LINES = [
   rainLine({ id: 'r-21', x: 0.11, delay: 1.22 }),
   rainLine({ id: 'r-22', x: 0.66, delay: 0.09 }),
   rainLine({ id: 'r-23', x: 0.71, delay: 0.22 }),
-  rainLine({ id: 'r-24', x: 0.75, delay: 0.34 }),
-  rainLine({ id: 'r-25', x: 0.8, delay: 0.5 }),
-  rainLine({ id: 'r-26', x: 0.84, delay: 0.73 }),
-  rainLine({ id: 'r-27', x: 0.89, delay: 0.98 }),
-  rainLine({ id: 'r-28', x: 0.93, delay: 1.12 }),
-  rainLine({ id: 'r-29', x: 0.97, delay: 1.3 }),
-  rainLine({ id: 'r-30', x: 0.29, delay: 0.24 }),
-  rainLine({ id: 'r-31', x: 0.25, delay: 0.54 }),
-  rainLine({ id: 'r-32', x: 0.19, delay: 0.88 }),
-  rainLine({ id: 'r-33', x: 0.15, delay: 1.1 }),
 ];
 
 const LIGHT_RAIN_LINES = [
@@ -201,16 +191,6 @@ const LIGHT_RAIN_LINES = [
   rainLine({ id: 'lr-42', x: 0.97, delay: 1.19 }),
   rainLine({ id: 'lr-43', x: 0.33, delay: 0.68 }),
   rainLine({ id: 'lr-44', x: 0.28, delay: 1.42 }),
-  rainLine({ id: 'lr-45', x: 0.58, delay: 0.06 }),
-  rainLine({ id: 'lr-46', x: 0.62, delay: 0.14 }),
-  rainLine({ id: 'lr-47', x: 0.66, delay: 0.22 }),
-  rainLine({ id: 'lr-48', x: 0.72, delay: 0.34 }),
-  rainLine({ id: 'lr-49', x: 0.76, delay: 0.48 }),
-  rainLine({ id: 'lr-50', x: 0.82, delay: 0.62 }),
-  rainLine({ id: 'lr-51', x: 0.87, delay: 0.79 }),
-  rainLine({ id: 'lr-52', x: 0.92, delay: 0.95 }),
-  rainLine({ id: 'lr-53', x: 0.95, delay: 1.11 }),
-  rainLine({ id: 'lr-54', x: 0.24, delay: 1.28 }),
 ];
 
 function createSeededRandom(seedSource: string) {

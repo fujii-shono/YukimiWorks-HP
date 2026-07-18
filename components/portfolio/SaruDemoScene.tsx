@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { PortfolioMediaVariant } from '@/data/portfolio';
 import { cn } from '@/lib/format';
 
@@ -222,7 +222,12 @@ export function SaruDemoScene({ variant }: SaruDemoSceneProps) {
             )}
           </div>
 
-          <div className="saru-demo-letter-grid" role="group" aria-label="カタカナボックス">
+          <div
+            className="saru-demo-letter-grid"
+            role="group"
+            aria-label="カタカナボックス"
+            style={{ '--saru-letter-count': String(letters.length) } as CSSProperties}
+          >
             {letters.map((token, index) => {
               const fixed = fixedIndexes.includes(index);
 

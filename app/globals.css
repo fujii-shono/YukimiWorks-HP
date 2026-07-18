@@ -1177,14 +1177,18 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   }
 
   .saru-demo-letter-grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 56px), 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(var(--saru-letter-count, 7), minmax(0, 1fr));
+    gap: 6px;
   }
 
   .saru-demo-letter {
-    min-height: clamp(64px, 11vw, 82px);
-    gap: 4px;
-    padding: 6px 4px;
+    min-height: clamp(52px, 10vw, 72px);
+    gap: 0;
+    padding: 4px 2px;
+  }
+
+  .saru-demo-letter span {
+    font-size: clamp(0.95rem, 5vw, 1.4rem);
   }
 
 }

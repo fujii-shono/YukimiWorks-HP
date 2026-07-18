@@ -24,6 +24,9 @@ export type PortfolioItem = {
   title: string;
   href: string;
   content: PortfolioContent;
+  ogImage?: string;
+  ogImageWidth?: number;
+  ogImageHeight?: number;
   description?: string;
   date?: string;
   year?: number;
@@ -44,6 +47,9 @@ export const portfolioItems: PortfolioItem[] = [
       height: 700,
       fitHeightToContent: true,
     },
+    ogImage: '/portfolio/saru-demo/saru-og.png',
+    ogImageWidth: 1024,
+    ogImageHeight: 1024,
     description:
       '猿でもランダムにタイプライターを叩けば、いつかは偶然シェイクスピアの作品を完成させられるという思考実験の地獄を味わえるゲームです。',
     date: '2026-07-18',

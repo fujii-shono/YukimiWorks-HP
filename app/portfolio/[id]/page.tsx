@@ -18,9 +18,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const title = `${item.title} | YukimiWorks`;
   const description = item.description ?? `${item.title} のポートフォリオ詳細ページです。`;
   const thumbnail = item.content.kind === 'image' ? item.content.src : item.content.thumbnail;
-  const thumbnailWidth = item.content.kind === 'html' ? item.content.width : undefined;
-  const thumbnailHeight = item.content.kind === 'html' ? item.content.height : undefined;
-  const ogImage = thumbnail;
+  const ogImage = item.ogImage ?? thumbnail;
+  const ogImageWidth = item.ogImageWidth;
+  const ogImageHeight = item.ogImageHeight;
   const resolvedOgImage = ogImage
     ? (ogImage.startsWith('http') ? ogImage : `${siteConfig.siteUrl}${ogImage}`)
     : undefined;
@@ -42,8 +42,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
               {
                 url: resolvedOgImage,
                 alt: `${item.title} のサムネイル`,
-                ...(thumbnailWidth ? { width: thumbnailWidth } : {}),
-                ...(thumbnailHeight ? { height: thumbnailHeight } : {}),
+                ...(ogImageWidth ? { width: ogImageWidth } : {}),
+                ...(ogImageHeight ? { height: ogImageHeight } : {}),
               },
             ],
           }

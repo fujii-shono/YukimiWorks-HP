@@ -30,7 +30,8 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
           alt={item.content.alt}
           width={width}
           height={height}
-          className={variant === 'modal' ? 'portfolio-media-image portfolio-media-image-modal' : 'portfolio-media-image'}
+          className={variant === 'modal' ? 'portfolio-media-image portfolio-media-image-modal pixel-image' : 'portfolio-media-image pixel-image'}
+          unoptimized
         />
       </div>
     );
@@ -38,7 +39,14 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
 
   const hasThumbnail = item.content.thumbnail?.trim().length ? true : false;
   const Renderer = portfolioHtmlComponents[item.content.componentId];
-  const outerClassName = cn('portfolio-media-shell', `portfolio-media-shell-${variant}`, 'portfolio-html-shell', `portfolio-html-shell-${variant}`, className);
+  const outerClassName = cn(
+    'portfolio-media-shell',
+    `portfolio-media-shell-${variant}`,
+    'portfolio-html-shell',
+    `portfolio-html-shell-${variant}`,
+    item.content.fitHeightToContent && 'portfolio-html-shell-fit-height',
+    className,
+  );
   const htmlWidth = item.content.width ?? 719;
   const htmlHeight = item.content.height ?? 1200;
   const htmlStyle = {
@@ -57,7 +65,8 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
           alt={`${item.title}のサムネイル`}
           width={width}
           height={height}
-          className="portfolio-media-image"
+          className="portfolio-media-image pixel-image"
+          unoptimized
         />
       </div>
     );

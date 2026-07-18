@@ -5,6 +5,7 @@ import type { PortfolioHtmlComponentId, PortfolioItem, PortfolioMediaVariant } f
 import { cn } from '@/lib/format';
 import { HikageScene } from '@/components/portfolio/HikageScene';
 import { RainyDayScene } from '@/components/portfolio/RainyDayScene';
+import { SaruDemoScene } from '@/components/portfolio/SaruDemoScene';
 
 type PortfolioHtmlRendererProps = {
   item: PortfolioItem;
@@ -48,4 +49,5 @@ export const portfolioHtmlComponents: Record<PortfolioHtmlComponentId, (props: P
   'pixel-window': PortfolioWindowHtml,
   'hikage-scene': ({ variant }) => <HikageScene variant={variant} />,
   'rainy-day-scene': ({ variant }) => <RainyDayScene variant={variant} />,
+  'saru-demo-scene': ({ variant }) => <SaruDemoScene variant={variant} />,
 };

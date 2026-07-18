@@ -1,6 +1,6 @@
 export type PortfolioMediaVariant = 'preview' | 'card' | 'modal';
 
-export type PortfolioHtmlComponentId = 'pixel-window' | 'hikage-scene' | 'rainy-day-scene';
+export type PortfolioHtmlComponentId = 'pixel-window' | 'hikage-scene' | 'rainy-day-scene' | 'saru-demo-scene';
 
 export type PortfolioImageContent = {
   kind: 'image';
@@ -14,6 +14,7 @@ export type PortfolioHtmlContent = {
   thumbnail?: string;
   width?: number;
   height?: number;
+  fitHeightToContent?: boolean;
 };
 
 export type PortfolioContent = PortfolioImageContent | PortfolioHtmlContent;
@@ -32,6 +33,25 @@ export type PortfolioItem = {
 
 export const portfolioItems: PortfolioItem[] = [
   {
+    id: 'saru-demo',
+    title: '猿でもシェイクスピア',
+    href: '/portfolio/saru-demo',
+    content: {
+      kind: 'html',
+      componentId: 'saru-demo-scene',
+      thumbnail: '/portfolio/saru-demo/saru.png',
+      width: 900,
+      height: 700,
+      fitHeightToContent: true,
+    },
+    description:
+      '猿でもランダムにタイプライターを叩けば、いつかは偶然シェイクスピアの作品を完成させられるという思考実験の地獄を味わえるゲームです。',
+    date: '2026-07-18',
+    year: 2026,
+    tags: ['HTML', 'ゲーム', 'ランダム'],
+    featured: true,
+  },
+  {
     id: 'rainy-day',
     title: '雨の日も悪くない',
     href: '/portfolio/rainy-day',
@@ -43,7 +63,7 @@ export const portfolioItems: PortfolioItem[] = [
       height: 1200,
     },
     description: '雨の日のお家のワクワク感を表現してみました。今回は時間経過で何かが変わります。探してみてね。',
-    tags: ['HTML', 'イラスト'],
+    tags: ['HTML', '時間変化', 'イラスト'],
     featured: true,
   },
   {

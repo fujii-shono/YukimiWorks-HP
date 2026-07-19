@@ -35,6 +35,10 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
     };
   }, [selected]);
 
+  useEffect(() => {
+    if (selected && !items.some((item) => item.id === selected.id)) setSelected(null);
+  }, [items, selected]);
+
   return (
     <>
       <div className="card-grid">

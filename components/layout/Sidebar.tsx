@@ -13,7 +13,6 @@ const navItems = [
   { href: '/about', label: 'About', icon: '❄', iconImage: null },
   { href: '/works', label: 'Works', icon: '❄', iconImage: null },
   { href: '/portfolio', label: 'Portfolio', icon: '❄', iconImage: null },
-  { href: '/games', label: 'Games', icon: '❄', iconImage: null },
   { href: '/news', label: 'News', icon: '❄', iconImage: null },
   { href: '/links', label: 'Link', icon: '❄', iconImage: null },
   { href: '/contact', label: 'Contact', icon: '❄', iconImage: null },

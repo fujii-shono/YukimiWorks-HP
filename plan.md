@@ -221,42 +221,35 @@
 
 ---
 
-## 追加対応: Games メニューと個別ページ
+## 追加対応: Portfolio カテゴリ統合
 
 ### 対応する仕様
 
-- ユーザー依頼: `Menu` に `Games` を追加する
-- ユーザー依頼: `data/portfolio.ts` のようにゲームデータ側で HTML の識別子を設定できるようにする
-- ユーザー依頼: `saru-demo` は `Games` 側で現在の HTML をそのまま表示する
+- ユーザー依頼: `Games` ページとメニューはなくし、`Portfolio` にイラスト・HTMLアート・ゲームのカテゴリを持たせる
+- ユーザー依頼: カテゴリは `kind` とは別管理にし、`Portfolio` 一覧で絞り込みできるようにする
+- ユーザー依頼: `saru-demo` は `Portfolio` 側に残し、既存リンクを維持する
 
 ### 実装方針
 
-- `data/games.ts` を追加し、既存の HTML 作品表示に必要なデータを `Portfolio` と同じ形で管理する
-- `saru-demo` は `portfolioItems` から外し、`gamesItems` に移して `/games` と `/games/[id]` から表示する
-- 一覧カード、モーダル、HTML 表示本体は既存の `PortfolioGallery` と `PortfolioMedia` を流用し、表示差分はページタイトルと導線だけに留める
+- `portfolioItems` に表示用カテゴリを追加し、`kind` は描画方式の判定専用として分離する
+- `PortfolioGallery` にカテゴリフィルター UI を追加し、一覧のカード表示だけを切り替える
+- `Games` のメニュー・専用データ・専用ページは削除し、`saru-demo` は `/portfolio/saru-demo` で引き続き表示する
 
 ### 変更予定のファイルと理由
 
-- `data/portfolio.ts`: `saru-demo` を `Portfolio` から外すため
-- `data/games.ts`: `Games` 用データを追加するため
-- `components/layout/Sidebar.tsx`: `Menu` に `Games` を追加するため
-- `app/games/page.tsx`: ゲーム一覧ページを追加するため
-- `app/games/[id]/page.tsx`: ゲーム個別ページを追加するため
+- `data/portfolio.ts`: カテゴリ定義と各作品のカテゴリ設定を追加するため
+- `components/ui/PortfolioGallery.tsx`: カテゴリ絞り込み UI を追加するため
+- `components/layout/Sidebar.tsx`: `Games` メニューを削除するため
+- `app/globals.css`: カテゴリフィルターの見た目を追加するため
+- `app/games/page.tsx`, `app/games/[id]/page.tsx`, `data/games.ts`: 不要になったため削除するため
 
 ### 影響範囲
 
 - サイドバーのメニュー表示
-- `/portfolio` 一覧からの `saru-demo` 非表示
-- `/games` および `/games/[id]` の新規ページ
+- `/portfolio` 一覧の絞り込み UI
+- `/games` ルートの削除
 
 ### 検証方法
 
 - `npm run lint`
-- `npx tsc --noEmit`
 - `npm run build`
-- `npm run build`
-
-### 懸念点・制約・未確定事項
-
-- X の Web Intent だけでは画像を添付した状態で投稿画面を開けないため、完全な要件達成には API / OAuth を含む別設計が必要
-- HTML 作品はモーダルと個別ページの両方で動くため、画面外にはみ出さないよう CSS と固定数の挙動を重点確認する

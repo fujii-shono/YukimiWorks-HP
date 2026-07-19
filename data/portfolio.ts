@@ -1,4 +1,5 @@
 export type PortfolioMediaVariant = 'preview' | 'card' | 'modal';
+export type PortfolioCategory = 'illustration' | 'html-art' | 'game';
 
 export type PortfolioHtmlComponentId = 'pixel-window' | 'hikage-scene' | 'rainy-day-scene' | 'saru-demo-scene';
 
@@ -23,6 +24,7 @@ export type PortfolioItem = {
   id: string;
   title: string;
   href: string;
+  category: PortfolioCategory;
   content: PortfolioContent;
   ogImage?: string;
   ogImageWidth?: number;
@@ -34,11 +36,18 @@ export type PortfolioItem = {
   featured?: boolean;
 };
 
+export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
+  illustration: 'イラスト',
+  'html-art': 'HTMLアート',
+  game: 'ゲーム',
+};
+
 export const portfolioItems: PortfolioItem[] = [
   {
     id: 'saru-demo',
     title: '猿でもシェイクスピア',
     href: '/portfolio/saru-demo',
+    category: 'game',
     content: {
       kind: 'html',
       componentId: 'saru-demo-scene',
@@ -61,6 +70,7 @@ export const portfolioItems: PortfolioItem[] = [
     id: 'rainy-day',
     title: '雨の日も悪くない',
     href: '/portfolio/rainy-day',
+    category: 'html-art',
     content: {
       kind: 'html',
       componentId: 'rainy-day-scene',
@@ -76,6 +86,7 @@ export const portfolioItems: PortfolioItem[] = [
     id: 'hikage',
     title: 'HTMLアート試作1号',
     href: '/portfolio/hikage',
+    category: 'html-art',
     content: {
       kind: 'html',
       componentId: 'hikage-scene',

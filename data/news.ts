@@ -86,7 +86,30 @@ export const news: News[] = [
   //   featured: true,
   // },
   {
-    id: 'announcement-tarif',
+    id: 'announcement-gamespage-launch',
+    title: 'Gamesページを追加しました',
+    date: '2026-07-19',
+    category: 'announcement',
+    thumbnail: '',
+    summary: 'HPにGamesページを追加しました',
+    body: [
+      {
+        type: 'text',
+        value :
+          'YukimiWorksにGamesページを追加しました。\n\nGamesページには、HTMLで作成したシンプルなゲームを追加していきます。\nネタ系から本格的に遊べるものまで思いついたアイデアを試していくので、ぜひ遊んでみてください。',
+      },
+            {
+        type: 'link',
+        label: 'Gamesページへ',
+        href: '/games',
+      }
+    ],
+    seoTitle: 'Gamesページを追加しました | YukimiWorks',
+    seoDescription: 'Gamesページを追加しました。',
+    featured: true,
+  },
+  {
+    id: 'release-tarif-beta',
     title: 'Tarifベータ版を公開しました',
     date: '2026-07-14',
     category: 'release',

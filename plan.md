@@ -218,6 +218,42 @@
 
 - `npm run lint`
 - `npx tsc --noEmit`
+
+---
+
+## 追加対応: Games メニューと個別ページ
+
+### 対応する仕様
+
+- ユーザー依頼: `Menu` に `Games` を追加する
+- ユーザー依頼: `data/portfolio.ts` のようにゲームデータ側で HTML の識別子を設定できるようにする
+- ユーザー依頼: `saru-demo` は `Games` 側で現在の HTML をそのまま表示する
+
+### 実装方針
+
+- `data/games.ts` を追加し、既存の HTML 作品表示に必要なデータを `Portfolio` と同じ形で管理する
+- `saru-demo` は `portfolioItems` から外し、`gamesItems` に移して `/games` と `/games/[id]` から表示する
+- 一覧カード、モーダル、HTML 表示本体は既存の `PortfolioGallery` と `PortfolioMedia` を流用し、表示差分はページタイトルと導線だけに留める
+
+### 変更予定のファイルと理由
+
+- `data/portfolio.ts`: `saru-demo` を `Portfolio` から外すため
+- `data/games.ts`: `Games` 用データを追加するため
+- `components/layout/Sidebar.tsx`: `Menu` に `Games` を追加するため
+- `app/games/page.tsx`: ゲーム一覧ページを追加するため
+- `app/games/[id]/page.tsx`: ゲーム個別ページを追加するため
+
+### 影響範囲
+
+- サイドバーのメニュー表示
+- `/portfolio` 一覧からの `saru-demo` 非表示
+- `/games` および `/games/[id]` の新規ページ
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
 - `npm run build`
 
 ### 懸念点・制約・未確定事項

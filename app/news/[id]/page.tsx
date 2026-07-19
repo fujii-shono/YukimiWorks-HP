@@ -92,6 +92,7 @@ export default function NewsDetailPage({ params }: { params: { id: string } }) {
           ) : (
             article.body.map((segment, index) => {
               if (segment.type === 'text') return <p key={index}>{segment.value}</p>;
+              if (segment.type === 'strikethrough') return <p key={index} className="detail-body-strikethrough">{segment.value}</p>;
               if (segment.type === 'link') {
                 return (
                   <p key={index}>

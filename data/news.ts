@@ -6,6 +6,7 @@ export type NewsMedia = {
 
 export type NewsBodySegment =
   | { type: 'text'; value: string }
+  | { type: 'strikethrough'; value: string }
   | { type: 'link'; label: string; href: string }
   | { type: 'media'; src: string; mediaType: 'image' | 'video'; alt?: string };
 
@@ -87,22 +88,27 @@ export const news: News[] = [
   // },
   {
     id: 'announcement-gamespage-launch',
-    title: 'Gamesページを追加しました',
+    title: '「ゲーム」カテゴリを追加しました',
     date: '2026-07-19',
     category: 'announcement',
     thumbnail: '',
     summary: 'HPにGamesページを追加しました',
     body: [
       {
-        type: 'text',
-        value :
+        type: 'strikethrough',
+        value:
           'YukimiWorksにGamesページを追加しました。\n\nGamesページには、HTMLで作成したシンプルなゲームを追加していきます。\nネタ系から本格的に遊べるものまで思いついたアイデアを試していくので、ぜひ遊んでみてください。',
       },
-            {
+      {
+        type: 'text',
+        value:
+          'ゲーム作品はPortfolioページ内の「ゲーム」カテゴリで公開しています。\n\nHTMLアートやイラストとあわせて、Portfolioページからまとめてご覧ください。',
+      },
+      {
         type: 'link',
-        label: 'Gamesページへ',
-        href: '/games',
-      }
+        label: 'Portfolioのゲーム一覧へ',
+        href: '/portfolio?category=game',
+      },
     ],
     seoTitle: 'Gamesページを追加しました | YukimiWorks',
     seoDescription: 'Gamesページを追加しました。',

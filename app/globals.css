@@ -1736,6 +1736,10 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   text-align: left;
 }
 
+.detail-body-strikethrough {
+  text-decoration: line-through;
+}
+
 .detail-body-center {
   text-align: center;
 }

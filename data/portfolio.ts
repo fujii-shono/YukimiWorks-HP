@@ -1,7 +1,7 @@
 export type PortfolioMediaVariant = 'preview' | 'card' | 'modal';
 export type PortfolioCategory = 'illustration' | 'html-art' | 'game';
 
-export type PortfolioHtmlComponentId = 'pixel-window' | 'hikage-scene' | 'rainy-day-scene' | 'saru-demo-scene';
+export type PortfolioHtmlComponentId = 'pixel-window' | 'hikage-scene' | 'rainy-day-scene' | 'saru-demo-scene' | 'kokoro-scene';
 
 export type PortfolioImageContent = {
   kind: 'image';
@@ -43,6 +43,24 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 };
 
 export const portfolioItems: PortfolioItem[] = [
+  {
+    id: 'kokoro-fanart',
+    title: 'すやすや',
+    href: '/portfolio/kokoro-fanart',
+    category: 'html-art',
+    content: {
+      kind: 'html',
+      componentId: 'kokoro-scene',
+      thumbnail: '/portfolio/kokoro/kokoro.png',
+      width: 629,
+      height: 1000,
+    },
+    description: '天宮こころ様のファンアートになります。今回は画面タップ/クリックで一部が動きます。',
+    date: '2026-07-20',
+    year: 2026,
+    tags: ['HTML', 'クリックイベント', 'イラスト'],
+    featured: true,
+  },
   {
     id: 'saru-demo',
     title: '猿でもシェイクスピア',

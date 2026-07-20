@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { PortfolioHtmlComponentId, PortfolioItem, PortfolioMediaVariant } from '@/data/portfolio';
 import { cn } from '@/lib/format';
 import { HikageScene } from '@/components/portfolio/HikageScene';
+import { KokoroScene } from '@/components/portfolio/KokoroScene';
 import { RainyDayScene } from '@/components/portfolio/RainyDayScene';
 import { SaruDemoScene } from '@/components/portfolio/SaruDemoScene';
 
@@ -48,6 +49,7 @@ function PortfolioWindowHtml({ item, variant }: PortfolioHtmlRendererProps) {
 export const portfolioHtmlComponents: Record<PortfolioHtmlComponentId, (props: PortfolioHtmlRendererProps) => ReactNode> = {
   'pixel-window': PortfolioWindowHtml,
   'hikage-scene': ({ variant }) => <HikageScene variant={variant} />,
+  'kokoro-scene': ({ variant }) => <KokoroScene variant={variant} />,
   'rainy-day-scene': ({ variant }) => <RainyDayScene variant={variant} />,
   'saru-demo-scene': ({ variant }) => <SaruDemoScene variant={variant} />,
 };

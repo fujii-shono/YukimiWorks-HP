@@ -253,3 +253,33 @@
 
 - `npm run lint`
 - `npm run build`
+
+---
+
+## 追加対応: Portfolio HTMLアート `kokoro`
+
+### 対応する仕様
+
+- ユーザー依頼: `public/portfolio/kokoro` の素材を使って HTMLアート作品を `Portfolio` に追加する
+- ユーザー依頼: `base.png` の上に `eye1.png`、下に `wing.png`、`bg.png` の順で重ねる
+- ユーザー依頼: 背景は朝・昼は白、夜・深夜は `rgb(187,184,230)` とし、時間判定は既存テーマと同じにする
+- ユーザー依頼: `wing` の位置は手動調整しやすくする
+
+### 実装方針
+
+- `data/portfolio.ts` に HTMLアート作品として `kokoro` を追加する
+- `components/portfolio/` に専用レンダラーを追加し、`useTimeTheme` の `theme` を参照して背景色を切り替える
+- `base`、`eye1`、`bg` は同寸法なので、同じフレームへ絶対配置してぴったり重ねる
+- `wing` は別寸法のため、相対位置・相対幅の定数で管理して手調整しやすくする
+
+### 変更予定のファイルと理由
+
+- `data/portfolio.ts`: 作品データとレンダラー ID を追加するため
+- `components/portfolio/PortfolioHtmlComponents.tsx`: 新しい HTMLアートレンダラーを登録するため
+- `components/portfolio/KokoroScene.tsx`: 作品本体を実装するため
+- `app/globals.css`: `kokoro` 用レイアウトと重ね順のスタイルを追加するため
+
+### 検証方法
+
+- `npm run lint`
+- `npm run build`

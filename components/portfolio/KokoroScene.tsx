@@ -675,6 +675,7 @@ export function KokoroScene({ variant }: KokoroSceneProps) {
             className="kokoro-layer kokoro-background"
             draggable={false}
             priority={variant === 'modal'}
+            unoptimized
           />
           <canvas ref={starCanvasRef} className="kokoro-canvas-layer kokoro-canvas-layer-stars" />
           <button
@@ -699,6 +700,7 @@ export function KokoroScene({ variant }: KokoroSceneProps) {
               style={wingImageStyle}
               draggable={false}
               priority={variant === 'modal'}
+              unoptimized
             />
           </div>
           <button
@@ -724,6 +726,7 @@ export function KokoroScene({ variant }: KokoroSceneProps) {
             className="kokoro-layer kokoro-base"
             draggable={false}
             priority={variant === 'modal'}
+            unoptimized
           />
           <Image
             src={MOUTH_DEFAULT_SRC}
@@ -733,6 +736,7 @@ export function KokoroScene({ variant }: KokoroSceneProps) {
             className={cn('kokoro-layer kokoro-mouth', mouthOpen && 'is-hidden')}
             draggable={false}
             priority={variant === 'modal'}
+            unoptimized
           />
           <Image
             src={MOUTH_ACTIVE_SRC}
@@ -742,6 +746,7 @@ export function KokoroScene({ variant }: KokoroSceneProps) {
             className={cn('kokoro-layer kokoro-mouth', !mouthOpen && 'is-hidden')}
             draggable={false}
             priority={variant === 'modal'}
+            unoptimized
           />
           <Image
             src={eyeOpen ? EYE_ACTIVE_SRC : EYE_DEFAULT_SRC}
@@ -751,6 +756,7 @@ export function KokoroScene({ variant }: KokoroSceneProps) {
             className="kokoro-layer kokoro-eye"
             draggable={false}
             priority={variant === 'modal'}
+            unoptimized
           />
         </div>
       </div>

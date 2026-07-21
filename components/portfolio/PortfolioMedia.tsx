@@ -30,7 +30,7 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
           alt={item.content.alt}
           width={width}
           height={height}
-          className={variant === 'modal' ? 'portfolio-media-image portfolio-media-image-modal pixel-image' : 'portfolio-media-image pixel-image'}
+          className={variant === 'modal' ? 'portfolio-media-image portfolio-media-image-modal' : 'portfolio-media-image'}
           unoptimized
         />
       </div>

@@ -1,3 +1,6 @@
+import { portfolioItems } from '@/data/portfolio';
+import { works } from '@/data/works';
+
 export type NewsMedia = {
   type: 'image' | 'video';
   src: string;
@@ -11,6 +14,7 @@ export type NewsBodySegment =
   | { type: 'media'; src: string; mediaType: 'image' | 'video'; alt?: string };
 
 export type NewsCategory = 'event' | 'announcement' | 'release' | 'other';
+export type NewsSource = 'manual' | 'work' | 'portfolio';
 
 export type News = {
   id: string;
@@ -19,6 +23,8 @@ export type News = {
   category: NewsCategory;
   thumbnail: string;
   summary: string;
+  href?: string;
+  source?: NewsSource;
   body?: NewsBodySegment[] | string;
   featured?: boolean;
   seoTitle?: string;
@@ -34,7 +40,7 @@ export const newsCategoryLabels: Record<NewsCategory, string> = {
   other: 'その他',
 };
 
-export const news: News[] = [
+export const manualNews: News[] = [
   // {
   //   id: 'release-sample-app-v1',
   //   title: '新作アプリ「〇〇」をリリースしました',
@@ -114,29 +120,29 @@ export const news: News[] = [
     seoDescription: 'Gamesページを追加しました。',
     featured: true,
   },
-  {
-    id: 'release-tarif-beta',
-    title: 'Tarifベータ版を公開しました',
-    date: '2026-07-14',
-    category: 'release',
-    thumbnail: '/tarif/hero.png',
-    summary: 'オンライン料金表サービスTarifを公開しました。',
-    body: [
-      {
-        type: 'text',
-        value :
-          'オンライン料金表サービスTarif(タリフ)を公開しました。\n\nTarifでは、依頼時のプラン説明の手間・見積書作成の手間を省くことができます。\n非常に便利なのでぜひお使いください。',
-      },
-            {
-        type: 'link',
-        label: 'サービスはこちら',
-        href: 'https://tarif.jp',
-      }
-    ],
-    seoTitle: 'オンライン料金表サービスTarif公開のお知らせ | YukimiWorks',
-    seoDescription: 'オンライン料金表サービスTarifを公開しました。料金表・見積もり書作成ならTarif。',
-    featured: true,
-  },
+  // {
+  //   id: 'release-tarif-beta',
+  //   title: 'Tarifベータ版を公開しました',
+  //   date: '2026-07-14',
+  //   category: 'release',
+  //   thumbnail: '/tarif/hero.png',
+  //   summary: 'オンライン料金表サービスTarifを公開しました。',
+  //   body: [
+  //     {
+  //       type: 'text',
+  //       value :
+  //         'オンライン料金表サービスTarif(タリフ)を公開しました。\n\nTarifでは、依頼時のプラン説明の手間・見積書作成の手間を省くことができます。\n非常に便利なのでぜひお使いください。',
+  //     },
+  //           {
+  //       type: 'link',
+  //       label: 'サービスはこちら',
+  //       href: 'https://tarif.jp',
+  //     }
+  //   ],
+  //   seoTitle: 'オンライン料金表サービスTarif公開のお知らせ | YukimiWorks',
+  //   seoDescription: 'オンライン料金表サービスTarifを公開しました。料金表・見積もり書作成ならTarif。',
+  //   featured: true,
+  // },
   {
     id: 'announcement-sample-site-launch',
     title: 'YukimiWorks コーポレートサイトを公開しました',
@@ -151,3 +157,53 @@ export const news: News[] = [
     featured: true,
   },
 ];
+
+const sourceRank: Record<NewsSource, number> = {
+  manual: 0,
+  work: 1,
+  portfolio: 2,
+};
+
+const generatedWorkNews: News[] = works
+  .filter((work) => Boolean(work.date))
+  .map((work) => ({
+    id: `work-${work.id}`,
+    title: `成果物「${work.title}」を追加しました`,
+    date: work.date as string,
+    category: 'other',
+    thumbnail: work.thumbnail,
+    summary: work.description,
+    href: `/works/${work.id}`,
+    source: 'work',
+  }));
+
+const getPortfolioThumbnail = (item: (typeof portfolioItems)[number]) => {
+  if (item.content.kind === 'image') return item.content.src;
+  return item.content.thumbnail ?? '';
+};
+
+const generatedPortfolioNews: News[] = portfolioItems
+  .filter((item) => Boolean(item.date))
+  .map((item) => ({
+    id: `portfolio-${item.id}`,
+    title: `ポートフォリオ「${item.title}」を追加しました`,
+    date: item.date as string,
+    category: 'other',
+    thumbnail: getPortfolioThumbnail(item),
+    summary: item.description ?? item.title,
+    href: item.href,
+    source: 'portfolio',
+  }));
+
+export const news: News[] = manualNews;
+
+export const newsItems: News[] = [
+  ...manualNews.map((item) => ({ ...item, source: item.source ?? 'manual' })),
+  ...generatedWorkNews,
+  ...generatedPortfolioNews,
+].sort((a, b) => {
+  const dateOrder = b.date.localeCompare(a.date);
+  if (dateOrder !== 0) return dateOrder;
+
+  return sourceRank[a.source ?? 'manual'] - sourceRank[b.source ?? 'manual'];
+});

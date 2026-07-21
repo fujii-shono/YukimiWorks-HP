@@ -5,15 +5,15 @@ import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { formatJapaneseDate } from '@/lib/format';
-import { news, newsCategoryLabels } from '@/data/news';
+import { manualNews, newsCategoryLabels } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 
 export function generateStaticParams() {
-  return news.map((article) => ({ id: article.id }));
+  return manualNews.map((article) => ({ id: article.id }));
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const article = news.find((entry) => entry.id === params.id);
+  const article = manualNews.find((entry) => entry.id === params.id);
   if (!article) return {};
 
   const title = article.seoTitle ?? `${article.title} | YukimiWorks`;
@@ -48,7 +48,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default function NewsDetailPage({ params }: { params: { id: string } }) {
-  const article = news.find((entry) => entry.id === params.id);
+  const article = manualNews.find((entry) => entry.id === params.id);
   if (!article) notFound();
 
   const ogImage = article.ogImage

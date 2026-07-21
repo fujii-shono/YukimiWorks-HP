@@ -19,6 +19,7 @@ export type Work = {
   tags: string[];
   thumbnail: string;
   media?: WorkMedia[];
+  date?: string;
   url?: string;
   featured?: boolean;
 };
@@ -83,6 +84,7 @@ export const works: Work[] = [
     tags: ['webサービス'],
     thumbnail: '/tarif/hero.png',
     media: [{ type: 'image', src: '/tarif/hero.png', alt: 'サービス紹介' }],
+    date: '2026-07-14',
     featured: true,
   },
   {

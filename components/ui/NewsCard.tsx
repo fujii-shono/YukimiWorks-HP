@@ -8,7 +8,7 @@ export function NewsCard({ article }: { article: News }) {
   const hasThumbnail = article.thumbnail.trim().length > 0;
 
   return (
-    <Link href={`/news/${article.id}`} className="retro-card">
+    <Link href={article.href ?? `/news/${article.id}`} className="retro-card">
       {hasThumbnail ? (
         <SleepWarningImage src={article.thumbnail} alt={`${article.title}のサムネイル`} width={560} height={315} className="retro-card-image" />
       ) : null}

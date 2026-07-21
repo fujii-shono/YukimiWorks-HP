@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
-import { news } from '@/data/news';
+import { newsItems } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { cn } from '@/lib/format';
 
@@ -28,7 +28,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [counterDisplay, setCounterDisplay] = useState<string>(siteConfig.decorativeCounter);
   const { absent, event, sleepMode } = useTimeTheme();
-  const latestNews = news.slice(0, 3);
+  const latestNews = newsItems.slice(0, 3);
   const counterCharacterSrc = sleepMode ? '/character/sleeping.png' : '/character/default.png';
   const counterCharacterMask = event === 'sleep-warning' ? '/effects/eyes.png' : counterCharacterSrc;
   const absentLabel = event === 'lunch' ? '食事中' : event === 'late-night-away' ? '....' : 'お出かけ中';
@@ -156,7 +156,7 @@ export function Sidebar() {
               <article className="news-item" key={item.id}>
                 <time dateTime={item.date}>{item.date.replaceAll('-', '/')}</time>
                 <p>
-                  <Link href={`/news/${item.id}`}>{item.title}</Link>
+                  <Link href={item.href ?? `/news/${item.id}`}>{item.title}</Link>
                 </p>
               </article>
             ))

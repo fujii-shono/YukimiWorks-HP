@@ -750,6 +750,13 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   background: var(--site-surface);
 }
 
+.portfolio-media-shell-preview {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  aspect-ratio: 1 / 1;
+}
+
 .portfolio-card-image {
   aspect-ratio: 1 / 1;
   border-bottom: 1px solid var(--site-border);
@@ -772,8 +779,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 
 .portfolio-media-image-modal {
@@ -781,8 +786,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   height: auto;
   max-height: calc(100vh - 200px);
   object-fit: contain;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 
 .portfolio-media-html {
@@ -1940,14 +1943,18 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .portfolio-detail-media {
-  width: min(100%, 960px);
+  width: min(100%, 1120px);
   margin: 0 auto;
 }
 
 .portfolio-detail-image {
-  width: auto;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto;
+}
+
+.portfolio-detail-image .portfolio-media-image-modal {
+  max-height: none;
 }
 
 .portfolio-detail-html {
@@ -2147,6 +2154,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   width: auto;
   max-width: 100%;
   max-height: var(--portfolio-modal-media-max-height);
+  background: #fff;
   object-fit: contain;
 }
 

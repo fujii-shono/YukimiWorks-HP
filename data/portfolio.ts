@@ -44,6 +44,22 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 
 export const portfolioItems: PortfolioItem[] = [
   {
+    id: 'to-limy',
+    title: '💎✨️',
+    href: '/portfolio/to-limy',
+    category: 'illustration',
+    content: {
+      kind: 'image',  
+      src: '/portfolio/skeb/to-limy.png',
+      alt: 'limy様ご依頼'
+    },
+    description: 'limy様からのご依頼でした！ありがとうございました。',
+    date: '2026-07-21',
+    year: 2026,
+    tags: ['イラスト'],
+    featured: true,
+  },
+  {
     id: 'kokoro-fanart',
     title: 'すやすや',
     href: '/portfolio/kokoro-fanart',
@@ -69,7 +85,7 @@ export const portfolioItems: PortfolioItem[] = [
     content: {
       kind: 'html',
       componentId: 'saru-demo-scene',
-      thumbnail: '/portfolio/saru-demo/saru.png',
+      thumbnail: '/portfolio/saru-demo/saru-og.png',
       width: 900,
       height: 700,
       fitHeightToContent: true,

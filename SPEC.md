@@ -268,8 +268,9 @@ YukimiWorksのコーポレートホームページ。
 
 #### What's Newパネル
 
-- `/data/news.ts`の先頭2〜3件を表示する
-- 日付と短いタイトルを表示し、クリックで記事詳細へ遷移する
+- `/data/news.ts`の表示用ニュース配列の先頭2〜3件を表示する
+- 表示用ニュース配列には、手動ニュースに加えて、`date`が設定されているWorks・Portfolioの追加情報を自動で含める
+- 日付と短いタイトルを表示し、クリックで手動ニュースは記事詳細へ、Works・Portfolioの自動追加分は対象ページへ遷移する
 - 下部に「過去の更新履歴」リンクを配置し、`/news`へ遷移する
 - データがない場合は`更新情報はありません`と表示する
 
@@ -783,6 +784,7 @@ export type Work = {
   tags: string[];
   thumbnail: string;
   media?: WorkMedia[];
+  date?: string;
   url?: string;
   featured?: boolean;
 };
@@ -809,6 +811,7 @@ export const works: Work[] = [
 ```
 
 - 新規成果物は`works`配列への追記だけで一覧・絞り込み・詳細ページへ反映する
+- 公開日がある成果物は`date`に`YYYY-MM-DD`形式で設定する。`date`がある成果物はWhat's Newとお知らせ一覧に「その他」として自動表示する
 - `category`は3分類のいずれかを必須とする
 - 既存の`design-web`、`illust-art`、`book`、`goods`カテゴリーは廃止する
 - イラスト作品は`works`ではなく`/data/portfolio.ts`で管理する
@@ -1013,8 +1016,9 @@ export const siteLinks: SiteLink[] = [
 - カードグリッド: 3列（広いデスクトップ） / 2列（標準デスクトップ・タブレット） / 1列（モバイル）
 - **カードグリッド全体を中央揃えで配置する**（`mx-auto` + `justify-items-center` 等を使用）
 - データが空の場合は「Coming Soon」表示
-- **各カードクリックで `/news/[id]` のお知らせ個別ページへ遷移する**
-- カテゴリーフィルタータブ: `news` 配列に実際に存在するカテゴリーのみタブとして表示する
+- 手動ニュースのカードクリックで `/news/[id]` のお知らせ個別ページへ遷移する
+- Works・Portfolioの自動追加カードは個別ニュースページを作らず、クリックで対象の成果物またはポートフォリオページへ遷移する
+- カテゴリーフィルタータブ: 表示用ニュース配列に実際に存在するカテゴリーのみタブとして表示する
 
 ### カテゴリー一覧
 
@@ -1026,8 +1030,9 @@ export const siteLinks: SiteLink[] = [
 | `'other'` | その他 |
 
 - 「すべて」タブを先頭に加え、全件表示を可能にする
-- `news` 配列内に1件以上存在するカテゴリーのみフィルタータブとして表示する
-- **カードの表示順は `news` 配列のインデックス順（格納順）に従う。ソートは行わない。**
+- 表示用ニュース配列内に1件以上存在するカテゴリーのみフィルタータブとして表示する
+- **カードの表示順は日付降順とし、同じ日付では手動ニュースを自動追加分より優先して表示する。**
+- `date`が設定されているPortfolio作品はWhat's Newとお知らせ一覧に「その他」として自動表示する
 
 ### データ構造（`/data/news.ts`）
 
@@ -1063,6 +1068,8 @@ export type News = {
   category: NewsCategory;
   thumbnail: string;                      // /public/news/xxx.png（一覧カード・メインページプレビュー用サムネイル）
   summary: string;                        // 一覧カード用の短い概要（1〜2行）。meta description のフォールバックにも使用する
+  href?: string;                           // 自動追加分の遷移先。手動ニュースは省略時 `/news/{id}`
+  source?: 'manual' | 'work' | 'portfolio';
   body?: NewsBodySegment[] | string;      // 個別ページ用の本文
                                           // 文字列の場合は \n で改行として扱う
                                           // NewsBodySegment[] の場合はセグメントを順に描画する
@@ -1169,7 +1176,7 @@ export const news: News[] = [
 
 - お知らせ一覧の各カードをクリックすると遷移する詳細ページ
 - 共通サイトフレーム内に表示する
-- `/data/news.ts` の `news` 配列から `id` に一致するデータを取得して表示する
+- `/data/news.ts` の手動ニュース配列から `id` に一致するデータを取得して表示する
 - Next.js の `generateStaticParams` を使用して静的生成（SSG）する
 
 ### レイアウト・コンテンツ

@@ -2,7 +2,7 @@ import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { NewsCard } from '@/components/ui/NewsCard';
-import { news, newsCategoryLabels, type NewsCategory } from '@/data/news';
+import { newsCategoryLabels, newsItems, type NewsCategory } from '@/data/news';
 
 const allCategories: NewsCategory[] = ['event', 'announcement', 'release', 'other'];
 
@@ -14,8 +14,8 @@ export default function NewsPage({
   const validCategory = allCategories.includes(searchParams?.category as NewsCategory)
     ? (searchParams?.category as NewsCategory)
     : null;
-  const visibleCategories = allCategories.filter((category) => news.some((item) => item.category === category));
-  const filteredNews = validCategory ? news.filter((item) => item.category === validCategory) : news;
+  const visibleCategories = allCategories.filter((category) => newsItems.some((item) => item.category === category));
+  const filteredNews = validCategory ? newsItems.filter((item) => item.category === validCategory) : newsItems;
 
   return (
     <SiteFrame>

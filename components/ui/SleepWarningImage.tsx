@@ -13,10 +13,19 @@ export function SleepWarningImage({
   sleepWarningSrc = '/effects/eyes.png',
   alt,
   className,
+  unoptimized = true,
   ...props
 }: SleepWarningImageProps) {
   const { event } = useTimeTheme();
   const resolvedSrc = event === 'sleep-warning' ? sleepWarningSrc : src;
 
-  return <Image {...props} src={resolvedSrc} alt={alt} className={cn(className, event === 'sleep-warning' && 'sleep-warning-image')} />;
+  return (
+    <Image
+      {...props}
+      src={resolvedSrc}
+      alt={alt}
+      className={cn(className, event === 'sleep-warning' && 'sleep-warning-image')}
+      unoptimized={unoptimized}
+    />
+  );
 }

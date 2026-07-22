@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
-import { formatJapaneseDate } from '@/lib/format';
+import { AcrylicKeychainTool } from '@/components/works/AcrylicKeychainTool';
 import { works } from '@/data/works';
 
 export function generateStaticParams() {
@@ -63,6 +63,7 @@ export default function WorkDetailPage({ params }: { params: { id: string } }) {
             </span>
           ))}
         </div>
+        {work.id === 'acrylic-keychain-tool' ? <AcrylicKeychainTool /> : null}
       </section>
     </SiteFrame>
   );

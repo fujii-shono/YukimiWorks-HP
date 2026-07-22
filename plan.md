@@ -323,3 +323,40 @@
 
 - `npm run lint`
 - `npm run build`
+
+---
+
+## 追加対応: Works ツール開発「アクキー確認ツール」
+
+### 対応する仕様
+
+- ユーザー依頼: Works 内に、アクキーの見た目を確認できる専用ページを追加する
+- ユーザー依頼: 画面上へ PNG をドラッグし、透過部分の周りへ透明領域を作り、その外側に白いハイライトを付ける
+- ユーザー依頼: イラストの非透過部分だけに `mix-blend-mode: multiply` 相当の暗さをかけ、透明領域・ハイライト・背景へ色を載せない
+
+### 実装方針
+
+- `works` のツール開発カテゴリに新規項目を追加し、既存の `/works/[id]` 詳細導線を使う
+- 詳細ページでは対象 ID のみクライアントコンポーネントを差し込み、PNG ドラッグ&ドロップとファイル選択を受け付ける
+- Canvas で PNG のアルファマスクを抽出し、マスク膨張でアクリル透明領域と白い外周ハイライトを描画する
+- 元画像はアルファ部分だけ別 Canvas に描き、CSS の `mix-blend-mode: multiply` と透明度で背景に馴染ませる
+
+### 変更予定のファイルと理由
+
+- `data/works.ts`: ツール開発カテゴリの成果物として追加するため
+- `app/works/[id]/page.tsx`: 対象詳細ページに専用ツールを表示するため
+- `components/works/AcrylicKeychainTool.tsx`: PNG 読み込みとアクキー見た目生成を実装するため
+- `app/globals.css`: ツール画面、ドラッグ領域、プレビュー表示を既存デザインに合わせるため
+- `public/works/acrylic-keychain-tool.svg`: Works 一覧用のサムネイルを追加するため
+
+### 影響範囲
+
+- `/works` 一覧、カテゴリ絞り込み
+- `/works/acrylic-keychain-tool` 詳細表示
+- クライアント側 Canvas / File API を使うブラウザ表示
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`

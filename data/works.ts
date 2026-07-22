@@ -33,10 +33,10 @@ export const workCategoryLabels: Record<WorkCategory, string> = {
 export const works: Work[] = [
   {
     id: 'acrylic-keychain-tool',
-    title: 'アクキー確認ツール',
-    description: '透過PNGから、アクリルキーホルダーの白フチと透明アクリル感を確認できるツールです。',
+    title: 'アクキーシミュレーター',
+    description: '透過PNGから、アクリルキーホルダーっぽい画像を作れます。回転させて透明感を確認できます。',
     body:
-      '透過PNGを読み込むと、アクキーっぽい完成予想図を作成できます。\n\n雰囲気の確認ツールなので、細かなカット指定やボールチェーンの確認はできません。',
+      '透過PNGを読み込むと、アクキーっぽい画像を作成できます。\n\n雰囲気を確認するためのツールなので、細かなカット指定やボールチェーンの確認はできません。',
     category: 'tools',
     tags: ['便利ツール', 'ブラウザ'],
     thumbnail: '/works/Acrylic/thumbnail.png',

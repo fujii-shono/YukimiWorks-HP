@@ -1,15 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/format';
 
 type PreviewState = {
   acrylicSrc: string;
+  edgeSrc: string;
   artworkSrc: string;
+  backSrc: string;
   width: number;
   height: number;
   fileName: string;
 };
+
+type PreviewRotation = {
+  y: number;
+};
+
+type RotationVelocity = PreviewRotation;
 
 const MAX_IMAGE_SIZE = 820;
 const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
@@ -22,6 +30,8 @@ const PREVIEW_ARTWORK_MAX_HEIGHT_RATIO = 0.98;
 const MOBILE_PREVIEW_ARTWORK_MAX_WIDTH_RATIO = 0.98;
 const MOBILE_PREVIEW_ARTWORK_MAX_HEIGHT_RATIO = 0.98;
 const MASK_RENDER_SCALE = 0.5;
+const ROTATION_MIN_SPEED = 0.015;
+const HIGHLIGHT_VISIBLE_START = 0.78;
 const CLEAR_RADIUS = 10;
 const HIGHLIGHT_RADIUS = 1;
 const TOP_LOOP_SPACE = 0;
@@ -33,6 +43,7 @@ const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124
 const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
 const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
+const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
 
 function createCircleOffsets(radius: number) {
   const offsets: Array<[number, number]> = [];
@@ -258,7 +269,6 @@ async function buildPreview(file: File): Promise<PreviewState> {
   const innerShineMask = await dilateMask(baseMask, maskWidth, maskHeight, innerShineRadius);
   const acrylicLow = makeLayerFromMask(maskWidth, maskHeight, () => null);
 
-  drawMaskLayer(acrylicLow.context, edgeMask, maskWidth, maskHeight, [88, 96, 112, 34], 'blur(0.7px)');
   drawMaskLayer(acrylicLow.context, highlightMask, maskWidth, maskHeight, [255, 255, 255, 58]);
 
   acrylicLow.context.save();
@@ -272,7 +282,13 @@ async function buildPreview(file: File): Promise<PreviewState> {
   const whiteHighlightLine = makeLayerFromMask(maskWidth, maskHeight, (index) =>
     highlightMask[index] && !innerShineMask[index] ? ACRYLIC_WHITE_HIGHLIGHT_COLOR : null,
   );
-  acrylicLow.context.drawImage(
+  const edgeLow = makeLayerFromMask(maskWidth, maskHeight, () => null);
+  drawMaskLayer(edgeLow.context, edgeMask, maskWidth, maskHeight, [88, 96, 112, 34], 'blur(0.7px)');
+  edgeLow.context.save();
+  edgeLow.context.globalCompositeOperation = 'destination-out';
+  drawMaskLayer(edgeLow.context, clearMask, maskWidth, maskHeight, [0, 0, 0, 255]);
+  edgeLow.context.restore();
+  edgeLow.context.drawImage(
     darkEdgeLine.canvas,
     ACRYLIC_DARK_EDGE_OFFSET.x * MASK_RENDER_SCALE,
     ACRYLIC_DARK_EDGE_OFFSET.y * MASK_RENDER_SCALE,
@@ -310,6 +326,19 @@ async function buildPreview(file: File): Promise<PreviewState> {
   acrylic.context.imageSmoothingQuality = 'high';
   acrylic.context.drawImage(acrylicLow.canvas, 0, 0, width, height);
 
+  const edge = makeLayerFromMask(width, height, () => null);
+  edge.context.imageSmoothingEnabled = true;
+  edge.context.imageSmoothingQuality = 'high';
+  edge.context.drawImage(edgeLow.canvas, 0, 0, width, height);
+
+  const backLow = makeLayerFromMask(maskWidth, maskHeight, (index) =>
+    highlightMask[index] ? BACK_FACE_MULTIPLY_COLOR : null,
+  );
+  const back = makeLayerFromMask(width, height, () => null);
+  back.context.imageSmoothingEnabled = true;
+  back.context.imageSmoothingQuality = 'high';
+  back.context.drawImage(backLow.canvas, 0, 0, width, height);
+
   const artworkCanvas = document.createElement('canvas');
   artworkCanvas.width = width;
   artworkCanvas.height = height;
@@ -333,7 +362,9 @@ async function buildPreview(file: File): Promise<PreviewState> {
 
   return {
     acrylicSrc: acrylic.canvas.toDataURL('image/png'),
+    edgeSrc: edge.canvas.toDataURL('image/png'),
     artworkSrc: artworkCanvas.toDataURL('image/png'),
+    backSrc: back.canvas.toDataURL('image/png'),
     width,
     height,
     fileName: file.name,
@@ -342,26 +373,54 @@ async function buildPreview(file: File): Promise<PreviewState> {
 
 export function AcrylicKeychainTool() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isRotatingRef = useRef(false);
+  const inertiaFrameRef = useRef<number | null>(null);
+  const lastPointerRef = useRef({ x: 0, y: 0, time: 0 });
+  const rotationVelocityRef = useRef<RotationVelocity>({ y: 0 });
+  const rotationStartPointerRef = useRef({ x: 0, y: 0 });
+  const rotationStartValueRef = useRef<PreviewRotation>({ y: 0 });
   const [preview, setPreview] = useState<PreviewState | null>(null);
-  const [renderedPreviewSrc, setRenderedPreviewSrc] = useState('');
+  const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
+  const [renderedEdgeSrc, setRenderedEdgeSrc] = useState('');
+  const [renderedArtworkSrc, setRenderedArtworkSrc] = useState('');
+  const [renderedBackArtworkSrc, setRenderedBackArtworkSrc] = useState('');
+  const [renderedHighlightSrc, setRenderedHighlightSrc] = useState('');
+  const [rotation, setRotation] = useState<PreviewRotation>({ y: 0 });
+  const [isRotating, setIsRotating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingDotCount, setProcessingDotCount] = useState(1);
   const [previewLayoutKey, setPreviewLayoutKey] = useState(0);
-  const [status, setStatus] = useState('PNGをドラッグしてください');
+  const [status, setStatus] = useState('PNGを選択してください');
 
   useEffect(() => {
     if (!preview) {
-      setRenderedPreviewSrc('');
+      setRenderedAcrylicSrc('');
+      setRenderedEdgeSrc('');
+      setRenderedArtworkSrc('');
+      setRenderedBackArtworkSrc('');
+      setRenderedHighlightSrc('');
       return;
     }
     let cancelled = false;
-    const canvas = document.createElement('canvas');
     const stage = getPreviewStageSize();
-    canvas.width = stage.width;
-    canvas.height = stage.height;
-    const context = canvas.getContext('2d');
-    if (!context) return;
+    const acrylicCanvas = document.createElement('canvas');
+    acrylicCanvas.width = stage.width;
+    acrylicCanvas.height = stage.height;
+    const acrylicContext = acrylicCanvas.getContext('2d');
+    const edgeCanvas = document.createElement('canvas');
+    edgeCanvas.width = stage.width;
+    edgeCanvas.height = stage.height;
+    const edgeContext = edgeCanvas.getContext('2d');
+    const artworkCanvas = document.createElement('canvas');
+    artworkCanvas.width = stage.width;
+    artworkCanvas.height = stage.height;
+    const artworkContext = artworkCanvas.getContext('2d');
+    const backCanvas = document.createElement('canvas');
+    backCanvas.width = stage.width;
+    backCanvas.height = stage.height;
+    const backContext = backCanvas.getContext('2d');
+    if (!acrylicContext || !edgeContext || !artworkContext || !backContext) return;
 
     const draw = async () => {
       const ratios = getPreviewArtworkRatios();
@@ -374,20 +433,59 @@ export function AcrylicKeychainTool() {
       const drawX = (stage.width - drawWidth) / 2;
       const drawY = (stage.height - drawHeight) / 2;
 
-      context.clearRect(0, 0, stage.width, stage.height);
-      context.save();
+      acrylicContext.clearRect(0, 0, stage.width, stage.height);
+      edgeContext.clearRect(0, 0, stage.width, stage.height);
+      artworkContext.clearRect(0, 0, stage.width, stage.height);
+      backContext.clearRect(0, 0, stage.width, stage.height);
+      acrylicContext.save();
+      edgeContext.save();
+      artworkContext.save();
+      backContext.save();
       try {
-        context.translate(drawX, drawY);
-        context.scale(scale, scale);
-        await drawImageSource(context, preview.acrylicSrc);
-        await drawImageSource(context, preview.artworkSrc);
+        acrylicContext.translate(drawX, drawY);
+        acrylicContext.scale(scale, scale);
+        await drawImageSource(acrylicContext, preview.acrylicSrc);
         if (cancelled) return;
-        context.globalAlpha = SURFACE_GLOSS_OPACITY;
-        context.globalCompositeOperation = 'screen';
-        await drawImageSource(context, preview.acrylicSrc);
-        if (!cancelled) setRenderedPreviewSrc(canvas.toDataURL('image/png'));
+        acrylicContext.globalAlpha = SURFACE_GLOSS_OPACITY;
+        acrylicContext.globalCompositeOperation = 'screen';
+        await drawImageSource(acrylicContext, preview.acrylicSrc);
+        if (cancelled) return;
+
+        edgeContext.translate(drawX, drawY);
+        edgeContext.scale(scale, scale);
+        await drawImageSource(edgeContext, preview.edgeSrc);
+        if (cancelled) return;
+
+        artworkContext.translate(drawX, drawY);
+        artworkContext.scale(scale, scale);
+        await drawImageSource(artworkContext, preview.artworkSrc);
+        if (cancelled) return;
+
+        backContext.translate(drawX, drawY);
+        backContext.scale(scale, scale);
+        await drawImageSource(backContext, preview.backSrc);
+        if (cancelled) return;
+
+        const highlightCanvas = document.createElement('canvas');
+        highlightCanvas.width = stage.width;
+        highlightCanvas.height = stage.height;
+        const highlightContext = highlightCanvas.getContext('2d');
+        if (!highlightContext) return;
+        highlightContext.fillStyle = 'rgba(255, 255, 255, 0.98)';
+        highlightContext.fillRect(0, 0, stage.width, stage.height);
+        highlightContext.globalCompositeOperation = 'destination-in';
+        highlightContext.drawImage(backCanvas, 0, 0);
+
+        setRenderedAcrylicSrc(acrylicCanvas.toDataURL('image/png'));
+        setRenderedEdgeSrc(edgeCanvas.toDataURL('image/png'));
+        setRenderedArtworkSrc(artworkCanvas.toDataURL('image/png'));
+        setRenderedBackArtworkSrc(backCanvas.toDataURL('image/png'));
+        setRenderedHighlightSrc(highlightCanvas.toDataURL('image/png'));
       } finally {
-        context.restore();
+        acrylicContext.restore();
+        edgeContext.restore();
+        artworkContext.restore();
+        backContext.restore();
       }
     };
 
@@ -438,6 +536,12 @@ export function AcrylicKeychainTool() {
     };
   }, [isProcessing]);
 
+  useEffect(() => {
+    return () => {
+      if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+    };
+  }, []);
+
   const loadFile = async (file: File | undefined) => {
     if (!file) return;
     const startedAt = Date.now();
@@ -450,6 +554,10 @@ export function AcrylicKeychainTool() {
       const elapsed = Date.now() - startedAt;
       if (elapsed < 900) await wait(900 - elapsed);
       setPreview(nextPreview);
+      setRotation({ y: 0 });
+      rotationVelocityRef.current = { y: 0 };
+      if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+      inertiaFrameRef.current = null;
       setStatus(`${file.name} を読み込みました`);
     } catch (error) {
       setPreview(null);
@@ -458,6 +566,49 @@ export function AcrylicKeychainTool() {
       setIsProcessing(false);
     }
   };
+
+  const stopRotation = (event: PointerEvent<HTMLDivElement>) => {
+    if (!isRotatingRef.current) return;
+    isRotatingRef.current = false;
+    setIsRotating(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const movedDistance = Math.abs(event.clientX - rotationStartPointerRef.current.x);
+    if (movedDistance < 6) {
+      rotationVelocityRef.current = { y: 0 };
+      if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+      inertiaFrameRef.current = null;
+      return;
+    }
+    runInertia();
+  };
+
+  const runInertia = () => {
+    if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+    const tick = () => {
+      const velocity = rotationVelocityRef.current;
+      const speed = Math.abs(velocity.y);
+      if (speed < ROTATION_MIN_SPEED) {
+        inertiaFrameRef.current = null;
+        return;
+      }
+      setRotation((current) => ({
+        y: current.y + velocity.y,
+      }));
+      inertiaFrameRef.current = window.requestAnimationFrame(tick);
+    };
+    inertiaFrameRef.current = window.requestAnimationFrame(tick);
+  };
+
+  const isBackSide = Math.cos((rotation.y * Math.PI) / 180) < 0;
+  const sideFacing = Math.sin((rotation.y * Math.PI) / 180);
+  const visibleSideFacing = isBackSide ? -sideFacing : sideFacing;
+  const leftFacingAmount = Math.max(0, -visibleSideFacing);
+  const leftHighlightOpacity = (
+    isBackSide ? 0 : Math.max(0, (leftFacingAmount - HIGHLIGHT_VISIBLE_START) / (1 - HIGHLIGHT_VISIBLE_START))
+  ).toFixed(3);
+  const rightShadeOpacity = Math.max(0, visibleSideFacing).toFixed(3);
 
   return (
     <div className="acrylic-tool">
@@ -473,16 +624,20 @@ export function AcrylicKeychainTool() {
       />
       <div
         className={cn('acrylic-preview-wrap', preview && 'has-preview', isDragging && 'is-dragging')}
-        role="button"
-        tabIndex={0}
+        role={preview ? undefined : 'button'}
+        tabIndex={preview ? undefined : 0}
         aria-live="polite"
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
+        onClick={preview ? undefined : () => inputRef.current?.click()}
+        onKeyDown={
+          preview
+            ? undefined
+            : (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  inputRef.current?.click();
+                }
+              }
+        }
         onDragEnter={(event) => {
           event.preventDefault();
           setIsDragging(true);
@@ -502,17 +657,86 @@ export function AcrylicKeychainTool() {
         }}
       >
         {preview ? (
-          <div className="acrylic-preview">
-            {renderedPreviewSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="acrylic-preview-image" src={renderedPreviewSrc} alt={`${preview.fileName}のアクキー完成予想`} />
+          <div
+            className={cn('acrylic-preview', isRotating && 'is-rotating')}
+            onPointerDown={(event) => {
+              if (!renderedAcrylicSrc || !renderedEdgeSrc || !renderedArtworkSrc || !renderedBackArtworkSrc || !renderedHighlightSrc) return;
+              event.preventDefault();
+              if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+              inertiaFrameRef.current = null;
+              rotationVelocityRef.current = { y: 0 };
+              isRotatingRef.current = true;
+              setIsRotating(true);
+              rotationStartPointerRef.current = { x: event.clientX, y: event.clientY };
+              lastPointerRef.current = { x: event.clientX, y: event.clientY, time: performance.now() };
+              rotationStartValueRef.current = rotation;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (!isRotatingRef.current) return;
+              event.preventDefault();
+              const rect = event.currentTarget.getBoundingClientRect();
+              const deltaX = event.clientX - rotationStartPointerRef.current.x;
+              const nextY = rotationStartValueRef.current.y + (deltaX / rect.width) * 130;
+              const now = performance.now();
+              const elapsed = Math.max(16, now - lastPointerRef.current.time);
+              const frameScale = 16 / elapsed;
+              rotationVelocityRef.current = {
+                y: ((event.clientX - lastPointerRef.current.x) / rect.width) * 130 * frameScale,
+              };
+              lastPointerRef.current = { x: event.clientX, y: event.clientY, time: now };
+              setRotation({ y: nextY });
+            }}
+            onPointerUp={stopRotation}
+            onPointerCancel={stopRotation}
+            onLostPointerCapture={() => {
+              isRotatingRef.current = false;
+              setIsRotating(false);
+            }}
+          >
+            {renderedAcrylicSrc && renderedEdgeSrc && renderedArtworkSrc && renderedBackArtworkSrc && renderedHighlightSrc ? (
+              <div
+                className="acrylic-preview-object"
+                style={{
+                  transform: `rotateY(${rotation.y}deg)`,
+                } as CSSProperties}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="acrylic-preview-image acrylic-preview-edge-image" src={renderedEdgeSrc} alt="" aria-hidden="true" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="acrylic-preview-image acrylic-preview-acrylic-image" src={renderedAcrylicSrc} alt="" aria-hidden="true" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="acrylic-preview-image acrylic-preview-artwork-image"
+                  src={isBackSide ? renderedBackArtworkSrc : renderedArtworkSrc}
+                  alt={`${preview.fileName}のアクキー完成予想`}
+                  style={{
+                    '--acrylic-right-shade': rightShadeOpacity,
+                  } as CSSProperties}
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="acrylic-preview-image acrylic-preview-light-image"
+                  src={renderedHighlightSrc}
+                  alt=""
+                  style={{
+                    '--acrylic-left-light': leftHighlightOpacity,
+                  } as CSSProperties}
+                  aria-hidden="true"
+                />
+              </div>
             ) : null}
           </div>
         ) : (
           <div className="acrylic-preview-empty">
-            <span>PNGをドラッグしてください</span>
+            <span>PNGを選択してください</span>
           </div>
         )}
+      </div>
+      <div className="acrylic-tool-actions">
+        <button type="button" className="acrylic-file-button" onClick={() => inputRef.current?.click()}>
+          {preview ? '新しいPNGを選択' : 'PNGを選択'}
+        </button>
       </div>
       {isProcessing ? (
         <div className="acrylic-processing-modal" role="status" aria-live="assertive" aria-label="プレビューを作成中です">

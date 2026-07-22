@@ -1965,6 +1965,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .acrylic-preview-wrap.has-preview {
+  cursor: default;
   background-image: url('/works/bg.png');
   background-repeat: no-repeat;
   background-position: center;
@@ -1986,14 +1987,59 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
 .acrylic-preview {
   position: relative;
+  cursor: grab;
+  perspective: 900px;
+  touch-action: none;
 }
 
-.acrylic-preview-image {
-  display: block;
+.acrylic-preview.is-rotating {
+  cursor: grabbing;
+}
+
+.acrylic-preview-object {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   user-select: none;
   pointer-events: none;
+  transform-origin: center;
+  transform-style: preserve-3d;
+}
+
+.acrylic-preview-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.acrylic-preview-acrylic-image {
+  z-index: 2;
+  transform: translateZ(6px);
+}
+
+.acrylic-preview-edge-image {
+  z-index: 1;
+  opacity: 0.95;
+  transform: translateZ(-4px);
+}
+
+.acrylic-preview-artwork-image {
+  z-index: 3;
+  --acrylic-right-shade: 0;
+  filter: brightness(calc(1 - (var(--acrylic-right-shade) * 0.14)));
+  transform: translateZ(8px);
+}
+
+.acrylic-preview-light-image {
+  z-index: 4;
+  --acrylic-left-light: 0;
+  mix-blend-mode: screen;
+  opacity: calc(var(--acrylic-left-light) * 0.95);
+  transform: translateZ(8px);
 }
 
 .acrylic-preview-empty {
@@ -2013,6 +2059,26 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   padding: 6px 12px;
   background: #ffffff;
   white-space: nowrap;
+}
+
+.acrylic-tool-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.acrylic-file-button {
+  padding: 7px 14px;
+  color: var(--site-accent);
+  cursor: pointer;
+  background: var(--site-surface);
+  border: 1px solid var(--site-border);
+  font-family: var(--font-pixel);
+}
+
+.acrylic-file-button:hover {
+  color: var(--site-surface);
+  background: var(--site-accent);
 }
 
 .acrylic-processing-modal {

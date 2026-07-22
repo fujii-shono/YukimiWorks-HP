@@ -1,12 +1,55 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { AcrylicKeychainTool } from '@/components/works/AcrylicKeychainTool';
+import { siteConfig } from '@/data/siteConfig';
 import { works } from '@/data/works';
 
 export function generateStaticParams() {
   return works.map((work) => ({ id: work.id }));
+}
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const work = works.find((item) => item.id === params.id);
+  if (!work) return {};
+
+  const title = `${work.title} | YukimiWorks`;
+  const description = work.description;
+  const ogImage = work.thumbnail.trim()
+    ? (work.thumbnail.startsWith('http') ? work.thumbnail : `${siteConfig.siteUrl}${work.thumbnail}`)
+    : undefined;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: `${siteConfig.siteUrl}/works/${work.id}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `${siteConfig.siteUrl}/works/${work.id}`,
+      type: 'article',
+      ...(ogImage
+        ? {
+            images: [
+              {
+                url: ogImage,
+                alt: `${work.title} のサムネイル`,
+              },
+            ],
+          }
+        : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
+  };
 }
 
 export default function WorkDetailPage({ params }: { params: { id: string } }) {

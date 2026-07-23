@@ -2061,6 +2061,39 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   white-space: nowrap;
 }
 
+.acrylic-hole-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-family: var(--font-pixel);
+}
+
+.acrylic-hole-toggle-button {
+  padding: 6px 10px;
+  color: color-mix(in srgb, var(--site-text-muted) 58%, #ffffff);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+
+.acrylic-hole-toggle-button.is-active {
+  color: var(--site-accent);
+  background: var(--site-surface-soft);
+  border-color: var(--site-border);
+}
+
+.acrylic-hole-toggle-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.acrylic-hole-toggle-separator {
+  color: var(--site-text-muted);
+}
+
 .acrylic-tool-actions {
   display: flex;
   justify-content: center;

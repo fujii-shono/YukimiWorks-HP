@@ -19,6 +19,10 @@ type PreviewRotation = {
 
 type RotationVelocity = PreviewRotation;
 
+type HoleMode = 'with-hole' | 'without-hole';
+
+type PreviewCache = Partial<Record<HoleMode, PreviewState>>;
+
 type AcrylicMetrics = {
   clearRadius: number;
   highlightRadius: number;
@@ -407,7 +411,7 @@ async function fileToImage(file: File) {
   return image;
 }
 
-async function buildPreview(file: File): Promise<PreviewState> {
+async function buildPreview(file: File, holeMode: HoleMode): Promise<PreviewState> {
   if (file.type !== 'image/png') {
     throw new Error('PNGファイルを選択してください');
   }
@@ -452,7 +456,7 @@ async function buildPreview(file: File): Promise<PreviewState> {
   const cropHeight = sourceMaxY - sourceMinY + 1;
   const metrics = getAcrylicMetrics(cropWidth, cropHeight);
   const padding = Math.ceil(metrics.clearRadius + metrics.highlightRadius + metrics.paddingSpace);
-  const topLoopSpace = Math.ceil(metrics.holeOuterRadius * 2 + metrics.holeGap * 2);
+  const topLoopSpace = holeMode === 'with-hole' ? Math.ceil(metrics.holeOuterRadius * 2 + metrics.holeGap * 2) : 0;
   const width = cropWidth + padding * 2;
   const height = cropHeight + padding * 2 + topLoopSpace;
   const imageX = padding - sourceMinX;
@@ -489,8 +493,11 @@ async function buildPreview(file: File): Promise<PreviewState> {
     maskHeight,
     scaleMaskRadius(metrics.internalGapCloseRadius),
   );
-  const keychainShape = addKeychainHoleToMask(gapClosedBaseMask, maskWidth, maskHeight, padding + cropWidth / 2, cropWidth, metrics);
-  const keychainMask = keychainShape.mask;
+  const keychainShape =
+    holeMode === 'with-hole'
+      ? addKeychainHoleToMask(gapClosedBaseMask, maskWidth, maskHeight, padding + cropWidth / 2, cropWidth, metrics)
+      : null;
+  const keychainMask = keychainShape?.mask ?? gapClosedBaseMask;
 
   const clearRadius = scaleMaskRadius(metrics.clearRadius);
   const edgeRadius = scaleMaskRadius(metrics.clearRadius + metrics.edgeShadowWidth);
@@ -500,13 +507,15 @@ async function buildPreview(file: File): Promise<PreviewState> {
   const edgeMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, edgeRadius), maskWidth, maskHeight);
   const highlightMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, highlightRadius), maskWidth, maskHeight);
   const innerShineMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, innerShineRadius), maskWidth, maskHeight);
-  const holeTransparentRadius = Math.max(1, keychainShape.hole.radius);
-  const holeLineWidth = Math.max(1, Math.round(metrics.edgeShadowWidth * MASK_RENDER_SCALE));
-  const holeLineInnerRadius = Math.max(1, holeTransparentRadius - holeLineWidth);
-  paintCircleOnMask(clearMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
-  paintCircleOnMask(edgeMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
-  paintCircleOnMask(highlightMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
-  paintCircleOnMask(innerShineMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
+  if (keychainShape) {
+    const holeTransparentRadius = Math.max(1, keychainShape.hole.radius);
+    const holeLineWidth = Math.max(1, Math.round(metrics.edgeShadowWidth * MASK_RENDER_SCALE));
+    const holeLineInnerRadius = Math.max(1, holeTransparentRadius - holeLineWidth);
+    paintCircleOnMask(clearMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
+    paintCircleOnMask(edgeMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
+    paintCircleOnMask(highlightMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
+    paintCircleOnMask(innerShineMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
+  }
   const acrylicLow = makeLayerFromMask(maskWidth, maskHeight, () => null);
 
   drawMaskLayer(acrylicLow.context, highlightMask, maskWidth, maskHeight, [255, 255, 255, 58]);
@@ -620,6 +629,9 @@ export function AcrylicKeychainTool() {
   const rotationStartPointerRef = useRef({ x: 0, y: 0 });
   const rotationStartValueRef = useRef<PreviewRotation>({ y: 0 });
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewCache, setPreviewCache] = useState<PreviewCache>({});
+  const [holeMode, setHoleMode] = useState<HoleMode>('with-hole');
   const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
   const [renderedEdgeSrc, setRenderedEdgeSrc] = useState('');
   const [renderedArtworkSrc, setRenderedArtworkSrc] = useState('');
@@ -785,14 +797,18 @@ export function AcrylicKeychainTool() {
   const loadFile = async (file: File | undefined) => {
     if (!file) return;
     const startedAt = Date.now();
+    const nextHoleMode = holeMode;
     setIsProcessing(true);
     setStatus('プレビューを作成中です');
+    setSelectedFile(file);
+    setPreviewCache({});
     try {
       await waitForNextFrame();
       await waitForNextFrame();
-      const nextPreview = await buildPreview(file);
+      const nextPreview = await buildPreview(file, nextHoleMode);
       const elapsed = Date.now() - startedAt;
       if (elapsed < 900) await wait(900 - elapsed);
+      setPreviewCache({ [nextHoleMode]: nextPreview });
       setPreview(nextPreview);
       setRotation({ y: 0 });
       rotationVelocityRef.current = { y: 0 };
@@ -801,7 +817,46 @@ export function AcrylicKeychainTool() {
       setStatus(`${file.name} を読み込みました`);
     } catch (error) {
       setPreview(null);
+      setSelectedFile(null);
+      setPreviewCache({});
       setStatus(error instanceof Error ? error.message : 'PNGを読み込めませんでした');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const switchHoleMode = async (nextHoleMode: HoleMode) => {
+    setHoleMode(nextHoleMode);
+    const cachedPreview = previewCache[nextHoleMode];
+    if (cachedPreview) {
+      setPreview(cachedPreview);
+      setRotation({ y: 0 });
+      rotationVelocityRef.current = { y: 0 };
+      if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+      inertiaFrameRef.current = null;
+      setStatus(`${cachedPreview.fileName} を読み込みました`);
+      return;
+    }
+    if (!selectedFile) return;
+
+    const startedAt = Date.now();
+    setIsProcessing(true);
+    setStatus('プレビューを作成中です');
+    try {
+      await waitForNextFrame();
+      await waitForNextFrame();
+      const nextPreview = await buildPreview(selectedFile, nextHoleMode);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 900) await wait(900 - elapsed);
+      setPreviewCache((current) => ({ ...current, [nextHoleMode]: nextPreview }));
+      setPreview(nextPreview);
+      setRotation({ y: 0 });
+      rotationVelocityRef.current = { y: 0 };
+      if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+      inertiaFrameRef.current = null;
+      setStatus(`${selectedFile.name} を読み込みました`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'プレビューを作成できませんでした');
     } finally {
       setIsProcessing(false);
     }
@@ -972,6 +1027,33 @@ export function AcrylicKeychainTool() {
             <span>PNGを選択してください</span>
           </div>
         )}
+      </div>
+      <div className="acrylic-hole-toggle" role="group" aria-label="ボールチェーン穴">
+        <button
+          type="button"
+          className={cn('acrylic-hole-toggle-button', holeMode === 'with-hole' && 'is-active')}
+          aria-pressed={holeMode === 'with-hole'}
+          disabled={isProcessing}
+          onClick={() => {
+            if (holeMode !== 'with-hole') void switchHoleMode('with-hole');
+          }}
+        >
+          穴あり
+        </button>
+        <span className="acrylic-hole-toggle-separator" aria-hidden="true">
+          ｜
+        </span>
+        <button
+          type="button"
+          className={cn('acrylic-hole-toggle-button', holeMode === 'without-hole' && 'is-active')}
+          aria-pressed={holeMode === 'without-hole'}
+          disabled={isProcessing}
+          onClick={() => {
+            if (holeMode !== 'without-hole') void switchHoleMode('without-hole');
+          }}
+        >
+          穴なし
+        </button>
       </div>
       <div className="acrylic-tool-actions">
         <button type="button" className="acrylic-file-button" onClick={() => inputRef.current?.click()}>

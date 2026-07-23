@@ -19,6 +19,18 @@ type PreviewRotation = {
 
 type RotationVelocity = PreviewRotation;
 
+type AcrylicMetrics = {
+  clearRadius: number;
+  highlightRadius: number;
+  internalGapCloseRadius: number;
+  holeOuterRadius: number;
+  holeInnerRadius: number;
+  holeGap: number;
+  paddingSpace: number;
+  edgeShadowWidth: number;
+  innerShineWidth: number;
+};
+
 const MAX_IMAGE_SIZE = 820;
 const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
 const PREVIEW_STAGE_WIDTH = 960;
@@ -32,18 +44,41 @@ const MOBILE_PREVIEW_ARTWORK_MAX_HEIGHT_RATIO = 0.98;
 const MASK_RENDER_SCALE = 0.5;
 const ROTATION_MIN_SPEED = 0.015;
 const HIGHLIGHT_VISIBLE_START = 0.78;
-const CLEAR_RADIUS = 10;
-const HIGHLIGHT_RADIUS = 1;
-const TOP_LOOP_SPACE = 0;
+const REFERENCE_ARTWORK_SIZE = 500;
+const BASE_CLEAR_RADIUS = 10;
+const BASE_HIGHLIGHT_RADIUS = 1;
+const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
+const BASE_KEYCHAIN_HOLE_OUTER_RADIUS = 24;
+const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
+const BASE_KEYCHAIN_HOLE_GAP = 2;
+const BASE_PADDING_SPACE = 20;
 const ARTWORK_MULTIPLY_COLOR = 'rgb(242, 241, 241)';
-const EDGE_SHADOW_WIDTH = 4;
-const INNER_SHINE_WIDTH = 2;
+const BASE_EDGE_SHADOW_WIDTH = 4;
+const BASE_INNER_SHINE_WIDTH = 2;
 const SURFACE_GLOSS_OPACITY = 0.46;
 const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124, 58];
 const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
 const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
+
+function scaleArtworkMetric(value: number, artworkWidth: number, artworkHeight: number) {
+  return value * (Math.max(artworkWidth, artworkHeight) / REFERENCE_ARTWORK_SIZE);
+}
+
+function getAcrylicMetrics(artworkWidth: number, artworkHeight: number): AcrylicMetrics {
+  return {
+    clearRadius: scaleArtworkMetric(BASE_CLEAR_RADIUS, artworkWidth, artworkHeight),
+    highlightRadius: scaleArtworkMetric(BASE_HIGHLIGHT_RADIUS, artworkWidth, artworkHeight),
+    internalGapCloseRadius: scaleArtworkMetric(BASE_INTERNAL_GAP_CLOSE_RADIUS, artworkWidth, artworkHeight),
+    holeOuterRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_OUTER_RADIUS, artworkWidth, artworkHeight),
+    holeInnerRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_INNER_RADIUS, artworkWidth, artworkHeight),
+    holeGap: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_GAP, artworkWidth, artworkHeight),
+    paddingSpace: scaleArtworkMetric(BASE_PADDING_SPACE, artworkWidth, artworkHeight),
+    edgeShadowWidth: scaleArtworkMetric(BASE_EDGE_SHADOW_WIDTH, artworkWidth, artworkHeight),
+    innerShineWidth: scaleArtworkMetric(BASE_INNER_SHINE_WIDTH, artworkWidth, artworkHeight),
+  };
+}
 
 function createCircleOffsets(radius: number) {
   const offsets: Array<[number, number]> = [];
@@ -74,6 +109,192 @@ async function dilateMask(mask: Uint8Array, width: number, height: number, radiu
   }
 
   return output;
+}
+
+async function fillEnclosedMaskHoles(mask: Uint8Array, width: number, height: number) {
+  const visited = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let head = 0;
+  let tail = 0;
+
+  const pushTransparentEdge = (x: number, y: number) => {
+    const index = y * width + x;
+    if (mask[index] || visited[index]) return;
+    visited[index] = 1;
+    queue[tail] = index;
+    tail += 1;
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    pushTransparentEdge(x, 0);
+    pushTransparentEdge(x, height - 1);
+  }
+  for (let y = 0; y < height; y += 1) {
+    pushTransparentEdge(0, y);
+    pushTransparentEdge(width - 1, y);
+  }
+
+  while (head < tail) {
+    if (head > 0 && head % 12000 === 0) await waitForNextFrame();
+    const index = queue[head];
+    head += 1;
+    const x = index % width;
+    const y = Math.floor(index / width);
+    const neighbors = [
+      x > 0 ? index - 1 : -1,
+      x < width - 1 ? index + 1 : -1,
+      y > 0 ? index - width : -1,
+      y < height - 1 ? index + width : -1,
+    ];
+
+    for (const nextIndex of neighbors) {
+      if (nextIndex < 0 || mask[nextIndex] || visited[nextIndex]) continue;
+      visited[nextIndex] = 1;
+      queue[tail] = nextIndex;
+      tail += 1;
+    }
+  }
+
+  const output = mask.slice();
+  for (let index = 0; index < width * height; index += 1) {
+    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
+    if (!output[index] && !visited[index]) output[index] = 1;
+  }
+
+  return output;
+}
+
+async function fillNarrowTransparentGaps(mask: Uint8Array, width: number, height: number, radius: number) {
+  if (radius <= 0) return mask.slice();
+
+  const expandedMask = await dilateMask(mask, width, height, radius);
+  const closedMask = await fillEnclosedMaskHoles(expandedMask, width, height);
+  const closedTransparentAreas = new Uint8Array(width * height);
+
+  for (let index = 0; index < width * height; index += 1) {
+    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
+    if (closedMask[index] && !expandedMask[index]) closedTransparentAreas[index] = 1;
+  }
+
+  const patchMask = await dilateMask(closedTransparentAreas, width, height, radius);
+  const output = mask.slice();
+  for (let index = 0; index < width * height; index += 1) {
+    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
+    if (patchMask[index] && closedMask[index]) output[index] = 1;
+  }
+
+  return output;
+}
+
+function paintCircleOnMask(mask: Uint8Array, width: number, height: number, centerX: number, centerY: number, radius: number, value: 0 | 1) {
+  const squaredRadius = radius * radius;
+  for (let y = centerY - radius; y <= centerY + radius; y += 1) {
+    if (y < 0 || y >= height) continue;
+    for (let x = centerX - radius; x <= centerX + radius; x += 1) {
+      if (x < 0 || x >= width) continue;
+      const offsetX = x - centerX;
+      const offsetY = y - centerY;
+      if (offsetX * offsetX + offsetY * offsetY > squaredRadius) continue;
+      mask[y * width + x] = value;
+    }
+  }
+}
+
+function paintSplitBottomConnectorOnMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  left: number,
+  right: number,
+  top: number,
+  leftBottom: number,
+  rightBottom: number,
+) {
+  const minX = Math.max(0, Math.min(left, right));
+  const maxX = Math.min(width - 1, Math.max(left, right));
+  const topY = Math.max(0, top);
+  const span = Math.max(1, maxX - minX);
+
+  for (let x = minX; x <= maxX; x += 1) {
+    const progress = (x - minX) / span;
+    const bottomY = Math.min(height - 1, Math.round(leftBottom + (rightBottom - leftBottom) * progress));
+    for (let y = topY; y <= bottomY; y += 1) {
+      mask[y * width + x] = 1;
+    }
+  }
+}
+
+function findTopMaskYNearX(mask: Uint8Array, width: number, height: number, centerX: number, halfWidth: number) {
+  const minX = Math.max(0, centerX - halfWidth);
+  const maxX = Math.min(width - 1, centerX + halfWidth);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      if (mask[y * width + x]) return y;
+    }
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (mask[y * width + x]) return y;
+    }
+  }
+
+  return 0;
+}
+
+function findConnectorEdgeContactY(mask: Uint8Array, width: number, height: number, x: number, radius: number, startY: number) {
+  const minX = Math.max(0, x - radius);
+  const maxX = Math.min(width - 1, x + radius);
+  const top = Math.max(0, startY);
+
+  for (let y = top; y < height; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      if (mask[y * width + x]) return y;
+    }
+  }
+
+  return null;
+}
+
+function addKeychainHoleToMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  metrics: AcrylicMetrics,
+) {
+  const loopMask = mask.slice();
+  const centerX = Math.round(artworkCenterX * MASK_RENDER_SCALE);
+  const centerBandHalfWidth = Math.max(3, Math.round(artworkWidth * 0.16 * MASK_RENDER_SCALE));
+  const artworkTopY = findTopMaskYNearX(loopMask, width, height, centerX, centerBandHalfWidth);
+  const outerRadius = scaleMaskRadius(metrics.holeOuterRadius);
+  const innerRadius = scaleMaskRadius(metrics.holeInnerRadius);
+  const clearRadius = scaleMaskRadius(metrics.clearRadius);
+  const gap = Math.round(metrics.holeGap * MASK_RENDER_SCALE);
+  const clearTopY = Math.max(0, artworkTopY - clearRadius);
+  const centerY = Math.max(outerRadius + 1, clearTopY - innerRadius - gap);
+  const connectorLeft = centerX - outerRadius;
+  const connectorRight = centerX + outerRadius;
+  const edgeProbeRadius = Math.max(1, Math.round(clearRadius * 0.35));
+  const probeStartY = centerY + outerRadius + 1;
+  const leftContactY = findConnectorEdgeContactY(loopMask, width, height, connectorLeft, edgeProbeRadius, probeStartY) ?? artworkTopY;
+  const rightContactY = findConnectorEdgeContactY(loopMask, width, height, connectorRight, edgeProbeRadius, probeStartY) ?? artworkTopY;
+  const leftConnectorEndY = Math.min(height - 1, leftContactY + clearRadius);
+  const rightConnectorEndY = Math.min(height - 1, rightContactY + clearRadius);
+
+  paintCircleOnMask(loopMask, width, height, centerX, centerY, outerRadius, 1);
+  paintSplitBottomConnectorOnMask(loopMask, width, height, connectorLeft, connectorRight, centerY, leftConnectorEndY, rightConnectorEndY);
+  paintCircleOnMask(loopMask, width, height, centerX, centerY, innerRadius, 0);
+
+  return {
+    mask: loopMask,
+    hole: {
+      centerX,
+      centerY,
+      radius: innerRadius,
+    },
+  };
 }
 
 function drawMaskLayer(
@@ -198,7 +419,6 @@ async function buildPreview(file: File): Promise<PreviewState> {
   const scale = Math.min(1, MAX_IMAGE_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
   const imageWidth = Math.max(1, Math.round(image.naturalWidth * scale));
   const imageHeight = Math.max(1, Math.round(image.naturalHeight * scale));
-  const padding = CLEAR_RADIUS + HIGHLIGHT_RADIUS + 20;
 
   const sourceCanvas = document.createElement('canvas');
   sourceCanvas.width = imageWidth;
@@ -230,10 +450,13 @@ async function buildPreview(file: File): Promise<PreviewState> {
 
   const cropWidth = sourceMaxX - sourceMinX + 1;
   const cropHeight = sourceMaxY - sourceMinY + 1;
+  const metrics = getAcrylicMetrics(cropWidth, cropHeight);
+  const padding = Math.ceil(metrics.clearRadius + metrics.highlightRadius + metrics.paddingSpace);
+  const topLoopSpace = Math.ceil(metrics.holeOuterRadius * 2 + metrics.holeGap * 2);
   const width = cropWidth + padding * 2;
-  const height = cropHeight + padding * 2 + TOP_LOOP_SPACE;
+  const height = cropHeight + padding * 2 + topLoopSpace;
   const imageX = padding - sourceMinX;
-  const imageY = padding + TOP_LOOP_SPACE - sourceMinY;
+  const imageY = padding + topLoopSpace - sourceMinY;
 
   const maskWidth = Math.max(1, Math.ceil(width * MASK_RENDER_SCALE));
   const maskHeight = Math.max(1, Math.ceil(height * MASK_RENDER_SCALE));
@@ -259,14 +482,31 @@ async function buildPreview(file: File): Promise<PreviewState> {
     baseMask[index] = 1;
   }
 
-  const clearRadius = scaleMaskRadius(CLEAR_RADIUS);
-  const edgeRadius = scaleMaskRadius(CLEAR_RADIUS + EDGE_SHADOW_WIDTH);
-  const highlightRadius = scaleMaskRadius(CLEAR_RADIUS + HIGHLIGHT_RADIUS);
-  const innerShineRadius = Math.max(0, Math.round((CLEAR_RADIUS - INNER_SHINE_WIDTH) * MASK_RENDER_SCALE));
-  const clearMask = await dilateMask(baseMask, maskWidth, maskHeight, clearRadius);
-  const edgeMask = await dilateMask(baseMask, maskWidth, maskHeight, edgeRadius);
-  const highlightMask = await dilateMask(baseMask, maskWidth, maskHeight, highlightRadius);
-  const innerShineMask = await dilateMask(baseMask, maskWidth, maskHeight, innerShineRadius);
+  const filledBaseMask = await fillEnclosedMaskHoles(baseMask, maskWidth, maskHeight);
+  const gapClosedBaseMask = await fillNarrowTransparentGaps(
+    filledBaseMask,
+    maskWidth,
+    maskHeight,
+    scaleMaskRadius(metrics.internalGapCloseRadius),
+  );
+  const keychainShape = addKeychainHoleToMask(gapClosedBaseMask, maskWidth, maskHeight, padding + cropWidth / 2, cropWidth, metrics);
+  const keychainMask = keychainShape.mask;
+
+  const clearRadius = scaleMaskRadius(metrics.clearRadius);
+  const edgeRadius = scaleMaskRadius(metrics.clearRadius + metrics.edgeShadowWidth);
+  const highlightRadius = scaleMaskRadius(metrics.clearRadius + metrics.highlightRadius);
+  const innerShineRadius = Math.max(0, Math.round((metrics.clearRadius - metrics.innerShineWidth) * MASK_RENDER_SCALE));
+  const clearMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, clearRadius), maskWidth, maskHeight);
+  const edgeMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, edgeRadius), maskWidth, maskHeight);
+  const highlightMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, highlightRadius), maskWidth, maskHeight);
+  const innerShineMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, innerShineRadius), maskWidth, maskHeight);
+  const holeTransparentRadius = Math.max(1, keychainShape.hole.radius);
+  const holeLineWidth = Math.max(1, Math.round(metrics.edgeShadowWidth * MASK_RENDER_SCALE));
+  const holeLineInnerRadius = Math.max(1, holeTransparentRadius - holeLineWidth);
+  paintCircleOnMask(clearMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
+  paintCircleOnMask(edgeMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
+  paintCircleOnMask(highlightMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
+  paintCircleOnMask(innerShineMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
   const acrylicLow = makeLayerFromMask(maskWidth, maskHeight, () => null);
 
   drawMaskLayer(acrylicLow.context, highlightMask, maskWidth, maskHeight, [255, 255, 255, 58]);
@@ -332,7 +572,7 @@ async function buildPreview(file: File): Promise<PreviewState> {
   edge.context.drawImage(edgeLow.canvas, 0, 0, width, height);
 
   const backLow = makeLayerFromMask(maskWidth, maskHeight, (index) =>
-    highlightMask[index] ? BACK_FACE_MULTIPLY_COLOR : null,
+    baseMask[index] ? BACK_FACE_MULTIPLY_COLOR : null,
   );
   const back = makeLayerFromMask(width, height, () => null);
   back.context.imageSmoothingEnabled = true;

@@ -551,6 +551,66 @@ textarea {
   height: auto;
 }
 
+.counter-character-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.counter-character-button {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.counter-character-press-target.is-clicked {
+  animation: character-click-press 120ms linear;
+}
+
+.counter-speech-bubble {
+  position: absolute;
+  z-index: 100;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 190px;
+  padding: 7px 10px;
+  color: var(--site-text);
+  background: var(--site-surface);
+  border: 2px solid var(--site-border);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--site-dotted) 70%, white);
+  font-family: var(--font-pixel);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: center;
+  white-space: normal;
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+.counter-speech-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 12px;
+  height: 12px;
+  background: var(--site-surface);
+  border-right: 2px solid var(--site-border);
+  border-bottom: 2px solid var(--site-border);
+  translate: -50% 0;
+  transform: rotate(45deg);
+}
+
 .counter-absent {
   display: inline-block;
   padding: 4px 8px;
@@ -2618,8 +2678,17 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   .speech-bubble {
     left: 50%;
     top: 0;
-    transform: translateX(-18%);
+    box-sizing: border-box;
+    max-width: min(280px, calc(100vw - 48px));
+    translate: -50% 0;
     white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .speech-bubble::after {
+    left: 50%;
+    translate: -50% 0;
   }
 
   .service-list,

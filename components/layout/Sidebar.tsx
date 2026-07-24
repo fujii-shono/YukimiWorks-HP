@@ -1,6 +1,7 @@
 'use client';
+import { AnimatePresence, motion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
@@ -27,11 +28,53 @@ export function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [counterDisplay, setCounterDisplay] = useState<string>(siteConfig.decorativeCounter);
+  const [counterMessage, setCounterMessage] = useState<string | null>(null);
+  const [isCounterPressed, setIsCounterPressed] = useState(false);
+  const counterClickTimestamps = useRef<number[]>([]);
+  const counterMessageTimer = useRef<number | null>(null);
+  const counterAnimationTimer = useRef<number | null>(null);
   const { absent, event, sleepMode } = useTimeTheme();
   const latestNews = newsItems.slice(0, 3);
   const counterCharacterSrc = sleepMode ? '/character/sleeping.png' : '/character/default.png';
   const counterCharacterMask = event === 'sleep-warning' ? '/effects/eyes.png' : counterCharacterSrc;
   const absentLabel = event === 'lunch' ? '食事中' : event === 'late-night-away' ? '....' : 'お出かけ中';
+
+  const clearCounterTimers = useCallback(() => {
+    if (counterMessageTimer.current !== null) {
+      window.clearTimeout(counterMessageTimer.current);
+      counterMessageTimer.current = null;
+    }
+
+    if (counterAnimationTimer.current !== null) {
+      window.clearTimeout(counterAnimationTimer.current);
+      counterAnimationTimer.current = null;
+    }
+  }, []);
+
+  const handleCounterCharacterClick = useCallback(() => {
+    if (absent) return;
+
+    setIsCounterPressed(true);
+    if (counterAnimationTimer.current !== null) window.clearTimeout(counterAnimationTimer.current);
+    counterAnimationTimer.current = window.setTimeout(() => {
+      setIsCounterPressed(false);
+      counterAnimationTimer.current = null;
+    }, 140);
+
+    const now = Date.now();
+    counterClickTimestamps.current = [...counterClickTimestamps.current.filter((stamp) => now - stamp <= 6000), now];
+
+    if (counterClickTimestamps.current.length < 10) return;
+
+    if (counterMessageTimer.current !== null) window.clearTimeout(counterMessageTimer.current);
+    setCounterMessage(
+      counterClickTimestamps.current.length >= 30 ? 'いい加減にしないと殴りますよ？' : 'ここをタップしても何もないですよ',
+    );
+    counterMessageTimer.current = window.setTimeout(() => {
+      setCounterMessage(null);
+      counterMessageTimer.current = null;
+    }, 2_500);
+  }, [absent]);
 
   useEffect(() => {
     let isMounted = true;
@@ -88,6 +131,20 @@ export function Sidebar() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!absent) return;
+    clearCounterTimers();
+    counterClickTimestamps.current = [];
+    setCounterMessage(null);
+    setIsCounterPressed(false);
+  }, [absent, clearCounterTimers]);
+
+  useEffect(() => {
+    return () => {
+      clearCounterTimers();
+    };
+  }, [clearCounterTimers]);
 
   return (
     <aside className="sidebar" aria-label="サイドメニュー">
@@ -183,19 +240,49 @@ export function Sidebar() {
           {absent ? (
             <span className="counter-absent">{absentLabel}</span>
           ) : (
-            <span
-              className="pixel-tint-frame pixel-tint-frame-counter"
-              style={{ '--pixel-mask': `url("${counterCharacterMask}")` } as CSSProperties}
-            >
-              <SleepWarningImage
-                src={counterCharacterSrc}
-                alt="YukimiWorksのミニキャラクター"
-                width={37}
-                height={45}
-                className={cn('tiny-character pixel-image tinted-pixel-art', event !== 'sleep-warning' && 'pixel-art-silhouette')}
-                unoptimized
-                draggable={false}
-              />
+            <span className="counter-character-slot">
+              <AnimatePresence>
+                {counterMessage ? (
+                  <motion.span
+                    key={counterMessage}
+                    className="counter-speech-bubble"
+                    role="status"
+                    aria-live="polite"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {counterMessage}
+                  </motion.span>
+                ) : null}
+              </AnimatePresence>
+              <button
+                type="button"
+                className="counter-character-button"
+                aria-label="ミニキャラクターをタップする"
+                onClick={handleCounterCharacterClick}
+              >
+                <span
+                  className={cn(
+                    'pixel-tint-frame',
+                    'pixel-tint-frame-counter',
+                    'counter-character-press-target',
+                    isCounterPressed && 'is-clicked',
+                  )}
+                  style={{ '--pixel-mask': `url("${counterCharacterMask}")` } as CSSProperties}
+                >
+                  <SleepWarningImage
+                    src={counterCharacterSrc}
+                    alt="YukimiWorksのミニキャラクター"
+                    width={37}
+                    height={45}
+                    className={cn('tiny-character pixel-image tinted-pixel-art', event !== 'sleep-warning' && 'pixel-art-silhouette')}
+                    unoptimized
+                    draggable={false}
+                  />
+                </span>
+              </button>
             </span>
           )}
         </div>

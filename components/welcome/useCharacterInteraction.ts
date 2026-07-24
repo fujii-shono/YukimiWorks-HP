@@ -15,6 +15,8 @@ function chooseOne(messages: readonly string[], lastIndexRef: { current: number 
   return messages[index] ?? '';
 }
 
+type ScrollSequenceState = 'waiting-for-bottom' | 'waiting-for-top';
+
 export function useCharacterInteraction() {
   const { event, hour, absent, sleepMode } = useTimeTheme();
   const [message, setMessage] = useState<string | null>(null);
@@ -26,6 +28,10 @@ export function useCharacterInteraction() {
   const animationTimers = useRef<number[]>([]);
   const lastIndex = useRef(-1);
   const clickTimestamps = useRef<number[]>([]);
+  const scrollSequenceState = useRef<ScrollSequenceState>('waiting-for-bottom');
+  const scrollSequenceCount = useRef(0);
+  const hasShownScrollSearchMessage = useRef(false);
+  const exclusiveMessageUntil = useRef(0);
 
   const clearTimers = () => {
     timers.current.forEach((timer) => window.clearTimeout(timer));
@@ -124,7 +130,12 @@ export function useCharacterInteraction() {
     };
   }, [scheduleBubbleLoop]);
 
-  const triggerSpecialMessage = (nextMessage: string) => {
+  const isExclusiveMessageActive = useCallback(() => Date.now() < exclusiveMessageUntil.current, []);
+
+  const triggerSpecialMessage = useCallback((nextMessage: string, duration = 2_500, exclusive = false) => {
+    if (!exclusive && isExclusiveMessageActive()) return;
+
+    if (exclusive) exclusiveMessageUntil.current = Date.now() + duration;
     clearTimers();
     setMessage(nextMessage);
     setBubbleTail(true);
@@ -134,9 +145,54 @@ export function useCharacterInteraction() {
         setMessage(null);
         setPolite(false);
         scheduleBubbleLoop();
-      }, 2_500),
+      }, duration),
     );
-  };
+  }, [isExclusiveMessageActive, scheduleBubbleLoop]);
+
+  useEffect(() => {
+    if (absent || event === 'sleep-warning' || sleepMode) return;
+
+    const topThreshold = 8;
+    const bottomThreshold = 8;
+
+    const isAtTop = () => window.scrollY <= topThreshold;
+    const isAtBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - bottomThreshold;
+
+    const handleScrollSequence = () => {
+      if (isExclusiveMessageActive()) return;
+      if (document.documentElement.scrollHeight <= window.innerHeight + bottomThreshold) return;
+
+      if (scrollSequenceState.current === 'waiting-for-bottom') {
+        if (isAtBottom()) scrollSequenceState.current = 'waiting-for-top';
+        return;
+      }
+
+      if (!isAtTop()) return;
+
+      scrollSequenceState.current = 'waiting-for-bottom';
+      scrollSequenceCount.current += 1;
+
+      if (scrollSequenceCount.current >= 3) {
+        scrollSequenceCount.current = 0;
+        triggerSpecialMessage('あんま揺らされると酔うんですけど', 5_000, true);
+        return;
+      }
+
+      if (scrollSequenceCount.current === 1 && !hasShownScrollSearchMessage.current) {
+        hasShownScrollSearchMessage.current = true;
+        triggerSpecialMessage('なにかお探しですか？');
+      }
+    };
+
+    handleScrollSequence();
+    window.addEventListener('scroll', handleScrollSequence, { passive: true });
+    window.addEventListener('resize', handleScrollSequence);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollSequence);
+      window.removeEventListener('resize', handleScrollSequence);
+    };
+  }, [absent, event, sleepMode, isExclusiveMessageActive, triggerSpecialMessage]);
 
   const onCharacterClick = () => {
     if (absent) return;
@@ -154,6 +210,8 @@ export function useCharacterInteraction() {
       setPolite(false);
       return;
     }
+
+    if (isExclusiveMessageActive()) return;
 
     if (sleepMode) {
       clearTimers();

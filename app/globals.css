@@ -1041,6 +1041,14 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   pointer-events: none;
 }
 
+.maid-asset-frame:not(.is-ready) .maid-dot-canvas,
+.maid-asset-frame:not(.is-ready) .maid-wind-shell,
+.maid-asset-frame:not(.is-ready) .maid-star,
+.maid-asset-frame:not(.is-ready) .maid-star-trigger,
+.maid-asset-frame:not(.is-ready) .maid-layer {
+  visibility: hidden;
+}
+
 .maid-layer {
   position: absolute;
   inset: 0;

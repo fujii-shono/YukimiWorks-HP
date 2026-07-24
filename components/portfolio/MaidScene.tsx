@@ -64,6 +64,18 @@ const EYE_OUTSIDE_FOLLOW_RANGE = {
   bottom: 2,
 } as const;
 const EYE_FOLLOW_RESET_DELAY_MS = 900;
+const REQUIRED_IMAGE_KEYS = [
+  'wind',
+  'star-top-right',
+  'star-middle-left',
+  'star-middle-right',
+  'eye-hole',
+  'eye',
+  'eye-highlight',
+  'base',
+] as const;
+
+type RequiredImageKey = (typeof REQUIRED_IMAGE_KEYS)[number];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -72,6 +84,7 @@ function clamp(value: number, min: number, max: number) {
 export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
   const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
   const [starCursorUrl, setStarCursorUrl] = useState('');
+  const [loadedImageKeys, setLoadedImageKeys] = useState<ReadonlySet<RequiredImageKey>>(() => new Set());
   const [eyeOutsideActive, setEyeOutsideActive] = useState(false);
   const [windDragging, setWindDragging] = useState(false);
   const [windReleasing, setWindReleasing] = useState(false);
@@ -199,6 +212,16 @@ export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
     const nextY = normalizedY >= 0 ? normalizedY * EYE_FOLLOW_RANGE.bottom : normalizedY * Math.abs(EYE_FOLLOW_RANGE.top);
 
     return { x: nextX, y: nextY };
+  }, []);
+
+  const markImageLoaded = useCallback((key: RequiredImageKey) => {
+    setLoadedImageKeys((current) => {
+      if (current.has(key)) return current;
+
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
   }, []);
 
   const getOutsideEyeOffset = useCallback(() => {
@@ -400,13 +423,14 @@ export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
     '--maid-eye-follow-x': `${(eyeOffset.x / FIGURE_WIDTH) * 100}cqw`,
     '--maid-eye-follow-y': `${(eyeOffset.y / FIGURE_WIDTH) * 100}cqw`,
   } as CSSProperties;
+  const sceneReady = loadedImageKeys.size >= REQUIRED_IMAGE_KEYS.length;
 
   return (
     <div className={cn('maid-scene', `maid-scene-${variant}`)}>
       <div className="maid-asset-stage">
         <div
           ref={frameRef}
-          className="maid-asset-frame"
+          className={cn('maid-asset-frame', sceneReady && 'is-ready')}
           onPointerDown={updateEyeFollow}
           onPointerMove={updateEyeFollow}
           onPointerLeave={scheduleEyeFollowReset}
@@ -423,6 +447,8 @@ export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
               style={windImageStyle}
               draggable={false}
               priority={variant === 'modal'}
+              onLoad={() => markImageLoaded('wind')}
+              onError={() => markImageLoaded('wind')}
               aria-hidden="true"
               unoptimized
             />
@@ -458,6 +484,8 @@ export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
                   '--maid-star-rotation': `${star.rotation}deg`,
                 } as CSSProperties}
                 draggable={false}
+                onLoad={() => markImageLoaded(`star-${star.id}` as RequiredImageKey)}
+                onError={() => markImageLoaded(`star-${star.id}` as RequiredImageKey)}
                 aria-hidden="true"
                 unoptimized
               />
@@ -477,7 +505,17 @@ export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
               )}
             </div>
           ))}
-          <Image className="maid-layer maid-eye-hole" src={EYE_HOLE_SRC} alt="" width={FIGURE_WIDTH} height={FIGURE_HEIGHT} aria-hidden="true" unoptimized />
+          <Image
+            className="maid-layer maid-eye-hole"
+            src={EYE_HOLE_SRC}
+            alt=""
+            width={FIGURE_WIDTH}
+            height={FIGURE_HEIGHT}
+            onLoad={() => markImageLoaded('eye-hole')}
+            onError={() => markImageLoaded('eye-hole')}
+            aria-hidden="true"
+            unoptimized
+          />
           <Image
             className="maid-layer maid-eye"
             src={EYE_SRC}
@@ -485,6 +523,8 @@ export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
             width={FIGURE_WIDTH}
             height={FIGURE_HEIGHT}
             style={eyeStyle}
+            onLoad={() => markImageLoaded('eye')}
+            onError={() => markImageLoaded('eye')}
             aria-hidden="true"
             unoptimized
           />
@@ -494,10 +534,21 @@ export function MaidScene({ variant }: { variant: PortfolioMediaVariant }) {
             alt=""
             width={1827}
             height={2732}
+            onLoad={() => markImageLoaded('eye-highlight')}
+            onError={() => markImageLoaded('eye-highlight')}
             aria-hidden="true"
             unoptimized
           />
-          <Image className="maid-layer maid-base" src={BASE_SRC} alt="メイドさんのHTMLアート" width={FIGURE_WIDTH} height={FIGURE_HEIGHT} unoptimized />
+          <Image
+            className="maid-layer maid-base"
+            src={BASE_SRC}
+            alt="メイドさんのHTMLアート"
+            width={FIGURE_WIDTH}
+            height={FIGURE_HEIGHT}
+            onLoad={() => markImageLoaded('base')}
+            onError={() => markImageLoaded('base')}
+            unoptimized
+          />
         </div>
       </div>
     </div>

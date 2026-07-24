@@ -5,6 +5,7 @@ import type { PortfolioHtmlComponentId, PortfolioItem, PortfolioMediaVariant } f
 import { cn } from '@/lib/format';
 import { HikageScene } from '@/components/portfolio/HikageScene';
 import { KokoroScene } from '@/components/portfolio/KokoroScene';
+import { MaidScene } from '@/components/portfolio/MaidScene';
 import { RainyDayScene } from '@/components/portfolio/RainyDayScene';
 import { SaruDemoScene } from '@/components/portfolio/SaruDemoScene';
 
@@ -52,4 +53,5 @@ export const portfolioHtmlComponents: Record<PortfolioHtmlComponentId, (props: P
   'kokoro-scene': ({ variant }) => <KokoroScene variant={variant} />,
   'rainy-day-scene': ({ variant }) => <RainyDayScene variant={variant} />,
   'saru-demo-scene': ({ variant }) => <SaruDemoScene variant={variant} />,
+  'maid-scene': ({ variant }) => <MaidScene variant={variant} />,
 };

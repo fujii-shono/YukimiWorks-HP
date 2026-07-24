@@ -1,7 +1,13 @@
 export type PortfolioMediaVariant = 'preview' | 'card' | 'modal';
 export type PortfolioCategory = 'illustration' | 'html-art' | 'game';
 
-export type PortfolioHtmlComponentId = 'pixel-window' | 'hikage-scene' | 'rainy-day-scene' | 'saru-demo-scene' | 'kokoro-scene';
+export type PortfolioHtmlComponentId =
+  | 'pixel-window'
+  | 'hikage-scene'
+  | 'rainy-day-scene'
+  | 'saru-demo-scene'
+  | 'kokoro-scene'
+  | 'maid-scene';
 
 export type PortfolioImageContent = {
   kind: 'image';
@@ -43,6 +49,27 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 };
 
 export const portfolioItems: PortfolioItem[] = [
+  {
+    id: 'maid',
+    title: 'そんなに指動かして何してるにゃ？',
+    href: '/portfolio/maid',
+    category: 'html-art',
+    content: {
+      kind: 'html',
+      componentId: 'maid-scene',
+      width: 669,
+      height: 1000,
+      thumbnail: '/portfolio/maid/thumbnail.png'
+    },
+    ogImage: '/portfolio/maid/base.png',
+    ogImageWidth: 669,
+    ogImageHeight: 1000,
+    description: '「すっごい気が散るにゃ...」\n（タップに合わせて目線が動くよ）',
+    date: '2026-07-24',
+    year: 2026,
+    tags: ['HTML', 'レイヤー', 'イラスト'],
+    featured: true,
+  },
   {
     id: 'to-limy',
     title: '💎✨️',

@@ -985,6 +985,212 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   gap: 8px;
 }
 
+.maid-scene {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  aspect-ratio: 669 / 1000;
+  height: auto;
+  overflow: hidden;
+  isolation: isolate;
+  container-type: inline-size;
+}
+
+.maid-scene-preview,
+.maid-scene-card {
+  width: 100%;
+  min-height: 0;
+}
+
+.maid-scene-modal {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 669 / 1000;
+}
+
+.maid-asset-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.maid-asset-frame {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 669 / 1000;
+  max-width: 100%;
+  overflow: hidden;
+  background: #ffffff;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.maid-dot-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.maid-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body[data-maid-star-cursor='true'],
+  body[data-maid-star-cursor='true'] * {
+    cursor: var(--maid-star-cursor, auto) !important;
+  }
+}
+
+.maid-wind-shell {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  transform-origin: 100% 50%;
+  animation: maid-wind-sway 7.5s ease-in-out infinite;
+}
+
+.maid-wind-shell.is-paused {
+  animation-play-state: paused;
+}
+
+.maid-wind {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transform-origin: 100% 50%;
+  transform: rotate(var(--maid-wind-drag-rotation, 0deg));
+}
+
+.maid-wind.is-releasing {
+  animation: maid-wind-release var(--maid-wind-release-duration, 1300ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.maid-wind-hit-area {
+  position: absolute;
+  z-index: 6;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: default;
+}
+
+.maid-wind-hit-area.is-visible {
+  background: rgba(255, 0, 0, 0.25);
+  outline: 2px dashed rgba(220, 20, 60, 0.95);
+  outline-offset: -2px;
+}
+
+.maid-star {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  height: auto;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transform-origin: 50% 50%;
+  animation: maid-star-spin 18s linear infinite;
+}
+
+.maid-star-trigger {
+  position: absolute;
+  z-index: 7;
+  display: block;
+  aspect-ratio: 214 / 225;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .maid-star-trigger {
+    display: none;
+  }
+}
+
+.maid-eye-hole {
+  z-index: 2;
+}
+
+.maid-eye {
+  z-index: 3;
+  transform: translate(var(--maid-eye-follow-x, 0), var(--maid-eye-follow-y, 0));
+}
+
+.maid-eye-highlight {
+  z-index: 4;
+}
+
+.maid-base {
+  z-index: 5;
+}
+
+@keyframes maid-wind-sway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(-1.8deg);
+  }
+}
+
+@keyframes maid-wind-release {
+  0% {
+    transform: rotate(var(--maid-wind-drag-rotation, 0deg));
+  }
+
+  38% {
+    transform: rotate(var(--maid-wind-release-rotation, 0deg));
+  }
+
+  68% {
+    transform: rotate(var(--maid-wind-release-return-rotation, 0deg));
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes maid-star-spin {
+  from {
+    transform: rotate(var(--maid-star-rotation, 0deg));
+  }
+
+  to {
+    transform: rotate(calc(var(--maid-star-rotation, 0deg) + 360deg));
+  }
+}
+
 .hikage-scene {
   --hikage-sky: #ffffff;
   position: relative;

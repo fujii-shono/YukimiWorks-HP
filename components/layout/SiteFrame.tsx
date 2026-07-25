@@ -1,6 +1,7 @@
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { DebugSpriteHost } from '@/components/theme/DebugSpriteHost';
 import { SleepWarningRouteGuard } from '@/components/theme/SleepWarningRouteGuard';
 import { ThemeDebugPanel } from '@/components/theme/ThemeDebugPanel';
 import { TimeThemeProvider } from '@/components/theme/TimeThemeProvider';
@@ -26,6 +27,7 @@ export function SiteFrame({
         </div>
         <Footer />
       </div>
+      <DebugSpriteHost />
       <ThemeDebugPanel />
     </TimeThemeProvider>
   );

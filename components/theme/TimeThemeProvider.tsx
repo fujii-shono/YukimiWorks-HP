@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -35,6 +36,8 @@ type ThemeContextValue = {
   peekImageSrc: string;
   showPeekBubble: boolean;
   sleepMode: boolean;
+  debugSpriteRunId: number;
+  triggerDebugSprite: () => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -129,7 +132,16 @@ export function TimeThemeProvider({ children }: { children: ReactNode }) {
   const [absent, setAbsent] = useState(false);
   const [canPeek, setCanPeek] = useState(false);
   const [peekActive, setPeekActive] = useState(false);
+  const [debugSpriteRunId, setDebugSpriteRunId] = useState(0);
   const rolledEventRef = useRef<ResolvedEvent | null>(null);
+
+  const triggerDebugSprite = useCallback(() => {
+    setDebugSpriteRunId((currentRunId) => currentRunId + 1);
+  }, []);
+
+  useEffect(() => {
+    if (drawTransientEvent(0.01)) triggerDebugSprite();
+  }, [triggerDebugSprite]);
 
   useEffect(() => {
     if (!isDevelopment || !debugControlsEnabled) return;
@@ -237,8 +249,25 @@ export function TimeThemeProvider({ children }: { children: ReactNode }) {
       peekImageSrc: event === 'late-night-away' ? '/effects/eyes2.png' : '/character/default.png',
       showPeekBubble: event === 'busy',
       sleepMode,
+      debugSpriteRunId,
+      triggerDebugSprite,
     }),
-    [absent, canPeek, event, forcedEvent, forcedTheme, forcedTime, hour, isDevelopment, minute, peekActive, sleepMode, theme],
+    [
+      absent,
+      canPeek,
+      debugSpriteRunId,
+      triggerDebugSprite,
+      event,
+      forcedEvent,
+      forcedTheme,
+      forcedTime,
+      hour,
+      isDevelopment,
+      minute,
+      peekActive,
+      sleepMode,
+      theme,
+    ],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

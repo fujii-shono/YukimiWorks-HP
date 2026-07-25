@@ -2572,6 +2572,30 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   transform: translateY(1px);
 }
 
+.debug-sprite {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 300;
+  width: 192px;
+  height: 192px;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transform: translate(-192px, -192px);
+  animation: debug-sprite-flow 3200ms cubic-bezier(0.55, 0, 1, 0.75) forwards;
+}
+
+@keyframes debug-sprite-flow {
+  0% {
+    transform: translate(-192px, -192px);
+  }
+
+  100% {
+    transform: translate(calc(100vw + 192px), calc(100vh + 192px));
+  }
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -2749,6 +2773,19 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 .debug-grid label {
   display: grid;
   gap: 6px;
+}
+
+.debug-action-button {
+  padding: 10px 12px;
+  color: #fff;
+  background: var(--site-accent);
+  border: 2px outset color-mix(in srgb, var(--site-accent) 60%, white);
+  font: inherit;
+  cursor: pointer;
+}
+
+.debug-action-button:active {
+  transform: translateY(1px);
 }
 
 @keyframes drift-stars {

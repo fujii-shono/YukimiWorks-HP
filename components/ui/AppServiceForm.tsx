@@ -1,8 +1,10 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { FormModal } from '@/components/ui/FormModal';
 import type { AppService } from '@/data/appServices';
 import { appInquirySchema, type AppInquiryInput } from '@/lib/validations';
@@ -10,9 +12,12 @@ import { appInquirySchema, type AppInquiryInput } from '@/lib/validations';
 export function AppServiceForm({ services }: { services: AppService[] }) {
   const [modal, setModal] = useState<{ title: string; message: string; reset?: boolean } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const { triggerDebugSprite } = useTimeTheme();
   const {
     register,
     handleSubmit,
+    getValues,
+    clearErrors,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<AppInquiryInput>({
@@ -20,7 +25,7 @@ export function AppServiceForm({ services }: { services: AppService[] }) {
     defaultValues: { service: '', email: '', message: '' },
   });
 
-  const onSubmit = handleSubmit(async (values) => {
+  const submitForm = handleSubmit(async (values) => {
     setFormError(null);
     const response = await fetch('/api/contact/app', {
       method: 'POST',
@@ -47,6 +52,18 @@ export function AppServiceForm({ services }: { services: AppService[] }) {
       reset: true,
     });
   });
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (getValues('email').trim().toLowerCase() === 'debug') {
+      event.preventDefault();
+      setFormError(null);
+      clearErrors('email');
+      triggerDebugSprite();
+      return;
+    }
+
+    void submitForm(event);
+  };
 
   return (
     <>

@@ -1,17 +1,22 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { FormModal } from '@/components/ui/FormModal';
 import { inquirySchema, type InquiryInput } from '@/lib/validations';
 
 export function InquiryForm() {
   const [modal, setModal] = useState<{ title: string; message: string; reset?: boolean } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const { triggerDebugSprite } = useTimeTheme();
   const {
     register,
     handleSubmit,
+    getValues,
+    clearErrors,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<InquiryInput>({
@@ -19,7 +24,7 @@ export function InquiryForm() {
     defaultValues: { email: '', name: '', nameKana: '', message: '' },
   });
 
-  const onSubmit = handleSubmit(async (values) => {
+  const submitForm = handleSubmit(async (values) => {
     setFormError(null);
     const response = await fetch('/api/contact/inquiry', {
       method: 'POST',
@@ -46,6 +51,18 @@ export function InquiryForm() {
       reset: true,
     });
   });
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (getValues('email').trim().toLowerCase() === 'debug') {
+      event.preventDefault();
+      setFormError(null);
+      clearErrors('email');
+      triggerDebugSprite();
+      return;
+    }
+
+    void submitForm(event);
+  };
 
   return (
     <>

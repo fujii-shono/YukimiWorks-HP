@@ -4,8 +4,16 @@ import { debugControlsEnabled, debugTimeOptions, eventOptions, themeOptions } fr
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 
 export function ThemeDebugPanel() {
-  const { isDevelopment, forcedEvent, forcedTheme, forcedTime, setForcedEvent, setForcedTheme, setForcedTime } =
-    useTimeTheme();
+  const {
+    isDevelopment,
+    forcedEvent,
+    forcedTheme,
+    forcedTime,
+    setForcedEvent,
+    setForcedTheme,
+    setForcedTime,
+    triggerDebugSprite,
+  } = useTimeTheme();
 
   if (!isDevelopment || !debugControlsEnabled) return null;
 
@@ -53,6 +61,9 @@ export function ThemeDebugPanel() {
             ))}
           </select>
         </label>
+        <button type="button" className="debug-action-button" onClick={triggerDebugSprite}>
+          debug.pngを流す
+        </button>
       </div>
     </details>
   );

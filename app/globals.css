@@ -3029,6 +3029,10 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
     order: 1;
   }
 
+  .main-column > .single-panel-body {
+    order: 2;
+  }
+
   .welcome-panel {
     order: 2;
   }

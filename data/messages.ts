@@ -18,6 +18,14 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    publishedAt: '2026-07-27 08:30',
+    body: 'アクキーシミュレーターの機能を改善してます。',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     image: {
       src: '/message/20260726.jpg',
       alt: 'ラフ',

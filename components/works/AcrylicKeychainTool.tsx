@@ -336,6 +336,21 @@ function waitForNextFrame() {
   });
 }
 
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+function getExportFileBaseName(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'acrylic-keychain';
+}
+
 function getPreviewArtworkRatios() {
   if (window.matchMedia('(max-width: 767px)').matches) {
     return {
@@ -641,6 +656,7 @@ export function AcrylicKeychainTool() {
   const [isRotating, setIsRotating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [processingDotCount, setProcessingDotCount] = useState(1);
   const [previewLayoutKey, setPreviewLayoutKey] = useState(0);
   const [status, setStatus] = useState('PNGを選択してください');
@@ -862,6 +878,41 @@ export function AcrylicKeychainTool() {
     }
   };
 
+  const exportOrderFiles = async () => {
+    if (!preview || isExporting) return;
+    setIsExporting(true);
+    setStatus('SVGを作成中です');
+    try {
+      const fileBaseName = getExportFileBaseName(preview.fileName);
+      const response = await fetch('/api/acrylic/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: fileBaseName,
+          width: preview.width,
+          height: preview.height,
+          artworkDataUrl: preview.artworkSrc,
+          holeMode,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? 'SVGを作成できませんでした');
+      }
+
+      const blob = await response.blob();
+      downloadBlob(blob, `${fileBaseName}.svg`);
+      setStatus('制御点を赤で表示したSVGを書き出しました');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'SVGを作成できませんでした');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const stopRotation = (event: PointerEvent<HTMLDivElement>) => {
     if (!isRotatingRef.current) return;
     isRotatingRef.current = false;
@@ -1059,7 +1110,15 @@ export function AcrylicKeychainTool() {
         <button type="button" className="acrylic-file-button" onClick={() => inputRef.current?.click()}>
           {preview ? '新しいPNGを選択' : 'PNGを選択'}
         </button>
+        {preview ? (
+          <button type="button" className="acrylic-file-button" disabled={isProcessing || isExporting} onClick={() => void exportOrderFiles()}>
+            {isExporting ? '作成中' : 'SVGを書き出す'}
+          </button>
+        ) : null}
       </div>
+      <p className="acrylic-tool-status" role="status" aria-live="polite">
+        {status}
+      </p>
       {isProcessing ? (
         <div className="acrylic-processing-modal" role="status" aria-live="assertive" aria-label="プレビューを作成中です">
           <div className="acrylic-processing-panel">

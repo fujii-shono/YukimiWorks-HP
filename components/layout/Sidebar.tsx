@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
+import { MessagePanel } from '@/components/ui/MessagePanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { newsItems } from '@/data/news';
@@ -226,12 +227,17 @@ export function Sidebar() {
         </div>
       </section>
 
+      <MessagePanel />
+
       <section className="window-panel counter-panel" aria-label="サイト情報">
         <h2 className="window-title">
           <span className="title-deco" aria-hidden="true">
             ❄
           </span>
           <span>Counter</span>
+          <span className="title-deco" aria-hidden="true">
+            ❄
+          </span>
         </h2>
         <div className="counter-body">
           <div className="counter-digits" aria-label="装飾用カウンター">

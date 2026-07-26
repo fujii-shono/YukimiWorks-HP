@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>メッセージモーダル サンプル</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --page-bg: #eaf3ff;
+      --surface: #ffffff;
+      --surface-soft: #f3f8ff;
+      --line: #7393e6;
+      --line-soft: #c5d5f7;
+      --accent: #2546be;
+      --text: #25293a;
+      --muted: #68728a;
+      --font-pixel: "DotGothic16", "MS Gothic", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      color: var(--text);
+      font-family: var(--font-pixel);
+      background-color: var(--page-bg);
+      background-image: radial-gradient(circle, rgba(84, 126, 218, 0.14) 0.8px, transparent 1px);
+      background-size: 4px 4px;
+    }
+
+    .sample-note {
+      max-width: 560px;
+      margin: 40px auto;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      line-height: 1.8;
+    }
+
+    .message-launcher {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 9px 14px;
+      color: #ffffff;
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      font: inherit;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(37, 70, 190, 0.24);
+    }
+
+    .message-count {
+      min-width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      padding: 0 6px;
+      color: var(--accent);
+      background: #ffffff;
+      border-radius: 999px;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .message-modal {
+      position: fixed;
+      right: 18px;
+      bottom: 74px;
+      z-index: 30;
+      width: min(340px, calc(100vw - 36px));
+      max-height: min(470px, calc(100vh - 110px));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 18px 50px rgba(28, 53, 118, 0.25);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px) scale(0.98);
+      transform-origin: right bottom;
+      transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
+    }
+
+    .message-modal.is-open {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+
+    .message-header {
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 14px 12px 18px;
+      background: var(--surface-soft);
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .message-header h1 {
+      margin: 0;
+      color: var(--accent);
+      font-size: 18px;
+      font-weight: 400;
+      line-height: 1.3;
+    }
+
+    .message-close {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--accent);
+      background: var(--surface);
+      border: 1px solid var(--line-soft);
+      border-radius: 50%;
+      font: inherit;
+      font-size: 21px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .message-list {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+    }
+
+    .message-post {
+      padding: 16px 18px 17px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .message-post:first-child {
+      border-top: 0;
+    }
+
+    .message-post:last-child {
+      border-bottom: 0;
+    }
+
+    .message-post h2 {
+      margin: 0 0 7px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.45;
+    }
+
+    .message-post p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.75;
+      overflow-wrap: anywhere;
+    }
+
+    .message-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+      display: none;
+      background: rgba(8, 20, 48, 0.18);
+    }
+
+    button:focus-visible,
+    .message-list:focus-visible {
+      outline: 3px double var(--accent);
+      outline-offset: 3px;
+    }
+
+    @media (max-width: 520px) {
+      .message-launcher {
+        right: 12px;
+        bottom: 12px;
+      }
+
+      .message-modal {
+        right: 12px;
+        bottom: 66px;
+        width: min(328px, calc(100vw - 24px));
+        max-height: min(440px, calc(100vh - 92px));
+      }
+
+      .message-backdrop.is-open {
+        display: block;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .message-modal {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="sample-note">
+    <h1>メッセージモーダル サンプル</h1>
+    <p>右下の「メッセージ」ボタンを押すと、閲覧専用の小型モーダルが開きます。</p>
+  </main>
+
+  <button
+    class="message-launcher"
+    id="messageLauncher"
+    type="button"
+    aria-controls="messageModal"
+    aria-expanded="false"
+  >
+    <span>メッセージ</span>
+    <span class="message-count" aria-label="3件">3</span>
+  </button>
+
+  <div class="message-backdrop" id="messageBackdrop" hidden></div>
+
+  <aside
+    class="message-modal"
+    id="messageModal"
+    aria-label="YukimiWorks メッセージ"
+    aria-hidden="true"
+  >
+    <header class="message-header">
+      <h1>メッセージ</h1>
+      <button class="message-close" id="messageClose" type="button" aria-label="閉じる">×</button>
+    </header>
+
+    <div class="message-list" id="messageList" tabindex="0">
+      <article class="message-post">
+        <h2>ゆきみるく</h2>
+        <p>トップページのレイアウトを微調整しています。表示が一時的に変わる場合があります。</p>
+      </article>
+
+      <article class="message-post">
+        <h2>ゆきみるく</h2>
+        <p>制作実績ページに新しい項目を追加しました。細部は引き続き調整中です。</p>
+      </article>
+
+      <article class="message-post">
+        <h2>ゆきみるく</h2>
+        <p>この欄では、開発状況や小さなお知らせを短く掲載します。</p>
+      </article>
+    </div>
+  </aside>
+
+  <script>
+    (() => {
+      const launcher = document.querySelector('#messageLauncher');
+      const modal = document.querySelector('#messageModal');
+      const closeButton = document.querySelector('#messageClose');
+      const backdrop = document.querySelector('#messageBackdrop');
+      const messageList = document.querySelector('#messageList');
+
+      function setOpen(open) {
+        modal.classList.toggle('is-open', open);
+        backdrop.classList.toggle('is-open', open);
+        backdrop.hidden = !open;
+        modal.setAttribute('aria-hidden', String(!open));
+        launcher.setAttribute('aria-expanded', String(open));
+
+        if (open) {
+          messageList.focus();
+        } else {
+          launcher.focus();
+        }
+      }
+
+      launcher.addEventListener('click', () => {
+        setOpen(!modal.classList.contains('is-open'));
+      });
+
+      closeButton.addEventListener('click', () => setOpen(false));
+      backdrop.addEventListener('click', () => setOpen(false));
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+          setOpen(false);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

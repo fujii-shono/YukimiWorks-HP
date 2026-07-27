@@ -41,6 +41,25 @@ type DebugPoint = {
   kind: 'normal' | 'green';
 };
 
+type Concavity = {
+  startIndex: number;
+  bottomIndex: number;
+  endIndex: number;
+  start: Point;
+  bottom: Point;
+  end: Point;
+  depth: number;
+  width: number;
+  score: number;
+  direction: 'left' | 'right';
+};
+
+type ConcavityDetectionOptions = {
+  closed?: boolean;
+  areaSign?: number;
+  protectedPointKeys?: Set<string>;
+};
+
 type SvgPathResult = {
   path: string;
   controlPoints: DebugPoint[];
@@ -60,6 +79,13 @@ type PathOp =
       control: Point;
       end: Point;
       controlKind: DebugPoint['kind'];
+    }
+  | {
+      kind: 'cubic';
+      start: Point;
+      control1: Point;
+      control2: Point;
+      end: Point;
     };
 
 type StraightLineCandidate = {
@@ -91,6 +117,13 @@ const OUTER_CORNER_ROUND_MAX_ANGLE = 179;
 const OUTER_CORNER_ROUND_MAX_TRIM = 18;
 const OUTER_CORNER_ROUND_MIN_TRIM = 0.2;
 const INNER_SHARP_CORNER_MAX_ANGLE = 90;
+const CONCAVITY_MAX_ANGLE = 160;
+const BASE_SMOOTH_CURVE_SIMPLIFY_TOLERANCE = 1.2;
+const BASE_SHORT_INNER_CONTROL_SIDE_MAX_LENGTH = 3;
+const BASE_CURVE_FIT_MAX_ERROR = 2;
+const CURVE_FIT_MAX_RECURSION = 4;
+const CURVE_FIT_MIN_POINTS = 4;
+const CURVE_FIT_SAMPLE_STEPS = 24;
 const LONG_STRAIGHT_LINE_STROKE = '#0066ff';
 const CONNECTED_STRAIGHT_LINE_STROKE = '#ffd400';
 const CONNECTED_STRAIGHT_LINE_MAX_GAP = 4;
@@ -100,7 +133,10 @@ const GREEN_POINT_FILL = '#00a651';
 const NORMAL_CONTROL_POINT_FILL = '#ff0000';
 const PARALLEL_LINE_MAX_ANGLE_DELTA = 8;
 const REMOVE_INNER_CONTROL_POINTS = true;
-const SHOW_CONTROL_POINT_MARKERS = true;
+const ENABLE_STRAIGHT_LINE_PROCESSING = false;
+const SHOW_CONTROL_POINT_MARKERS = false;
+const SHOW_LONG_STRAIGHT_LINE_MARKERS = false;
+const SHOW_CONNECTED_STRAIGHT_LINE_MARKERS = false;
 
 function createPathResult(
   path: string,
@@ -121,6 +157,18 @@ function getLongStraightLineMinLength(width: number, height: number) {
 
 function getStraightAdjacentControlMaxGap(longStraightLineMinLength: number) {
   return BASE_STRAIGHT_ADJACENT_CONTROL_MAX_GAP * (longStraightLineMinLength / BASE_LONG_STRAIGHT_LINE_MIN_LENGTH);
+}
+
+function getSmoothCurveSimplifyTolerance(longStraightLineMinLength: number) {
+  return BASE_SMOOTH_CURVE_SIMPLIFY_TOLERANCE * (longStraightLineMinLength / BASE_LONG_STRAIGHT_LINE_MIN_LENGTH);
+}
+
+function getShortInnerControlSideMaxLength(longStraightLineMinLength: number) {
+  return BASE_SHORT_INNER_CONTROL_SIDE_MAX_LENGTH * (longStraightLineMinLength / BASE_LONG_STRAIGHT_LINE_MIN_LENGTH);
+}
+
+function getCurveFitMaxError(longStraightLineMinLength: number) {
+  return BASE_CURVE_FIT_MAX_ERROR * (longStraightLineMinLength / BASE_LONG_STRAIGHT_LINE_MIN_LENGTH);
 }
 
 function pushLineCommand(commands: string[], longStraightLines: Array<{ start: Point; end: Point }>, start: Point, end: Point, minLength: number) {
@@ -207,6 +255,9 @@ function setPathOpStart(op: PathOp | undefined, start: Point) {
 function clonePathOp(op: PathOp): PathOp {
   if (op.kind === 'line') {
     return { kind: 'line', start: { ...op.start }, end: { ...op.end } };
+  }
+  if (op.kind === 'cubic') {
+    return { kind: 'cubic', start: { ...op.start }, control1: { ...op.control1 }, control2: { ...op.control2 }, end: { ...op.end } };
   }
   return { kind: 'quad', start: { ...op.start }, control: { ...op.control }, end: { ...op.end }, controlKind: op.controlKind };
 }
@@ -351,19 +402,21 @@ function removeAdjacentQuadraticControlPointsNextToStraightLines(
 }
 
 function buildPathFromOps(ops: PathOp[], start: Point, minLength: number) {
-  const initialCandidates = buildStraightLineCandidates(ops, minLength);
-  const initialConnectedGroups = buildConnectedStraightLineGroups(initialCandidates);
-  const targetLines = collectStraightTargetLines(initialCandidates, initialConnectedGroups);
-  const adjustedOps = removeAdjacentQuadraticControlPointsNextToStraightLines(
-    ops,
-    collectStraightTargetOpIndices(initialCandidates, initialConnectedGroups),
-    targetLines,
-    minLength,
-  );
+  const initialCandidates = ENABLE_STRAIGHT_LINE_PROCESSING ? buildStraightLineCandidates(ops, minLength) : [];
+  const initialConnectedGroups = ENABLE_STRAIGHT_LINE_PROCESSING ? buildConnectedStraightLineGroups(initialCandidates) : [];
+  const targetLines = ENABLE_STRAIGHT_LINE_PROCESSING ? collectStraightTargetLines(initialCandidates, initialConnectedGroups) : [];
+  const adjustedOps = ENABLE_STRAIGHT_LINE_PROCESSING
+    ? removeAdjacentQuadraticControlPointsNextToStraightLines(
+        ops,
+        collectStraightTargetOpIndices(initialCandidates, initialConnectedGroups),
+        targetLines,
+        minLength,
+      )
+    : ops;
   const commands = [`M ${formatSvgNumber(start.x)} ${formatSvgNumber(start.y)}`];
   const controlPoints: DebugPoint[] = [];
   const longStraightLines: Array<{ start: Point; end: Point }> = [];
-  const connectedGroups = buildConnectedStraightLineGroups(buildStraightLineCandidates(adjustedOps, minLength));
+  const connectedGroups = ENABLE_STRAIGHT_LINE_PROCESSING ? buildConnectedStraightLineGroups(buildStraightLineCandidates(adjustedOps, minLength)) : [];
   const connectedGroupByStartIndex = new Map<number, ConnectedStraightLineGroup>();
   const connectedStraightLines: Array<{ start: Point; end: Point }> = [];
 
@@ -394,11 +447,15 @@ function buildPathFromOps(ops: PathOp[], start: Point, minLength: number) {
     const op = adjustedOps[index];
     if (op.kind === 'line') {
       pushLineCommand(commands, longStraightLines, op.start, op.end, minLength);
-    } else {
+    } else if (op.kind === 'quad') {
       commands.push(
         `Q ${formatSvgNumber(op.control.x)} ${formatSvgNumber(op.control.y)} ${formatSvgNumber(op.end.x)} ${formatSvgNumber(op.end.y)}`,
       );
       controlPoints.push({ point: op.control, kind: op.controlKind });
+    } else {
+      commands.push(
+        `C ${formatSvgNumber(op.control1.x)} ${formatSvgNumber(op.control1.y)} ${formatSvgNumber(op.control2.x)} ${formatSvgNumber(op.control2.y)} ${formatSvgNumber(op.end.x)} ${formatSvgNumber(op.end.y)}`,
+      );
     }
   }
 
@@ -957,48 +1014,398 @@ function angleDegrees(previous: Point, current: Point, next: Point) {
   return (Math.acos(Math.max(-1, Math.min(1, dot / (leftLength * rightLength)))) * 180) / Math.PI;
 }
 
-function getInnerCornerPointKeys(points: Point[]) {
-  const areaSign = Math.sign(signedArea(points)) || 1;
-  const innerCornerKeys = new Set<string>();
-  points.forEach((current, index) => {
-    const previous = points[(index - 1 + points.length) % points.length];
-    const next = points[(index + 1) % points.length];
-    const turnSign = Math.sign(cornerCross(previous, current, next));
-    if (turnSign !== 0 && turnSign !== areaSign) innerCornerKeys.add(pointKey(current));
-  });
-  return innerCornerKeys;
+function detectConcavities(points: Point[], options: ConcavityDetectionOptions = {}): Concavity[] {
+  const { closed = true, protectedPointKeys = new Set<string>() } = options;
+  if (points.length < 3) return [];
+
+  const areaSign = options.areaSign ?? (Math.sign(signedArea(points)) || 1);
+  const concavities: Concavity[] = [];
+  const startIndex = closed ? 0 : 1;
+  const endIndex = closed ? points.length : points.length - 1;
+
+  for (let index = startIndex; index < endIndex; index += 1) {
+    const previousIndex = (index - 1 + points.length) % points.length;
+    const nextIndex = (index + 1) % points.length;
+    const previous = points[previousIndex];
+    const current = points[index];
+    const next = points[nextIndex];
+    const turn = cornerCross(previous, current, next);
+    const turnSign = Math.sign(turn);
+    if (turnSign === 0 || turnSign === areaSign || protectedPointKeys.has(pointKey(current))) continue;
+    const angle = angleDegrees(previous, current, next);
+    if (angle > CONCAVITY_MAX_ANGLE) continue;
+
+    const depth = perpendicularDistance(current, previous, next);
+    const width = distance(previous, next);
+    concavities.push({
+      startIndex: previousIndex,
+      bottomIndex: index,
+      endIndex: nextIndex,
+      start: previous,
+      bottom: current,
+      end: next,
+      depth,
+      width,
+      score: depth * width,
+      direction: turn > 0 ? 'left' : 'right',
+    });
+  }
+
+  return concavities;
 }
 
-function collectLongStraightEndpointKeys(lines: Array<{ start: Point; end: Point }>) {
-  const endpointKeys = new Set<string>();
-  lines.forEach(({ start, end }) => {
-    endpointKeys.add(pointKey(start));
-    endpointKeys.add(pointKey(end));
-  });
-  return endpointKeys;
+function buildConcavityPointSet(points: Point[], concavities: Concavity[]) {
+  const result = new Set<number>();
+
+  for (const concavity of concavities) {
+    const bottomIndex = Math.max(0, Math.min(points.length - 1, concavity.bottomIndex));
+    result.add(bottomIndex);
+  }
+
+  return result;
 }
 
-function collectRawLongStraightEndpointKeys(points: Point[], minLength: number, closed: boolean) {
-  const endpointKeys = new Set<string>();
-  const segmentCount = closed ? points.length : points.length - 1;
-  for (let index = 0; index < segmentCount; index += 1) {
-    const start = points[index];
-    const end = points[(index + 1) % points.length];
-    if (distance(start, end) >= minLength) {
-      endpointKeys.add(pointKey(start));
-      endpointKeys.add(pointKey(end));
+function buildConcavityPointKeys(points: Point[], concavityPointSet: Set<number>) {
+  const keys = new Set<string>();
+  concavityPointSet.forEach((index) => {
+    const point = points[index];
+    if (point) keys.add(pointKey(point));
+  });
+  return keys;
+}
+
+function getControlPointKind(point: Point, concavityPointKeys: Set<string>): DebugPoint['kind'] {
+  return concavityPointKeys.has(pointKey(point)) ? 'green' : 'normal';
+}
+
+function buildPathPointDebugPoints(points: Point[], concavityPointKeys: Set<string>): DebugPoint[] {
+  return points.map((point) => ({ point, kind: getControlPointKind(point, concavityPointKeys) }));
+}
+
+function simplifyPolyline(points: Point[], tolerance: number): Point[] {
+  if (points.length <= 2) return points;
+
+  let farthestIndex = -1;
+  let farthestDistance = 0;
+  const start = points[0];
+  const end = points[points.length - 1];
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const currentDistance = perpendicularDistance(points[index], start, end);
+    if (currentDistance > farthestDistance) {
+      farthestDistance = currentDistance;
+      farthestIndex = index;
     }
   }
-  return endpointKeys;
+
+  if (farthestIndex < 0 || farthestDistance <= tolerance) return [start, end];
+
+  const left = simplifyPolyline(points.slice(0, farthestIndex + 1), tolerance);
+  const right = simplifyPolyline(points.slice(farthestIndex), tolerance);
+  return [...left.slice(0, -1), ...right];
 }
 
-function removeInnerControlPointsFromLoop(points: Point[], innerCornerPointKeys: Set<string>, protectedPointKeys: Set<string>, closed: boolean) {
-  if (!REMOVE_INNER_CONTROL_POINTS) return points;
-  const filtered = points.filter((point, index) => {
-    if (!closed && (index === 0 || index === points.length - 1)) return true;
-    return !innerCornerPointKeys.has(pointKey(point)) || protectedPointKeys.has(pointKey(point));
+function isPointSequenceNearlyStraight(points: Point[], tolerance: number) {
+  if (points.length <= 2) return true;
+  const start = points[0];
+  const end = points[points.length - 1];
+  return points.slice(1, -1).every((point) => perpendicularDistance(point, start, end) <= tolerance);
+}
+
+function signedPerpendicularDistance(point: Point, lineStart: Point, lineEnd: Point) {
+  const lineLength = distance(lineStart, lineEnd);
+  if (lineLength === 0) return 0;
+  return ((lineEnd.x - lineStart.x) * (point.y - lineStart.y) - (lineEnd.y - lineStart.y) * (point.x - lineStart.x)) / lineLength;
+}
+
+function lerpPoint(start: Point, end: Point, ratio: number) {
+  return {
+    x: start.x + (end.x - start.x) * ratio,
+    y: start.y + (end.y - start.y) * ratio,
+  };
+}
+
+function segmentUnitNormal(start: Point, end: Point) {
+  const lineLength = distance(start, end);
+  if (lineLength === 0) return { x: 0, y: 0 };
+  return {
+    x: -(end.y - start.y) / lineLength,
+    y: (end.x - start.x) / lineLength,
+  };
+}
+
+function splitSegmentByBulgeDirection(points: Point[], tolerance: number) {
+  if (points.length <= 3) return [points];
+
+  const segments: Point[][] = [];
+  let currentStart = 0;
+  let currentSign = 0;
+
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const signedDistance = signedPerpendicularDistance(points[index], points[currentStart], points[points.length - 1]);
+    if (Math.abs(signedDistance) <= tolerance) continue;
+    const sign = Math.sign(signedDistance);
+    if (currentSign === 0) {
+      currentSign = sign;
+      continue;
+    }
+    if (sign === currentSign) continue;
+
+    const splitIndex = Math.max(currentStart + 1, index - 1);
+    segments.push(points.slice(currentStart, splitIndex + 1));
+    currentStart = splitIndex;
+    currentSign = 0;
+  }
+
+  segments.push(points.slice(currentStart));
+  return segments.filter((segment) => segment.length >= 2);
+}
+
+function buildSingleFlowCubicOp(segmentPoints: Point[], tolerance: number): Extract<PathOp, { kind: 'cubic' }> | null {
+  if (segmentPoints.length < 2) return null;
+  const start = segmentPoints[0];
+  const end = segmentPoints[segmentPoints.length - 1];
+  const lineLength = distance(start, end);
+  if (lineLength <= 0.001) return null;
+
+  let signedDistanceTotal = 0;
+  let signedDistanceWeight = 0;
+  let dominantSignedDistance = 0;
+  for (const point of segmentPoints.slice(1, -1)) {
+    const signedDistance = signedPerpendicularDistance(point, start, end);
+    const weight = Math.abs(signedDistance);
+    signedDistanceTotal += signedDistance * weight;
+    signedDistanceWeight += weight;
+    if (Math.abs(signedDistance) > Math.abs(dominantSignedDistance)) dominantSignedDistance = signedDistance;
+  }
+
+  const weightedSignedDistance = signedDistanceWeight > 0 ? signedDistanceTotal / signedDistanceWeight : 0;
+  const sampleSignedDistance = Math.abs(weightedSignedDistance) >= tolerance ? weightedSignedDistance : dominantSignedDistance;
+  const normal = segmentUnitNormal(start, end);
+  const controlOffset = Math.max(-lineLength * 0.45, Math.min(lineLength * 0.45, sampleSignedDistance / 0.75));
+  const firstBase = lerpPoint(start, end, 1 / 3);
+  const secondBase = lerpPoint(start, end, 2 / 3);
+
+  return {
+    kind: 'cubic',
+    start,
+    control1: {
+      x: firstBase.x + normal.x * controlOffset,
+      y: firstBase.y + normal.y * controlOffset,
+    },
+    control2: {
+      x: secondBase.x + normal.x * controlOffset,
+      y: secondBase.y + normal.y * controlOffset,
+    },
+    end,
+  };
+}
+
+function cubicPointAt(cubic: Extract<PathOp, { kind: 'cubic' }>, ratio: number) {
+  const inverse = 1 - ratio;
+  const inverseSquared = inverse * inverse;
+  const ratioSquared = ratio * ratio;
+  return {
+    x:
+      inverseSquared * inverse * cubic.start.x +
+      3 * inverseSquared * ratio * cubic.control1.x +
+      3 * inverse * ratioSquared * cubic.control2.x +
+      ratioSquared * ratio * cubic.end.x,
+    y:
+      inverseSquared * inverse * cubic.start.y +
+      3 * inverseSquared * ratio * cubic.control1.y +
+      3 * inverse * ratioSquared * cubic.control2.y +
+      ratioSquared * ratio * cubic.end.y,
+  };
+}
+
+function distanceToCubic(point: Point, cubic: Extract<PathOp, { kind: 'cubic' }>) {
+  let minimumDistance = Infinity;
+  for (let step = 0; step <= CURVE_FIT_SAMPLE_STEPS; step += 1) {
+    minimumDistance = Math.min(minimumDistance, distance(point, cubicPointAt(cubic, step / CURVE_FIT_SAMPLE_STEPS)));
+  }
+  return minimumDistance;
+}
+
+function findWorstFitPoint(points: Point[], cubic: Extract<PathOp, { kind: 'cubic' }>) {
+  let index = -1;
+  let error = 0;
+  for (let pointIndex = 1; pointIndex < points.length - 1; pointIndex += 1) {
+    const currentError = distanceToCubic(points[pointIndex], cubic);
+    if (currentError > error) {
+      error = currentError;
+      index = pointIndex;
+    }
+  }
+  return { index, error };
+}
+
+function smoothJoinedCubicTangents(ops: PathOp[]) {
+  for (let index = 0; index < ops.length - 1; index += 1) {
+    const left = ops[index];
+    const right = ops[index + 1];
+    if (left.kind !== 'cubic' || right.kind !== 'cubic' || distance(left.end, right.start) > 0.001) continue;
+
+    const join = left.end;
+    const leftHandleLength = distance(left.control2, join);
+    const rightHandleLength = distance(join, right.control1);
+    if (leftHandleLength <= 0.001 || rightHandleLength <= 0.001) continue;
+
+    const incoming = {
+      x: join.x - left.control2.x,
+      y: join.y - left.control2.y,
+    };
+    const outgoing = {
+      x: right.control1.x - join.x,
+      y: right.control1.y - join.y,
+    };
+    const incomingLength = Math.hypot(incoming.x, incoming.y);
+    const outgoingLength = Math.hypot(outgoing.x, outgoing.y);
+    if (incomingLength <= 0.001 || outgoingLength <= 0.001) continue;
+
+    let tangent = {
+      x: incoming.x / incomingLength + outgoing.x / outgoingLength,
+      y: incoming.y / incomingLength + outgoing.y / outgoingLength,
+    };
+    const tangentLength = Math.hypot(tangent.x, tangent.y);
+    if (tangentLength <= 0.001) {
+      tangent = {
+        x: right.end.x - left.start.x,
+        y: right.end.y - left.start.y,
+      };
+    }
+    const normalizedLength = Math.hypot(tangent.x, tangent.y);
+    if (normalizedLength <= 0.001) continue;
+
+    const unit = {
+      x: tangent.x / normalizedLength,
+      y: tangent.y / normalizedLength,
+    };
+    left.control2 = {
+      x: join.x - unit.x * leftHandleLength,
+      y: join.y - unit.y * leftHandleLength,
+    };
+    right.control1 = {
+      x: join.x + unit.x * rightHandleLength,
+      y: join.y + unit.y * rightHandleLength,
+    };
+  }
+}
+
+function appendFittedSingleFlowCubicOps(ops: PathOp[], segmentPoints: Point[], tolerance: number, maxError: number, depth = 0) {
+  const cubic = buildSingleFlowCubicOp(segmentPoints, tolerance);
+  if (!cubic) return;
+
+  const worst = findWorstFitPoint(segmentPoints, cubic);
+  if (
+    worst.error <= maxError ||
+    worst.index <= 0 ||
+    depth >= CURVE_FIT_MAX_RECURSION ||
+    segmentPoints.length <= CURVE_FIT_MIN_POINTS
+  ) {
+    ops.push(cubic);
+    return;
+  }
+
+  appendFittedSingleFlowCubicOps(ops, segmentPoints.slice(0, worst.index + 1), tolerance, maxError, depth + 1);
+  appendFittedSingleFlowCubicOps(ops, segmentPoints.slice(worst.index), tolerance, maxError, depth + 1);
+}
+
+function appendSmoothSegmentOps(ops: PathOp[], segmentPoints: Point[], tolerance: number, maxError: number) {
+  if (segmentPoints.length < 2) return;
+  if (ENABLE_STRAIGHT_LINE_PROCESSING && isPointSequenceNearlyStraight(segmentPoints, tolerance)) {
+    const simplifiedPoints = simplifyPolyline(segmentPoints, tolerance);
+    ops.push({ kind: 'line', start: simplifiedPoints[0], end: simplifiedPoints[simplifiedPoints.length - 1] });
+    return;
+  }
+
+  splitSegmentByBulgeDirection(segmentPoints, tolerance).forEach((segment) => {
+    const startIndex = ops.length;
+    appendFittedSingleFlowCubicOps(ops, segment, tolerance, maxError);
+    smoothJoinedCubicTangents(ops.slice(startIndex));
   });
-  return filtered.length >= (closed ? 3 : 2) ? filtered : points;
+}
+
+function collectCyclicIndexRangePoints(points: Point[], startIndex: number, endIndex: number) {
+  const segment: Point[] = [];
+  let index = startIndex;
+  let guard = points.length + 1;
+  while (guard > 0) {
+    guard -= 1;
+    segment.push(points[index]);
+    if (index === endIndex) break;
+    index = (index + 1) % points.length;
+  }
+  return segment;
+}
+
+function buildClosedSmoothOpsBetweenConcavities(points: Point[], concavityPointSet: Set<number>, tolerance: number, maxError: number) {
+  const anchorIndices = Array.from(concavityPointSet).sort((left, right) => left - right);
+  if (anchorIndices.length < 2) return null;
+
+  const ops: PathOp[] = [];
+  for (let index = 0; index < anchorIndices.length; index += 1) {
+    const startIndex = anchorIndices[index];
+    const endIndex = anchorIndices[(index + 1) % anchorIndices.length];
+    appendSmoothSegmentOps(ops, collectCyclicIndexRangePoints(points, startIndex, endIndex), tolerance, maxError);
+  }
+  return { start: points[anchorIndices[0]], ops };
+}
+
+function buildOpenSmoothOpsBetweenConcavities(points: Point[], concavityPointSet: Set<number>, tolerance: number, maxError: number) {
+  if (concavityPointSet.size < 2) return null;
+  const breakpoints = Array.from(new Set([0, ...Array.from(concavityPointSet), points.length - 1])).sort((left, right) => left - right);
+  if (breakpoints.length < 2) return null;
+
+  const ops: PathOp[] = [];
+  for (let index = 0; index < breakpoints.length - 1; index += 1) {
+    const startIndex = breakpoints[index];
+    const endIndex = breakpoints[index + 1];
+    if (startIndex === endIndex) continue;
+    appendSmoothSegmentOps(ops, points.slice(startIndex, endIndex + 1), tolerance, maxError);
+  }
+  return { start: points[0], ops };
+}
+
+function isInnerCornerPoint(points: Point[], index: number, areaSign: number, closed: boolean) {
+  if (!closed && (index === 0 || index === points.length - 1)) return false;
+  const previous = points[(index - 1 + points.length) % points.length];
+  const current = points[index];
+  const next = points[(index + 1) % points.length];
+  const turnSign = Math.sign(cornerCross(previous, current, next));
+  return turnSign !== 0 && turnSign !== areaSign;
+}
+
+function removeInnerControlPointsFromLoop(
+  points: Point[],
+  areaSign: number,
+  closed: boolean,
+  shortSideMaxLength: number,
+) {
+  if (!REMOVE_INNER_CONTROL_POINTS) return points;
+  let currentPoints = points.slice();
+  let changed = true;
+  let guard = points.length;
+
+  while (changed && guard > 0) {
+    changed = false;
+    guard -= 1;
+    const filtered = currentPoints.filter((point, index) => {
+      if (!closed && (index === 0 || index === currentPoints.length - 1)) return true;
+      if (!isInnerCornerPoint(currentPoints, index, areaSign, closed)) return true;
+
+      const previous = currentPoints[(index - 1 + currentPoints.length) % currentPoints.length];
+      const next = currentPoints[(index + 1) % currentPoints.length];
+      const hasShortSide = distance(previous, point) <= shortSideMaxLength || distance(point, next) <= shortSideMaxLength;
+      if (!hasShortSide) return true;
+
+      changed = true;
+      return false;
+    });
+    if (filtered.length < (closed ? 3 : 2)) return currentPoints;
+    currentPoints = filtered;
+  }
+
+  return currentPoints;
 }
 
 function getAdaptiveTrim(angle: number, incomingLength: number, outgoingLength: number, depth: number) {
@@ -1033,7 +1440,6 @@ function getRoundedCornerData(loop: Point[]) {
     if (!shouldRound) {
       return {
         point: current,
-        innerCorner: !isOuterCorner,
         entry: current,
         exit: current,
         rounded: false,
@@ -1043,7 +1449,6 @@ function getRoundedCornerData(loop: Point[]) {
     const trim = getAdaptiveTrim(angle, incomingLength, outgoingLength, depth);
     return {
       point: current,
-      innerCorner: !isOuterCorner,
       entry: {
         x: current.x + ((previous.x - current.x) / incomingLength) * trim,
         y: current.y + ((previous.y - current.y) / incomingLength) * trim,
@@ -1059,8 +1464,27 @@ function getRoundedCornerData(loop: Point[]) {
 
 function roundedClosedPath(points: Point[], longStraightLineMinLength: number): SvgPathResult {
   if (points.length < 3) return createPathResult('');
-  const protectedPointKeys = collectRawLongStraightEndpointKeys(points, longStraightLineMinLength, true);
-  const pathPoints = removeInnerControlPointsFromLoop(points, getInnerCornerPointKeys(points), protectedPointKeys, true);
+  const pathPoints = removeInnerControlPointsFromLoop(
+    points,
+    Math.sign(signedArea(points)) || 1,
+    true,
+    getShortInnerControlSideMaxLength(longStraightLineMinLength),
+  );
+  const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
+  const concavityPointKeys = buildConcavityPointKeys(pathPoints, concavityPointSet);
+  const smoothPath = buildClosedSmoothOpsBetweenConcavities(
+    pathPoints,
+    concavityPointSet,
+    getSmoothCurveSimplifyTolerance(longStraightLineMinLength),
+    getCurveFitMaxError(longStraightLineMinLength),
+  );
+  if (smoothPath) {
+    const { commands, controlPoints, longStraightLines, connectedStraightLines } = buildPathFromOps(smoothPath.ops, smoothPath.start, longStraightLineMinLength);
+    const debugPoints = buildPathPointDebugPoints(pathPoints, concavityPointKeys);
+    commands.push('Z');
+    return createPathResult(commands.join(' '), mergeDebugPoints([...controlPoints, ...debugPoints]), longStraightLines, connectedStraightLines);
+  }
+
   const corners = getRoundedCornerData(pathPoints);
   const start = corners[0].exit;
   let cursor = start;
@@ -1071,7 +1495,7 @@ function roundedClosedPath(points: Point[], longStraightLineMinLength: number): 
     ops.push({ kind: 'line', start: cursor, end: corner.entry });
     cursor = corner.entry;
     if (corner.rounded) {
-      const kind = corner.innerCorner ? 'green' : 'normal';
+      const kind = getControlPointKind(corner.point, concavityPointKeys);
       ops.push({ kind: 'quad', start: cursor, control: corner.point, end: corner.exit, controlKind: kind });
       cursor = corner.exit;
     } else {
@@ -1082,22 +1506,36 @@ function roundedClosedPath(points: Point[], longStraightLineMinLength: number): 
 
   if (distance(cursor, start) > 0.001) ops.push({ kind: 'line', start: cursor, end: start });
   const { commands, controlPoints, longStraightLines, connectedStraightLines } = buildPathFromOps(ops, start, longStraightLineMinLength);
-  const longStraightEndpointKeys = collectLongStraightEndpointKeys(longStraightLines);
-  protectedPointKeys.forEach((key) => longStraightEndpointKeys.add(key));
-  const coloredControlPoints = controlPoints.map((controlPoint) =>
-    longStraightEndpointKeys.has(pointKey(controlPoint.point)) ? { ...controlPoint, kind: 'normal' as const } : controlPoint,
-  );
+  const debugPoints = buildPathPointDebugPoints(pathPoints, concavityPointKeys);
   commands.push('Z');
-  return createPathResult(commands.join(' '), mergeDebugPoints(coloredControlPoints), longStraightLines, connectedStraightLines);
+  return createPathResult(commands.join(' '), mergeDebugPoints([...controlPoints, ...debugPoints]), longStraightLines, connectedStraightLines);
 }
 
-function roundedOpenPath(points: Point[], longStraightLineMinLength: number, innerCornerPointKeys: Set<string>): SvgPathResult {
+function roundedOpenPath(points: Point[], longStraightLineMinLength: number, areaSign: number): SvgPathResult {
   if (points.length === 0) return createPathResult('');
   if (points.length === 1) return createPathResult(`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`);
 
   const controlPoints: DebugPoint[] = [];
-  const protectedPointKeys = collectRawLongStraightEndpointKeys(points, longStraightLineMinLength, false);
-  const pathPoints = removeInnerControlPointsFromLoop(points, innerCornerPointKeys, protectedPointKeys, false);
+  const pathPoints = removeInnerControlPointsFromLoop(
+    points,
+    areaSign,
+    false,
+    getShortInnerControlSideMaxLength(longStraightLineMinLength),
+  );
+  const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign }));
+  const concavityPointKeys = buildConcavityPointKeys(pathPoints, concavityPointSet);
+  const smoothPath = buildOpenSmoothOpsBetweenConcavities(
+    pathPoints,
+    concavityPointSet,
+    getSmoothCurveSimplifyTolerance(longStraightLineMinLength),
+    getCurveFitMaxError(longStraightLineMinLength),
+  );
+  if (smoothPath) {
+    const pathData = buildPathFromOps(smoothPath.ops, smoothPath.start, longStraightLineMinLength);
+    const debugPoints = buildPathPointDebugPoints(pathPoints, concavityPointKeys);
+    return createPathResult(pathData.commands.join(' '), mergeDebugPoints([...pathData.controlPoints, ...debugPoints]), pathData.longStraightLines, pathData.connectedStraightLines);
+  }
+
   let cursor = pathPoints[0];
   const ops: PathOp[] = [];
 
@@ -1138,30 +1576,26 @@ function roundedOpenPath(points: Point[], longStraightLineMinLength: number, inn
       y: current.y + ((next.y - current.y) / outgoingLength) * trim,
     };
     ops.push({ kind: 'line', start: cursor, end: entry });
-    const kind = innerCornerPointKeys.has(pointKey(current)) ? 'green' : 'normal';
+    const kind = getControlPointKind(current, concavityPointKeys);
     ops.push({ kind: 'quad', start: entry, control: current, end: exit, controlKind: kind });
     cursor = exit;
   }
 
   const pathData = buildPathFromOps(ops, pathPoints[0], longStraightLineMinLength);
   controlPoints.push(...pathData.controlPoints);
-  const longStraightEndpointKeys = collectLongStraightEndpointKeys(pathData.longStraightLines);
-  protectedPointKeys.forEach((key) => longStraightEndpointKeys.add(key));
-  const coloredControlPoints = controlPoints.map((controlPoint) =>
-    longStraightEndpointKeys.has(pointKey(controlPoint.point)) ? { ...controlPoint, kind: 'normal' as const } : controlPoint,
-  );
-  return createPathResult(pathData.commands.join(' '), mergeDebugPoints(coloredControlPoints), pathData.longStraightLines, pathData.connectedStraightLines);
+  const debugPoints = buildPathPointDebugPoints(pathPoints, concavityPointKeys);
+  return createPathResult(pathData.commands.join(' '), mergeDebugPoints([...controlPoints, ...debugPoints]), pathData.longStraightLines, pathData.connectedStraightLines);
 }
 
 function loopToPath(points: Point[], longStraightLineMinLength: number, outerCircle: Circle | null = null): SvgPathResult {
-  const innerCornerPointKeys = getInnerCornerPointKeys(points);
+  const areaSign = Math.sign(signedArea(points)) || 1;
   if (outerCircle) {
     const run = findUpperCircleRun(points, outerCircle);
     if (run) {
       const beforeRun = (run.start - 1 + points.length) % points.length;
       const afterRun = (run.end + 1) % points.length;
       const rest = collectCyclicRange(points, afterRun, beforeRun);
-      const restPath = roundedOpenPath(rest, longStraightLineMinLength, innerCornerPointKeys);
+      const restPath = roundedOpenPath(rest, longStraightLineMinLength, areaSign);
       const upperCircle = upperCircleArcWithVerticalConnectors(
         outerCircle,
         points[beforeRun].x <= points[afterRun].x,
@@ -1260,8 +1694,8 @@ function buildConnectedStraightLineMarkers(lines: Array<{ start: Point; end: Poi
 
 function buildSvg(fileName: string, width: number, height: number, artworkDataUrl: string, cutPath: SvgPathResult) {
   const controlPointMarkers = SHOW_CONTROL_POINT_MARKERS ? buildControlPointMarkers(cutPath.controlPoints) : '';
-  const longStraightLineMarkers = buildLongStraightLineMarkers(cutPath.longStraightLines);
-  const connectedStraightLineMarkers = buildConnectedStraightLineMarkers(cutPath.connectedStraightLines);
+  const longStraightLineMarkers = SHOW_LONG_STRAIGHT_LINE_MARKERS ? buildLongStraightLineMarkers(cutPath.longStraightLines) : '';
+  const connectedStraightLineMarkers = SHOW_CONNECTED_STRAIGHT_LINE_MARKERS ? buildConnectedStraightLineMarkers(cutPath.connectedStraightLines) : '';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(fileName)} acrylic keychain cut line">
   <title>${escapeXml(fileName)} acrylic keychain cut line</title>

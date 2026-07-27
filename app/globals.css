@@ -2240,7 +2240,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
 .acrylic-preview-wrap.has-preview {
   cursor: default;
-  background-image: url('/works/bg.png');
+  background-image: url('/works/Acrylic/bg.png');
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -2322,16 +2322,37 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   display: flex;
   align-items: center;
   justify-content: center;
+  background-image: url('/works/Acrylic/bg.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
   color: var(--site-text-muted);
   text-align: center;
   border: 1px dashed color-mix(in srgb, var(--site-border) 65%, #ffffff);
 }
 
+.acrylic-preview-empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.42);
+}
+
 .acrylic-preview-empty span {
+  position: relative;
+  z-index: 1;
   display: block;
   max-width: calc(100% - 24px);
   padding: 6px 12px;
-  background: #ffffff;
+  text-shadow:
+    -1px -1px 0 #ffffff,
+    0 -1px 0 #ffffff,
+    1px -1px 0 #ffffff,
+    -1px 0 0 #ffffff,
+    1px 0 0 #ffffff,
+    -1px 1px 0 #ffffff,
+    0 1px 0 #ffffff,
+    1px 1px 0 #ffffff;
   white-space: nowrap;
 }
 

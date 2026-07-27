@@ -94,6 +94,39 @@ export const manualNews: News[] = [
   // },
   {
     id: 'announcement-gamespage-launch',
+    title: '「アクキーシミュレーター」にSVG作成機能を追加しました',
+    date: '2026-07-27',
+    category: 'release',
+    thumbnail: '/news/20260727-171550.png',
+    summary: 'アクキーシミュレーターにSVG作成機能を追加しました',
+    body: [
+      {
+        type: 'text',
+        value:
+          '「アクキーシミュレーター」に、なんと「SVG作成機能」が追加されました。\nイラストからカットパスを作成できます。',
+      },
+      {
+        type: 'link',
+        label: 'アクキーシミュレーター',
+        href: '/works/acrylic-keychain-tool',
+      },
+      {
+        type: 'text',
+        value:
+          'ただし、カットパスは業者によって指定が異なるためそのままでは使えません。今後はこの技術に興味を持ってくれた企業様と連携し、そのまま発注できる形にしたいと思います。\n\nもし、ご興味が湧いた方がいらっしゃいましたら、\nぜひこちらからご連絡くださいm(_ _)m\n\n要望に合わせて柔軟に対応可能です。',
+      },
+            {
+        type: 'link',
+        label: 'ご意見・ご要望',
+        href: '/contact/inquiry',
+      },
+    ],
+    seoTitle: 'Gamesページを追加しました | YukimiWorks',
+    seoDescription: 'Gamesページを追加しました。',
+    featured: true,
+  },
+  {
+    id: 'announcement-gamespage-launch',
     title: '「ゲーム」カテゴリを追加しました',
     date: '2026-07-19',
     category: 'announcement',

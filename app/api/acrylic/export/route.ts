@@ -9,6 +9,7 @@ type AcrylicExportRequest = {
   height?: unknown;
   artworkDataUrl?: unknown;
   holeMode?: unknown;
+  debug?: unknown;
 };
 
 type Point = {
@@ -119,7 +120,6 @@ const OUTER_CORNER_ROUND_MIN_TRIM = 0.2;
 const INNER_SHARP_CORNER_MAX_ANGLE = 90;
 const CONCAVITY_MAX_ANGLE = 160;
 const BASE_SMOOTH_CURVE_SIMPLIFY_TOLERANCE = 1.2;
-const BASE_SHORT_INNER_CONTROL_SIDE_MAX_LENGTH = 3;
 const BASE_CURVE_FIT_MAX_ERROR = 2;
 const CURVE_FIT_MAX_RECURSION = 4;
 const CURVE_FIT_MIN_POINTS = 4;
@@ -134,9 +134,13 @@ const NORMAL_CONTROL_POINT_FILL = '#ff0000';
 const PARALLEL_LINE_MAX_ANGLE_DELTA = 8;
 const REMOVE_INNER_CONTROL_POINTS = true;
 const ENABLE_STRAIGHT_LINE_PROCESSING = false;
+const DEBUG_OUTPUT_PRE_SMOOTHING_PATH = false;
 const SHOW_CONTROL_POINT_MARKERS = false;
 const SHOW_LONG_STRAIGHT_LINE_MARKERS = false;
 const SHOW_CONNECTED_STRAIGHT_LINE_MARKERS = false;
+const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
+const ZIP_CENTRAL_DIRECTORY_HEADER_SIGNATURE = 0x02014b50;
+const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
 
 function createPathResult(
   path: string,
@@ -161,10 +165,6 @@ function getStraightAdjacentControlMaxGap(longStraightLineMinLength: number) {
 
 function getSmoothCurveSimplifyTolerance(longStraightLineMinLength: number) {
   return BASE_SMOOTH_CURVE_SIMPLIFY_TOLERANCE * (longStraightLineMinLength / BASE_LONG_STRAIGHT_LINE_MIN_LENGTH);
-}
-
-function getShortInnerControlSideMaxLength(longStraightLineMinLength: number) {
-  return BASE_SHORT_INNER_CONTROL_SIDE_MAX_LENGTH * (longStraightLineMinLength / BASE_LONG_STRAIGHT_LINE_MIN_LENGTH);
 }
 
 function getCurveFitMaxError(longStraightLineMinLength: number) {
@@ -481,6 +481,91 @@ function escapeXml(value: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function encodeUtf8(value: string) {
+  return Buffer.from(value, 'utf8');
+}
+
+function createCrc32Table() {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < table.length; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+}
+
+const CRC32_TABLE = createCrc32Table();
+
+function crc32(buffer: Buffer) {
+  let value = 0xffffffff;
+  for (const byte of buffer) {
+    value = CRC32_TABLE[(value ^ byte) & 0xff] ^ (value >>> 8);
+  }
+  return (value ^ 0xffffffff) >>> 0;
+}
+
+function createZip(files: Array<{ name: string; data: Buffer }>) {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  files.forEach(({ name, data }) => {
+    const nameBuffer = encodeUtf8(name);
+    const checksum = crc32(data);
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(ZIP_LOCAL_FILE_HEADER_SIGNATURE, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(0, 10);
+    localHeader.writeUInt16LE(0, 12);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(data.length, 18);
+    localHeader.writeUInt32LE(data.length, 22);
+    localHeader.writeUInt16LE(nameBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+    localParts.push(localHeader, nameBuffer, data);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(ZIP_CENTRAL_DIRECTORY_HEADER_SIGNATURE, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x0800, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(0, 12);
+    centralHeader.writeUInt16LE(0, 14);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(data.length, 20);
+    centralHeader.writeUInt32LE(data.length, 24);
+    centralHeader.writeUInt16LE(nameBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralParts.push(centralHeader, nameBuffer);
+
+    offset += localHeader.length + nameBuffer.length + data.length;
+  });
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  end.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
 function formatSvgNumber(value: number) {
@@ -1082,6 +1167,16 @@ function buildPathPointDebugPoints(points: Point[], concavityPointKeys: Set<stri
   return points.map((point) => ({ point, kind: getControlPointKind(point, concavityPointKeys) }));
 }
 
+function buildPreSmoothingDebugPath(points: Point[], concavityPointKeys: Set<string>, closed: boolean): SvgPathResult {
+  if (points.length === 0) return createPathResult('');
+  const commands = [`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`];
+  points.slice(1).forEach((point) => {
+    commands.push(lineToCommand(point));
+  });
+  if (closed) commands.push('Z');
+  return createPathResult(commands.join(' '), mergeDebugPoints(buildPathPointDebugPoints(points, concavityPointKeys)));
+}
+
 function simplifyPolyline(points: Point[], tolerance: number): Point[] {
   if (points.length <= 2) return points;
 
@@ -1366,46 +1461,15 @@ function buildOpenSmoothOpsBetweenConcavities(points: Point[], concavityPointSet
   return { start: points[0], ops };
 }
 
-function isInnerCornerPoint(points: Point[], index: number, areaSign: number, closed: boolean) {
-  if (!closed && (index === 0 || index === points.length - 1)) return false;
-  const previous = points[(index - 1 + points.length) % points.length];
-  const current = points[index];
-  const next = points[(index + 1) % points.length];
-  const turnSign = Math.sign(cornerCross(previous, current, next));
-  return turnSign !== 0 && turnSign !== areaSign;
-}
-
-function removeInnerControlPointsFromLoop(
-  points: Point[],
-  areaSign: number,
-  closed: boolean,
-  shortSideMaxLength: number,
-) {
+function removeConcavityControlPoints(points: Point[], concavityPointSet: Set<number>, closed: boolean) {
   if (!REMOVE_INNER_CONTROL_POINTS) return points;
-  let currentPoints = points.slice();
-  let changed = true;
-  let guard = points.length;
+  if (concavityPointSet.size === 0) return points;
 
-  while (changed && guard > 0) {
-    changed = false;
-    guard -= 1;
-    const filtered = currentPoints.filter((point, index) => {
-      if (!closed && (index === 0 || index === currentPoints.length - 1)) return true;
-      if (!isInnerCornerPoint(currentPoints, index, areaSign, closed)) return true;
-
-      const previous = currentPoints[(index - 1 + currentPoints.length) % currentPoints.length];
-      const next = currentPoints[(index + 1) % currentPoints.length];
-      const hasShortSide = distance(previous, point) <= shortSideMaxLength || distance(point, next) <= shortSideMaxLength;
-      if (!hasShortSide) return true;
-
-      changed = true;
-      return false;
-    });
-    if (filtered.length < (closed ? 3 : 2)) return currentPoints;
-    currentPoints = filtered;
-  }
-
-  return currentPoints;
+  const filtered = points.filter((_, index) => {
+    if (!closed && (index === 0 || index === points.length - 1)) return true;
+    return !concavityPointSet.has(index);
+  });
+  return filtered.length >= (closed ? 3 : 2) ? filtered : points;
 }
 
 function getAdaptiveTrim(angle: number, incomingLength: number, outgoingLength: number, depth: number) {
@@ -1464,14 +1528,11 @@ function getRoundedCornerData(loop: Point[]) {
 
 function roundedClosedPath(points: Point[], longStraightLineMinLength: number): SvgPathResult {
   if (points.length < 3) return createPathResult('');
-  const pathPoints = removeInnerControlPointsFromLoop(
-    points,
-    Math.sign(signedArea(points)) || 1,
-    true,
-    getShortInnerControlSideMaxLength(longStraightLineMinLength),
-  );
+  const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: true }));
+  const pathPoints = removeConcavityControlPoints(points, rawConcavityPointSet, true);
   const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
   const concavityPointKeys = buildConcavityPointKeys(pathPoints, concavityPointSet);
+  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, true);
   const smoothPath = buildClosedSmoothOpsBetweenConcavities(
     pathPoints,
     concavityPointSet,
@@ -1516,14 +1577,11 @@ function roundedOpenPath(points: Point[], longStraightLineMinLength: number, are
   if (points.length === 1) return createPathResult(`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`);
 
   const controlPoints: DebugPoint[] = [];
-  const pathPoints = removeInnerControlPointsFromLoop(
-    points,
-    areaSign,
-    false,
-    getShortInnerControlSideMaxLength(longStraightLineMinLength),
-  );
+  const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: false, areaSign }));
+  const pathPoints = removeConcavityControlPoints(points, rawConcavityPointSet, false);
   const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign }));
   const concavityPointKeys = buildConcavityPointKeys(pathPoints, concavityPointSet);
+  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, false);
   const smoothPath = buildOpenSmoothOpsBetweenConcavities(
     pathPoints,
     concavityPointSet,
@@ -1708,6 +1766,15 @@ function buildSvg(fileName: string, width: number, height: number, artworkDataUr
 `;
 }
 
+function buildCutPathOnlySvg(fileName: string, width: number, height: number, cutPath: SvgPathResult) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(fileName)} acrylic keychain cut line">
+  <title>${escapeXml(fileName)} acrylic keychain cut line</title>
+  <path d="${cutPath.path}" fill="none" fill-rule="evenodd" stroke="#ff2f7d" stroke-width="1" vector-effect="non-scaling-stroke"/>
+</svg>
+`;
+}
+
 export async function POST(request: Request) {
   let body: AcrylicExportRequest;
   try {
@@ -1724,15 +1791,33 @@ export async function POST(request: Request) {
 
   try {
     const fileBaseName = sanitizeFileName(body.fileName);
-    const artwork = decodePngAlpha(parsePngDataUrl(body.artworkDataUrl));
+    const artworkPng = parsePngDataUrl(body.artworkDataUrl);
+    const artwork = decodePngAlpha(artworkPng);
     if (artwork.width !== body.width || artwork.height !== body.height) throw new Error('イラストPNGのサイズが不正です');
     const cutPath = buildServerCutPath(artwork, body.holeMode);
-    const svg = buildSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, cutPath);
+    const debug = body.debug === true;
 
-    return new NextResponse(svg, {
+    if (debug) {
+      const svg = buildSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, cutPath);
+      return new NextResponse(svg, {
+        headers: {
+          'Content-Type': 'image/svg+xml; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${fileBaseName}.svg"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
+    const svg = buildCutPathOnlySvg(fileBaseName, body.width, body.height, cutPath);
+    const zip = createZip([
+      { name: `${fileBaseName}.svg`, data: Buffer.from(svg, 'utf8') },
+      { name: `${fileBaseName}.png`, data: artworkPng },
+    ]);
+
+    return new NextResponse(zip, {
       headers: {
-        'Content-Type': 'image/svg+xml; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${fileBaseName}.svg"`,
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${fileBaseName}.zip"`,
         'Cache-Control': 'no-store',
       },
     });

@@ -65,6 +65,7 @@ const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
 const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
+const EXPORT_DEBUG_SVG = false;
 
 function scaleArtworkMetric(value: number, artworkWidth: number, artworkHeight: number) {
   return value * (Math.max(artworkWidth, artworkHeight) / REFERENCE_ARTWORK_SIZE);
@@ -895,6 +896,7 @@ export function AcrylicKeychainTool() {
           height: preview.height,
           artworkDataUrl: preview.artworkSrc,
           holeMode,
+          debug: EXPORT_DEBUG_SVG,
         }),
       });
 
@@ -904,8 +906,8 @@ export function AcrylicKeychainTool() {
       }
 
       const blob = await response.blob();
-      downloadBlob(blob, `${fileBaseName}.svg`);
-      setStatus('制御点を赤で表示したSVGを書き出しました');
+      downloadBlob(blob, `${fileBaseName}${EXPORT_DEBUG_SVG ? '.svg' : '.zip'}`);
+      setStatus(EXPORT_DEBUG_SVG ? 'デバッグ用SVGを書き出しました' : '発注用SVGと元画像をZIPで書き出しました');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'SVGを作成できませんでした');
     } finally {

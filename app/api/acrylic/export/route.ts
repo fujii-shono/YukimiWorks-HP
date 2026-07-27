@@ -36,9 +36,42 @@ type PngImage = {
   alpha: Uint8Array;
 };
 
+type DebugPoint = {
+  point: Point;
+  kind: 'normal' | 'green';
+};
+
 type SvgPathResult = {
   path: string;
-  controlPoints: Point[];
+  controlPoints: DebugPoint[];
+  longStraightLines: Array<{ start: Point; end: Point }>;
+  connectedStraightLines: Array<{ start: Point; end: Point }>;
+};
+
+type PathOp =
+  | {
+      kind: 'line';
+      start: Point;
+      end: Point;
+    }
+  | {
+      kind: 'quad';
+      start: Point;
+      control: Point;
+      end: Point;
+      controlKind: DebugPoint['kind'];
+    };
+
+type StraightLineCandidate = {
+  start: Point;
+  end: Point;
+  opIndex: number;
+};
+
+type ConnectedStraightLineGroup = {
+  start: Point;
+  end: Point;
+  opIndices: number[];
 };
 
 const MAX_EXPORT_SIZE = 2400;
@@ -50,13 +83,332 @@ const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
 const BASE_KEYCHAIN_HOLE_OUTER_RADIUS = 24;
 const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
 const BASE_KEYCHAIN_HOLE_GAP = 2;
+const CONTROL_POINT_RADIUS = 0.9;
+const CONTROL_POINT_STROKE_WIDTH = 0.2;
+const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 5;
 const OUTER_CORNER_ROUND_MIN_ANGLE = 1;
 const OUTER_CORNER_ROUND_MAX_ANGLE = 179;
 const OUTER_CORNER_ROUND_MAX_TRIM = 18;
 const OUTER_CORNER_ROUND_MIN_TRIM = 0.2;
 const INNER_SHARP_CORNER_MAX_ANGLE = 90;
-const CONTROL_POINT_RADIUS = 0.9;
-const CONTROL_POINT_STROKE_WIDTH = 0.2;
+const LONG_STRAIGHT_LINE_STROKE = '#0066ff';
+const CONNECTED_STRAIGHT_LINE_STROKE = '#ffd400';
+const CONNECTED_STRAIGHT_LINE_MAX_GAP = 4;
+const BASE_STRAIGHT_ADJACENT_CONTROL_MAX_GAP = 8;
+const STRAIGHT_OFF_DIRECTION_CONTROL_MIN_ANGLE = 8;
+const GREEN_POINT_FILL = '#00a651';
+const NORMAL_CONTROL_POINT_FILL = '#ff0000';
+const PARALLEL_LINE_MAX_ANGLE_DELTA = 8;
+const REMOVE_INNER_CONTROL_POINTS = true;
+const SHOW_CONTROL_POINT_MARKERS = true;
+
+function createPathResult(
+  path: string,
+  controlPoints: DebugPoint[] = [],
+  longStraightLines: Array<{ start: Point; end: Point }> = [],
+  connectedStraightLines: Array<{ start: Point; end: Point }> = [],
+): SvgPathResult {
+  return { path, controlPoints, longStraightLines, connectedStraightLines };
+}
+
+function lineToCommand(point: Point) {
+  return `L ${formatSvgNumber(point.x)} ${formatSvgNumber(point.y)}`;
+}
+
+function getLongStraightLineMinLength(width: number, height: number) {
+  return BASE_LONG_STRAIGHT_LINE_MIN_LENGTH * (Math.max(width, height) / REFERENCE_ARTWORK_SIZE);
+}
+
+function getStraightAdjacentControlMaxGap(longStraightLineMinLength: number) {
+  return BASE_STRAIGHT_ADJACENT_CONTROL_MAX_GAP * (longStraightLineMinLength / BASE_LONG_STRAIGHT_LINE_MIN_LENGTH);
+}
+
+function pushLineCommand(commands: string[], longStraightLines: Array<{ start: Point; end: Point }>, start: Point, end: Point, minLength: number) {
+  commands.push(lineToCommand(end));
+  if (distance(start, end) >= minLength) longStraightLines.push({ start, end });
+}
+
+function areEndpointsNear(left: Point, right: Point) {
+  return distance(left, right) <= CONNECTED_STRAIGHT_LINE_MAX_GAP;
+}
+
+function areLinesAdjacent(left: { start: Point; end: Point }, right: { start: Point; end: Point }) {
+  return (
+    areEndpointsNear(left.start, right.start) ||
+    areEndpointsNear(left.start, right.end) ||
+    areEndpointsNear(left.end, right.start) ||
+    areEndpointsNear(left.end, right.end)
+  );
+}
+
+function areCandidatesConnected(left: StraightLineCandidate, right: StraightLineCandidate) {
+  return areNearlyParallel(left, right) && areLinesAdjacent(left, right);
+}
+
+function buildConnectedStraightLineGroups(candidates: StraightLineCandidate[]): ConnectedStraightLineGroup[] {
+  const mergedLines = candidates;
+  const endpointCounts = new Map<string, number>();
+  mergedLines.forEach(({ start, end }) => {
+    [pointKey(start), pointKey(end)].forEach((key) => {
+      endpointCounts.set(key, (endpointCounts.get(key) ?? 0) + 1);
+    });
+  });
+
+  const isConnectedLine = (line: StraightLineCandidate, index: number) =>
+    (endpointCounts.get(pointKey(line.start)) ?? 0) > 1 ||
+    (endpointCounts.get(pointKey(line.end)) ?? 0) > 1 ||
+    mergedLines.some((otherLine, otherIndex) => otherIndex !== index && areCandidatesConnected(line, otherLine));
+  const connectedLineFlags = mergedLines.map(isConnectedLine);
+  const visited = new Set<number>();
+  const groups: ConnectedStraightLineGroup[] = [];
+
+  mergedLines.forEach((line, index) => {
+    if (visited.has(index) || !connectedLineFlags[index]) return;
+    const groupIndices: number[] = [];
+    const queue = [index];
+    visited.add(index);
+    while (queue.length > 0) {
+      const currentIndex = queue.shift();
+      if (currentIndex === undefined) continue;
+      groupIndices.push(currentIndex);
+      mergedLines.forEach((candidateLine, candidateIndex) => {
+        if (visited.has(candidateIndex) || !connectedLineFlags[candidateIndex]) return;
+        const currentLine = mergedLines[currentIndex];
+        if (!areCandidatesConnected(currentLine, candidateLine)) return;
+        visited.add(candidateIndex);
+        queue.push(candidateIndex);
+      });
+    }
+
+    if (groupIndices.length < 2) return;
+    const sortedLines = groupIndices.map((groupIndex) => mergedLines[groupIndex]).sort((left, right) => left.opIndex - right.opIndex);
+    groups.push({
+      start: sortedLines[0].start,
+      end: sortedLines[sortedLines.length - 1].end,
+      opIndices: sortedLines.map(({ opIndex }) => opIndex),
+    });
+  });
+
+  return groups;
+}
+
+function buildStraightLineCandidates(ops: PathOp[], minLength: number) {
+  return ops.reduce<StraightLineCandidate[]>((candidates, op, opIndex) => {
+    if (op.kind === 'line' && distance(op.start, op.end) >= minLength) candidates.push({ start: op.start, end: op.end, opIndex });
+    return candidates;
+  }, []);
+}
+
+function setPathOpStart(op: PathOp | undefined, start: Point) {
+  if (!op) return;
+  op.start = start;
+}
+
+function clonePathOp(op: PathOp): PathOp {
+  if (op.kind === 'line') {
+    return { kind: 'line', start: { ...op.start }, end: { ...op.end } };
+  }
+  return { kind: 'quad', start: { ...op.start }, control: { ...op.control }, end: { ...op.end }, controlKind: op.controlKind };
+}
+
+function collectStraightTargetOpIndices(candidates: StraightLineCandidate[], groups: ConnectedStraightLineGroup[]) {
+  const targetOpIndices = new Set<number>();
+  candidates.forEach(({ opIndex }) => targetOpIndices.add(opIndex));
+  groups.forEach(({ opIndices }) => {
+    opIndices.forEach((opIndex) => targetOpIndices.add(opIndex));
+  });
+  return targetOpIndices;
+}
+
+function collectStraightTargetLines(candidates: StraightLineCandidate[], groups: ConnectedStraightLineGroup[]) {
+  return [
+    ...candidates.map(({ start, end }) => ({ start, end })),
+    ...groups.map(({ start, end }) => ({ start, end })),
+  ];
+}
+
+function isNearStraightTargetEndpoint(point: Point, targetLines: Array<{ start: Point; end: Point }>, maxGap: number) {
+  return targetLines.some(({ start, end }) => distance(point, start) <= maxGap || distance(point, end) <= maxGap);
+}
+
+function isSameStraightTargetLine(line: { start: Point; end: Point }, targetLines: Array<{ start: Point; end: Point }>, maxGap: number) {
+  return targetLines.some((targetLine) => areNearlyParallel(line, targetLine) && areLinesAdjacent(line, targetLine));
+}
+
+function findTrailingStraightTargetIndex(
+  ops: PathOp[],
+  targetLines: Array<{ start: Point; end: Point }>,
+  maxGap: number,
+  longLineMinLength: number,
+) {
+  for (let index = ops.length - 1; index >= 0; index -= 1) {
+    const op = ops[index];
+    if (op.kind !== 'line') return -1;
+    if (distance(op.start, op.end) >= longLineMinLength && isSameStraightTargetLine(op, targetLines, maxGap)) return index;
+    if (distance(op.start, op.end) > maxGap) return -1;
+  }
+  return -1;
+}
+
+function canExtendStraightLineToPoint(line: { start: Point; end: Point }, point: Point, maxGap: number) {
+  if (distance(line.end, point) <= 0.001) return true;
+  const extension = { start: line.end, end: point };
+  return areNearlyParallel(line, extension) && perpendicularDistance(point, line.start, line.end) <= maxGap;
+}
+
+function isShortOffDirectionControlAfterStraight(line: { start: Point; end: Point }, quad: Extract<PathOp, { kind: 'quad' }>, maxGap: number) {
+  const controlDistance = distance(line.end, quad.control);
+  const endDistance = distance(line.end, quad.end);
+  if (controlDistance > maxGap || endDistance > maxGap * 2.5) return false;
+  const controlAngle = lineAngle(line.end, quad.control);
+  const endAngle = lineAngle(line.end, quad.end);
+  const lineDirection = lineAngle(line.start, line.end);
+  return (
+    angleDelta(lineDirection, controlAngle) >= STRAIGHT_OFF_DIRECTION_CONTROL_MIN_ANGLE ||
+    angleDelta(lineDirection, endAngle) >= STRAIGHT_OFF_DIRECTION_CONTROL_MIN_ANGLE
+  );
+}
+
+function isShortOffDirectionLineAfterStraight(line: { start: Point; end: Point }, segment: Extract<PathOp, { kind: 'line' }>, maxGap: number) {
+  if (distance(line.end, segment.start) > maxGap || distance(segment.start, segment.end) > maxGap) return false;
+  return angleDelta(lineAngle(line.start, line.end), lineAngle(segment.start, segment.end)) >= STRAIGHT_OFF_DIRECTION_CONTROL_MIN_ANGLE;
+}
+
+function removeAdjacentQuadraticControlPointsNextToStraightLines(
+  ops: PathOp[],
+  targetOpIndices: Set<number>,
+  targetLines: Array<{ start: Point; end: Point }>,
+  longLineMinLength: number,
+) {
+  const clonedOps = ops.map(clonePathOp);
+  const output: PathOp[] = [];
+  const maxGap = getStraightAdjacentControlMaxGap(longLineMinLength);
+
+  for (let index = 0; index < clonedOps.length; index += 1) {
+    const op = clonedOps[index];
+    const previous = output[output.length - 1];
+    const next = clonedOps[index + 1];
+    const nextNext = clonedOps[index + 2];
+    const isPreviousStraightTarget = targetOpIndices.has(index - 1);
+    const isControlNearStraightEndpoint = op.kind === 'quad' && isNearStraightTargetEndpoint(op.control, targetLines, maxGap);
+    const trailingStraightTargetIndex = op.kind === 'quad' ? findTrailingStraightTargetIndex(output, targetLines, maxGap, longLineMinLength) : -1;
+    const trailingStraightTarget = trailingStraightTargetIndex >= 0 ? output[trailingStraightTargetIndex] : undefined;
+    const isControlNearTrailingStraightEndpoint =
+      op.kind === 'quad' && trailingStraightTarget?.kind === 'line' && distance(op.control, trailingStraightTarget.end) <= maxGap;
+
+    if (op.kind === 'line' && trailingStraightTarget?.kind === 'line' && isShortOffDirectionLineAfterStraight(trailingStraightTarget, op, maxGap)) {
+      if (next?.kind === 'quad' && distance(trailingStraightTarget.end, next.end) <= maxGap * 2.5) {
+        output.splice(trailingStraightTargetIndex + 1);
+        setPathOpStart(nextNext, trailingStraightTarget.end);
+        index += 1;
+        continue;
+      }
+      output.splice(trailingStraightTargetIndex + 1);
+      setPathOpStart(next, trailingStraightTarget.end);
+      continue;
+    }
+
+    if (op.kind === 'quad' && trailingStraightTarget?.kind === 'line' && isShortOffDirectionControlAfterStraight(trailingStraightTarget, op, maxGap)) {
+      output.splice(trailingStraightTargetIndex + 1);
+      setPathOpStart(next, trailingStraightTarget.end);
+      continue;
+    }
+
+    if (
+      op.kind === 'line' &&
+      next?.kind === 'quad' &&
+      isPreviousStraightTarget &&
+      previous?.kind === 'line' &&
+      distance(op.start, op.end) <= maxGap &&
+      canExtendStraightLineToPoint(previous, next.end, maxGap)
+    ) {
+      setPathOpStart(nextNext, previous.end);
+      index += 1;
+      continue;
+    }
+
+    if (op.kind === 'quad' && (isControlNearStraightEndpoint || isControlNearTrailingStraightEndpoint)) {
+      if (trailingStraightTarget?.kind === 'line' && canExtendStraightLineToPoint(trailingStraightTarget, op.end, maxGap)) {
+        output.splice(trailingStraightTargetIndex + 1);
+        setPathOpStart(next, trailingStraightTarget.end);
+      } else if (previous?.kind === 'line' && canExtendStraightLineToPoint(previous, op.end, maxGap)) {
+        setPathOpStart(next, previous.end);
+      } else {
+        output.push(op);
+      }
+      continue;
+    }
+
+    if (op.kind === 'quad' && isPreviousStraightTarget && previous?.kind === 'line' && canExtendStraightLineToPoint(previous, op.end, maxGap)) {
+      setPathOpStart(next, previous.end);
+      continue;
+    }
+
+    output.push(op);
+  }
+
+  return output.filter((op) => op.kind !== 'line' || distance(op.start, op.end) > 0.001);
+}
+
+function buildPathFromOps(ops: PathOp[], start: Point, minLength: number) {
+  const initialCandidates = buildStraightLineCandidates(ops, minLength);
+  const initialConnectedGroups = buildConnectedStraightLineGroups(initialCandidates);
+  const targetLines = collectStraightTargetLines(initialCandidates, initialConnectedGroups);
+  const adjustedOps = removeAdjacentQuadraticControlPointsNextToStraightLines(
+    ops,
+    collectStraightTargetOpIndices(initialCandidates, initialConnectedGroups),
+    targetLines,
+    minLength,
+  );
+  const commands = [`M ${formatSvgNumber(start.x)} ${formatSvgNumber(start.y)}`];
+  const controlPoints: DebugPoint[] = [];
+  const longStraightLines: Array<{ start: Point; end: Point }> = [];
+  const connectedGroups = buildConnectedStraightLineGroups(buildStraightLineCandidates(adjustedOps, minLength));
+  const connectedGroupByStartIndex = new Map<number, ConnectedStraightLineGroup>();
+  const connectedStraightLines: Array<{ start: Point; end: Point }> = [];
+
+  connectedGroups.forEach((group) => {
+    const sortedIndices = group.opIndices.slice().sort((left, right) => left - right);
+    const firstOpIndex = sortedIndices[0];
+    const lastOpIndex = sortedIndices[sortedIndices.length - 1];
+    const firstOp = adjustedOps[firstOpIndex];
+    const lastOp = adjustedOps[lastOpIndex];
+    if (!firstOp || !lastOp) return;
+    const mergedGroup = {
+      start: firstOp.start,
+      end: lastOp.end,
+      opIndices: sortedIndices,
+    };
+    connectedGroupByStartIndex.set(firstOpIndex, mergedGroup);
+    connectedStraightLines.push({ start: mergedGroup.start, end: mergedGroup.end });
+  });
+
+  for (let index = 0; index < adjustedOps.length; index += 1) {
+    const connectedGroup = connectedGroupByStartIndex.get(index);
+    if (connectedGroup) {
+      pushLineCommand(commands, longStraightLines, connectedGroup.start, connectedGroup.end, minLength);
+      index = connectedGroup.opIndices[connectedGroup.opIndices.length - 1];
+      continue;
+    }
+
+    const op = adjustedOps[index];
+    if (op.kind === 'line') {
+      pushLineCommand(commands, longStraightLines, op.start, op.end, minLength);
+    } else {
+      commands.push(
+        `Q ${formatSvgNumber(op.control.x)} ${formatSvgNumber(op.control.y)} ${formatSvgNumber(op.end.x)} ${formatSvgNumber(op.end.y)}`,
+      );
+      controlPoints.push({ point: op.control, kind: op.controlKind });
+    }
+  }
+
+  return {
+    commands,
+    controlPoints,
+    longStraightLines,
+    connectedStraightLines,
+  };
+}
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -439,28 +791,40 @@ function perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point) {
   return Math.abs((lineEnd.x - lineStart.x) * (lineStart.y - point.y) - (lineStart.x - point.x) * (lineEnd.y - lineStart.y)) / lineLength;
 }
 
-function signedArea(points: Point[]) {
-  let area = 0;
-  for (let index = 0; index < points.length; index += 1) {
-    const current = points[index];
-    const next = points[(index + 1) % points.length];
-    area += current.x * next.y - next.x * current.y;
-  }
-  return area / 2;
+function lineAngle(start: Point, end: Point) {
+  const angle = (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI;
+  return ((angle % 180) + 180) % 180;
 }
 
-function angleDegrees(previous: Point, current: Point, next: Point) {
-  const left = { x: previous.x - current.x, y: previous.y - current.y };
-  const right = { x: next.x - current.x, y: next.y - current.y };
-  const leftLength = Math.hypot(left.x, left.y);
-  const rightLength = Math.hypot(right.x, right.y);
-  if (leftLength === 0 || rightLength === 0) return 180;
-  const dot = left.x * right.x + left.y * right.y;
-  return (Math.acos(Math.max(-1, Math.min(1, dot / (leftLength * rightLength)))) * 180) / Math.PI;
+function angleDelta(left: number, right: number) {
+  const delta = Math.abs(left - right) % 180;
+  return Math.min(delta, 180 - delta);
 }
 
-function cornerCross(previous: Point, current: Point, next: Point) {
-  return (current.x - previous.x) * (next.y - current.y) - (current.y - previous.y) * (next.x - current.x);
+function areNearlyParallel(left: { start: Point; end: Point }, right: { start: Point; end: Point }) {
+  return angleDelta(lineAngle(left.start, left.end), lineAngle(right.start, right.end)) <= PARALLEL_LINE_MAX_ANGLE_DELTA;
+}
+
+function mergeStraightLineMarkers(lines: Array<{ start: Point; end: Point }>) {
+  return lines.reduce<Array<{ start: Point; end: Point }>>((merged, line) => {
+    const previous = merged[merged.length - 1];
+    if (previous && pointKey(previous.end) === pointKey(line.start) && areNearlyParallel(previous, line)) {
+      previous.end = line.end;
+      return merged;
+    }
+    merged.push({ start: line.start, end: line.end });
+    return merged;
+  }, []);
+}
+
+function mergeDebugPoints(controlPoints: DebugPoint[]) {
+  const merged = new Map<string, DebugPoint>();
+  controlPoints.forEach((controlPoint) => {
+    const key = pointKey(controlPoint.point);
+    const existing = merged.get(key);
+    if (!existing || controlPoint.kind === 'green') merged.set(key, controlPoint);
+  });
+  return Array.from(merged.values());
 }
 
 function isHoleLoop(loop: Point[], hole: Circle) {
@@ -527,38 +891,114 @@ function collectCyclicRange(points: Point[], start: number, end: number) {
   return output;
 }
 
-function upperCircleArcWithVerticalConnectors(circle: Circle, fromLeftToRight: boolean, startConnectorY: number, endConnectorY: number): SvgPathResult {
+function upperCircleArcWithVerticalConnectors(circle: Circle, fromLeftToRight: boolean, startConnectorY: number, endConnectorY: number, longStraightLineMinLength: number): SvgPathResult {
   const left = { x: circle.centerX - circle.radius, y: circle.centerY };
   const top = { x: circle.centerX, y: circle.centerY - circle.radius };
   const right = { x: circle.centerX + circle.radius, y: circle.centerY };
   if (fromLeftToRight) {
     const startConnector = { x: left.x, y: startConnectorY };
     const endConnector = { x: right.x, y: endConnectorY };
-    const controlPoints = [startConnector, left, top, right, endConnector];
-    return {
-      path: [
-        `L ${formatSvgNumber(startConnector.x)} ${formatSvgNumber(startConnector.y)}`,
-        `L ${formatSvgNumber(left.x)} ${formatSvgNumber(left.y)}`,
+    const controlPoints = [startConnector, left, top, right, endConnector].map((point) => ({ point, kind: 'normal' as const }));
+    const commands: string[] = [];
+    const longStraightLines: Array<{ start: Point; end: Point }> = [];
+    pushLineCommand(commands, longStraightLines, startConnector, left, longStraightLineMinLength);
+    return createPathResult(
+      [
+        lineToCommand(startConnector),
+        ...commands,
         `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 1 ${formatSvgNumber(top.x)} ${formatSvgNumber(top.y)}`,
         `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 1 ${formatSvgNumber(right.x)} ${formatSvgNumber(right.y)}`,
-        `L ${formatSvgNumber(endConnector.x)} ${formatSvgNumber(endConnector.y)}`,
+        lineToCommand(endConnector),
       ].join(' '),
       controlPoints,
-    };
+      distance(right, endConnector) >= longStraightLineMinLength ? [...longStraightLines, { start: right, end: endConnector }] : longStraightLines,
+    );
   }
   const startConnector = { x: right.x, y: startConnectorY };
   const endConnector = { x: left.x, y: endConnectorY };
-  const controlPoints = [startConnector, right, top, left, endConnector];
-  return {
-    path: [
-      `L ${formatSvgNumber(startConnector.x)} ${formatSvgNumber(startConnector.y)}`,
-      `L ${formatSvgNumber(right.x)} ${formatSvgNumber(right.y)}`,
+  const controlPoints = [startConnector, right, top, left, endConnector].map((point) => ({ point, kind: 'normal' as const }));
+  const commands: string[] = [];
+  const longStraightLines: Array<{ start: Point; end: Point }> = [];
+  pushLineCommand(commands, longStraightLines, startConnector, right, longStraightLineMinLength);
+  return createPathResult(
+    [
+      lineToCommand(startConnector),
+      ...commands,
       `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 0 ${formatSvgNumber(top.x)} ${formatSvgNumber(top.y)}`,
       `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 0 ${formatSvgNumber(left.x)} ${formatSvgNumber(left.y)}`,
-      `L ${formatSvgNumber(endConnector.x)} ${formatSvgNumber(endConnector.y)}`,
+      lineToCommand(endConnector),
     ].join(' '),
     controlPoints,
-  };
+    distance(left, endConnector) >= longStraightLineMinLength ? [...longStraightLines, { start: left, end: endConnector }] : longStraightLines,
+  );
+}
+
+function cornerCross(previous: Point, current: Point, next: Point) {
+  return (current.x - previous.x) * (next.y - current.y) - (current.y - previous.y) * (next.x - current.x);
+}
+
+function signedArea(points: Point[]) {
+  let area = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index];
+    const next = points[(index + 1) % points.length];
+    area += current.x * next.y - next.x * current.y;
+  }
+  return area / 2;
+}
+
+function angleDegrees(previous: Point, current: Point, next: Point) {
+  const left = { x: previous.x - current.x, y: previous.y - current.y };
+  const right = { x: next.x - current.x, y: next.y - current.y };
+  const leftLength = Math.hypot(left.x, left.y);
+  const rightLength = Math.hypot(right.x, right.y);
+  if (leftLength === 0 || rightLength === 0) return 180;
+  const dot = left.x * right.x + left.y * right.y;
+  return (Math.acos(Math.max(-1, Math.min(1, dot / (leftLength * rightLength)))) * 180) / Math.PI;
+}
+
+function getInnerCornerPointKeys(points: Point[]) {
+  const areaSign = Math.sign(signedArea(points)) || 1;
+  const innerCornerKeys = new Set<string>();
+  points.forEach((current, index) => {
+    const previous = points[(index - 1 + points.length) % points.length];
+    const next = points[(index + 1) % points.length];
+    const turnSign = Math.sign(cornerCross(previous, current, next));
+    if (turnSign !== 0 && turnSign !== areaSign) innerCornerKeys.add(pointKey(current));
+  });
+  return innerCornerKeys;
+}
+
+function collectLongStraightEndpointKeys(lines: Array<{ start: Point; end: Point }>) {
+  const endpointKeys = new Set<string>();
+  lines.forEach(({ start, end }) => {
+    endpointKeys.add(pointKey(start));
+    endpointKeys.add(pointKey(end));
+  });
+  return endpointKeys;
+}
+
+function collectRawLongStraightEndpointKeys(points: Point[], minLength: number, closed: boolean) {
+  const endpointKeys = new Set<string>();
+  const segmentCount = closed ? points.length : points.length - 1;
+  for (let index = 0; index < segmentCount; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    if (distance(start, end) >= minLength) {
+      endpointKeys.add(pointKey(start));
+      endpointKeys.add(pointKey(end));
+    }
+  }
+  return endpointKeys;
+}
+
+function removeInnerControlPointsFromLoop(points: Point[], innerCornerPointKeys: Set<string>, protectedPointKeys: Set<string>, closed: boolean) {
+  if (!REMOVE_INNER_CONTROL_POINTS) return points;
+  const filtered = points.filter((point, index) => {
+    if (!closed && (index === 0 || index === points.length - 1)) return true;
+    return !innerCornerPointKeys.has(pointKey(point)) || protectedPointKeys.has(pointKey(point));
+  });
+  return filtered.length >= (closed ? 3 : 2) ? filtered : points;
 }
 
 function getAdaptiveTrim(angle: number, incomingLength: number, outgoingLength: number, depth: number) {
@@ -593,6 +1033,7 @@ function getRoundedCornerData(loop: Point[]) {
     if (!shouldRound) {
       return {
         point: current,
+        innerCorner: !isOuterCorner,
         entry: current,
         exit: current,
         rounded: false,
@@ -602,6 +1043,7 @@ function getRoundedCornerData(loop: Point[]) {
     const trim = getAdaptiveTrim(angle, incomingLength, outgoingLength, depth);
     return {
       point: current,
+      innerCorner: !isOuterCorner,
       entry: {
         x: current.x + ((previous.x - current.x) / incomingLength) * trim,
         y: current.y + ((previous.y - current.y) / incomingLength) * trim,
@@ -615,41 +1057,58 @@ function getRoundedCornerData(loop: Point[]) {
   });
 }
 
-function roundedLoopToPath(loop: Point[]): SvgPathResult {
-  const corners = getRoundedCornerData(loop);
-  const controlPoints: Point[] = [];
-  const commands = [`M ${formatSvgNumber(corners[0].exit.x)} ${formatSvgNumber(corners[0].exit.y)}`];
+function roundedClosedPath(points: Point[], longStraightLineMinLength: number): SvgPathResult {
+  if (points.length < 3) return createPathResult('');
+  const protectedPointKeys = collectRawLongStraightEndpointKeys(points, longStraightLineMinLength, true);
+  const pathPoints = removeInnerControlPointsFromLoop(points, getInnerCornerPointKeys(points), protectedPointKeys, true);
+  const corners = getRoundedCornerData(pathPoints);
+  const start = corners[0].exit;
+  let cursor = start;
+  const ops: PathOp[] = [];
 
   for (let offset = 1; offset <= corners.length; offset += 1) {
     const corner = corners[offset % corners.length];
-    commands.push(`L ${formatSvgNumber(corner.entry.x)} ${formatSvgNumber(corner.entry.y)}`);
+    ops.push({ kind: 'line', start: cursor, end: corner.entry });
+    cursor = corner.entry;
     if (corner.rounded) {
-      commands.push(
-        `Q ${formatSvgNumber(corner.point.x)} ${formatSvgNumber(corner.point.y)} ${formatSvgNumber(corner.exit.x)} ${formatSvgNumber(corner.exit.y)}`,
-      );
-      controlPoints.push(corner.point);
+      const kind = corner.innerCorner ? 'green' : 'normal';
+      ops.push({ kind: 'quad', start: cursor, control: corner.point, end: corner.exit, controlKind: kind });
+      cursor = corner.exit;
     } else {
-      commands.push(`L ${formatSvgNumber(corner.exit.x)} ${formatSvgNumber(corner.exit.y)}`);
+      ops.push({ kind: 'line', start: cursor, end: corner.exit });
+      cursor = corner.exit;
     }
   }
 
+  if (distance(cursor, start) > 0.001) ops.push({ kind: 'line', start: cursor, end: start });
+  const { commands, controlPoints, longStraightLines, connectedStraightLines } = buildPathFromOps(ops, start, longStraightLineMinLength);
+  const longStraightEndpointKeys = collectLongStraightEndpointKeys(longStraightLines);
+  protectedPointKeys.forEach((key) => longStraightEndpointKeys.add(key));
+  const coloredControlPoints = controlPoints.map((controlPoint) =>
+    longStraightEndpointKeys.has(pointKey(controlPoint.point)) ? { ...controlPoint, kind: 'normal' as const } : controlPoint,
+  );
   commands.push('Z');
-  return { path: commands.join(' '), controlPoints };
+  return createPathResult(commands.join(' '), mergeDebugPoints(coloredControlPoints), longStraightLines, connectedStraightLines);
 }
 
-function roundedOpenPath(points: Point[]): SvgPathResult {
-  if (points.length === 0) return { path: '', controlPoints: [] };
-  if (points.length === 1) return { path: `M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`, controlPoints: [] };
+function roundedOpenPath(points: Point[], longStraightLineMinLength: number, innerCornerPointKeys: Set<string>): SvgPathResult {
+  if (points.length === 0) return createPathResult('');
+  if (points.length === 1) return createPathResult(`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`);
 
-  const controlPoints: Point[] = [];
-  const commands = [`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`];
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const next = points[Math.min(points.length - 1, index + 1)];
+  const controlPoints: DebugPoint[] = [];
+  const protectedPointKeys = collectRawLongStraightEndpointKeys(points, longStraightLineMinLength, false);
+  const pathPoints = removeInnerControlPointsFromLoop(points, innerCornerPointKeys, protectedPointKeys, false);
+  let cursor = pathPoints[0];
+  const ops: PathOp[] = [];
 
-    if (index >= points.length - 1) {
-      commands.push(`L ${formatSvgNumber(current.x)} ${formatSvgNumber(current.y)}`);
+  for (let index = 1; index < pathPoints.length; index += 1) {
+    const previous = pathPoints[index - 1];
+    const current = pathPoints[index];
+    const next = pathPoints[Math.min(pathPoints.length - 1, index + 1)];
+
+    if (index >= pathPoints.length - 1) {
+      ops.push({ kind: 'line', start: cursor, end: current });
+      cursor = current;
       continue;
     }
 
@@ -664,7 +1123,8 @@ function roundedOpenPath(points: Point[]): SvgPathResult {
       incomingLength <= OUTER_CORNER_ROUND_MIN_TRIM * 2 ||
       outgoingLength <= OUTER_CORNER_ROUND_MIN_TRIM * 2
     ) {
-      commands.push(`L ${formatSvgNumber(current.x)} ${formatSvgNumber(current.y)}`);
+      ops.push({ kind: 'line', start: cursor, end: current });
+      cursor = current;
       continue;
     }
 
@@ -677,34 +1137,50 @@ function roundedOpenPath(points: Point[]): SvgPathResult {
       x: current.x + ((next.x - current.x) / outgoingLength) * trim,
       y: current.y + ((next.y - current.y) / outgoingLength) * trim,
     };
-    commands.push(`L ${formatSvgNumber(entry.x)} ${formatSvgNumber(entry.y)}`);
-    commands.push(`Q ${formatSvgNumber(current.x)} ${formatSvgNumber(current.y)} ${formatSvgNumber(exit.x)} ${formatSvgNumber(exit.y)}`);
-    controlPoints.push(current);
+    ops.push({ kind: 'line', start: cursor, end: entry });
+    const kind = innerCornerPointKeys.has(pointKey(current)) ? 'green' : 'normal';
+    ops.push({ kind: 'quad', start: entry, control: current, end: exit, controlKind: kind });
+    cursor = exit;
   }
-  return { path: commands.join(' '), controlPoints };
+
+  const pathData = buildPathFromOps(ops, pathPoints[0], longStraightLineMinLength);
+  controlPoints.push(...pathData.controlPoints);
+  const longStraightEndpointKeys = collectLongStraightEndpointKeys(pathData.longStraightLines);
+  protectedPointKeys.forEach((key) => longStraightEndpointKeys.add(key));
+  const coloredControlPoints = controlPoints.map((controlPoint) =>
+    longStraightEndpointKeys.has(pointKey(controlPoint.point)) ? { ...controlPoint, kind: 'normal' as const } : controlPoint,
+  );
+  return createPathResult(pathData.commands.join(' '), mergeDebugPoints(coloredControlPoints), pathData.longStraightLines, pathData.connectedStraightLines);
 }
 
-function loopToPath(points: Point[], outerCircle: Circle | null = null): SvgPathResult {
+function loopToPath(points: Point[], longStraightLineMinLength: number, outerCircle: Circle | null = null): SvgPathResult {
+  const innerCornerPointKeys = getInnerCornerPointKeys(points);
   if (outerCircle) {
     const run = findUpperCircleRun(points, outerCircle);
     if (run) {
       const beforeRun = (run.start - 1 + points.length) % points.length;
       const afterRun = (run.end + 1) % points.length;
       const rest = collectCyclicRange(points, afterRun, beforeRun);
-      const restPath = roundedOpenPath(rest);
+      const restPath = roundedOpenPath(rest, longStraightLineMinLength, innerCornerPointKeys);
       const upperCircle = upperCircleArcWithVerticalConnectors(
         outerCircle,
         points[beforeRun].x <= points[afterRun].x,
         points[beforeRun].y,
         points[afterRun].y,
+        longStraightLineMinLength,
       );
       const commands = [restPath.path, upperCircle.path];
       commands.push('Z');
-      return { path: commands.join(' '), controlPoints: [...restPath.controlPoints, ...upperCircle.controlPoints] };
+      return createPathResult(
+        commands.join(' '),
+        mergeDebugPoints([...restPath.controlPoints, ...upperCircle.controlPoints]),
+        [...restPath.longStraightLines, ...upperCircle.longStraightLines],
+        [...restPath.connectedStraightLines, ...upperCircle.connectedStraightLines],
+      );
     }
   }
 
-  return roundedLoopToPath(points);
+  return roundedClosedPath(points, longStraightLineMinLength);
 }
 
 function circleToPath(circle: Circle): SvgPathResult {
@@ -712,9 +1188,9 @@ function circleToPath(circle: Circle): SvgPathResult {
   const right = { x: circle.centerX + circle.radius, y: circle.centerY };
   const bottom = { x: circle.centerX, y: circle.centerY + circle.radius };
   const left = { x: circle.centerX - circle.radius, y: circle.centerY };
-  const controlPoints = [top, right, bottom, left];
-  return {
-    path: [
+  const controlPoints = [top, right, bottom, left].map((point) => ({ point, kind: 'normal' as const }));
+  return createPathResult(
+    [
       `M ${formatSvgNumber(top.x)} ${formatSvgNumber(top.y)}`,
       `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 1 ${formatSvgNumber(right.x)} ${formatSvgNumber(right.y)}`,
       `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 1 ${formatSvgNumber(bottom.x)} ${formatSvgNumber(bottom.y)}`,
@@ -723,7 +1199,7 @@ function circleToPath(circle: Circle): SvgPathResult {
       'Z',
     ].join(' '),
     controlPoints,
-  };
+  );
 }
 
 function buildServerCutPath(artwork: PngImage, holeMode: 'with-hole' | 'without-hole'): SvgPathResult {
@@ -742,29 +1218,57 @@ function buildServerCutPath(artwork: PngImage, holeMode: 'with-hole' | 'without-
   if (hole) paintCircleOnMask(clearMask, artwork.width, artwork.height, hole.centerX, hole.centerY, hole.radius, 0);
 
   const loops = maskToBoundaryLoops(clearMask, artwork.width, artwork.height);
-  const pathResults = (hole ? loops.filter((loop) => !isHoleLoop(loop, hole)) : loops).map((loop) => loopToPath(loop, keychainShape?.outerCircle ?? null));
+  const longStraightLineMinLength = getLongStraightLineMinLength(artwork.width, artwork.height);
+  const pathResults = (hole ? loops.filter((loop) => !isHoleLoop(loop, hole)) : loops).map((loop) =>
+    loopToPath(loop, longStraightLineMinLength, keychainShape?.outerCircle ?? null),
+  );
   if (hole) pathResults.push(circleToPath(hole));
   return {
     path: pathResults.map((result) => result.path).join(' '),
     controlPoints: pathResults.flatMap((result) => result.controlPoints),
+    longStraightLines: pathResults.flatMap((result) => result.longStraightLines),
+    connectedStraightLines: pathResults.flatMap((result) => result.connectedStraightLines),
   };
 }
 
-function buildControlPointMarkers(controlPoints: Point[]) {
+function buildControlPointMarkers(controlPoints: DebugPoint[]) {
   return controlPoints
     .map(
-      (point) =>
-        `<circle cx="${formatSvgNumber(point.x)}" cy="${formatSvgNumber(point.y)}" r="${CONTROL_POINT_RADIUS}" fill="#ff0000" stroke="#ffffff" stroke-width="${CONTROL_POINT_STROKE_WIDTH}" vector-effect="non-scaling-stroke"/>`,
+      ({ point, kind }) =>
+        `<circle cx="${formatSvgNumber(point.x)}" cy="${formatSvgNumber(point.y)}" r="${CONTROL_POINT_RADIUS}" fill="${kind === 'green' ? GREEN_POINT_FILL : NORMAL_CONTROL_POINT_FILL}" stroke="#ffffff" stroke-width="${CONTROL_POINT_STROKE_WIDTH}" vector-effect="non-scaling-stroke"/>`,
     )
     .join('\n  ');
 }
 
-function buildSvg(fileName: string, width: number, height: number, cutPath: SvgPathResult) {
-  const controlPointMarkers = buildControlPointMarkers(cutPath.controlPoints);
+function buildLongStraightLineMarkers(lines: Array<{ start: Point; end: Point }>) {
+  return mergeStraightLineMarkers(lines)
+    .map(
+      ({ start, end }) =>
+        `<line x1="${formatSvgNumber(start.x)}" y1="${formatSvgNumber(start.y)}" x2="${formatSvgNumber(end.x)}" y2="${formatSvgNumber(end.y)}" stroke="${LONG_STRAIGHT_LINE_STROKE}" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`,
+    )
+    .join('\n  ');
+}
+
+function buildConnectedStraightLineMarkers(lines: Array<{ start: Point; end: Point }>) {
+  return lines
+    .map(
+      ({ start, end }) =>
+        `<line x1="${formatSvgNumber(start.x)}" y1="${formatSvgNumber(start.y)}" x2="${formatSvgNumber(end.x)}" y2="${formatSvgNumber(end.y)}" stroke="${CONNECTED_STRAIGHT_LINE_STROKE}" stroke-width="1.8" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`,
+    )
+    .join('\n  ');
+}
+
+function buildSvg(fileName: string, width: number, height: number, artworkDataUrl: string, cutPath: SvgPathResult) {
+  const controlPointMarkers = SHOW_CONTROL_POINT_MARKERS ? buildControlPointMarkers(cutPath.controlPoints) : '';
+  const longStraightLineMarkers = buildLongStraightLineMarkers(cutPath.longStraightLines);
+  const connectedStraightLineMarkers = buildConnectedStraightLineMarkers(cutPath.connectedStraightLines);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(fileName)} acrylic keychain cut line">
   <title>${escapeXml(fileName)} acrylic keychain cut line</title>
+  <image href="${escapeXml(artworkDataUrl)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="none"/>
   <path d="${cutPath.path}" fill="rgba(179, 229, 252, 0.18)" fill-rule="evenodd" stroke="#ff2f7d" stroke-width="1" vector-effect="non-scaling-stroke"/>
+  ${longStraightLineMarkers}
+  ${connectedStraightLineMarkers}
   ${controlPointMarkers}
 </svg>
 `;
@@ -789,7 +1293,7 @@ export async function POST(request: Request) {
     const artwork = decodePngAlpha(parsePngDataUrl(body.artworkDataUrl));
     if (artwork.width !== body.width || artwork.height !== body.height) throw new Error('イラストPNGのサイズが不正です');
     const cutPath = buildServerCutPath(artwork, body.holeMode);
-    const svg = buildSvg(fileBaseName, body.width, body.height, cutPath);
+    const svg = buildSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, cutPath);
 
     return new NextResponse(svg, {
       headers: {

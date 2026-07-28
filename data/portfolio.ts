@@ -50,6 +50,22 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 
 export const portfolioItems: PortfolioItem[] = [
   {
+    id: 'dame-tensi',
+    title: 'だめ天使',
+    href: '/portfolio/dame-tensi',
+    category: 'illustration',
+    content: {
+      kind: 'image',  
+      src: '/portfolio/illust/dametensi.png',
+      alt: 'だめ天使'
+    },
+    description: '天使なのに圧倒的不安感。なにかしでかしそう...',
+    date: '2026-07-28',
+    year: 2026,
+    tags: ['イラスト'],
+    featured: true,
+  },
+  {
     id: 'maid',
     title: 'そんなに指動かして何してるにゃ？',
     href: '/portfolio/maid',

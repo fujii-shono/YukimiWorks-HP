@@ -22,7 +22,7 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/message/20260728.png',
       alt: 'ラフ',
     },
-    publishedAt: '2026-07-27 15:35',
+    publishedAt: '2026-07-28 15:35',
     body: 'イラストできたー！ラフと顔違うけどそんなもの',
   },
   {

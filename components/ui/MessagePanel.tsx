@@ -13,6 +13,26 @@ function getTokyoDateKey(date: Date) {
   }).format(date);
 }
 
+function getTokyoDateParts(date: Date) {
+  const [year = '0', month = '0', day = '0'] = getTokyoDateKey(date).split('-');
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+  };
+}
+
+function getCalendarDayDiff(from: ReturnType<typeof getTokyoDateParts>, to: ReturnType<typeof getTokyoDateParts>) {
+  const fromDate = Date.UTC(from.year, from.month - 1, from.day);
+  const toDate = Date.UTC(to.year, to.month - 1, to.day);
+  return Math.max(0, Math.floor((toDate - fromDate) / 86_400_000));
+}
+
+function getCalendarMonthDiff(from: ReturnType<typeof getTokyoDateParts>, to: ReturnType<typeof getTokyoDateParts>) {
+  const monthDiff = (to.year - from.year) * 12 + to.month - from.month;
+  return to.day < from.day ? monthDiff - 1 : monthDiff;
+}
+
 function parseJapaneseDateTime(value: string) {
   const normalized = value.trim().replace(' ', 'T');
   return new Date(`${normalized}:00+09:00`);
@@ -29,12 +49,14 @@ function formatMessageDate(value: string, now: Date) {
     return `${Math.floor(elapsedMinutes / 60)}時間前`;
   }
 
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(publishedAt);
+  const publishedDateParts = getTokyoDateParts(publishedAt);
+  const currentDateParts = getTokyoDateParts(now);
+  const elapsedMonths = getCalendarMonthDiff(publishedDateParts, currentDateParts);
+
+  if (elapsedMonths >= 12) return `${Math.floor(elapsedMonths / 12)}年前`;
+  if (elapsedMonths >= 1) return `${elapsedMonths}ヶ月前`;
+
+  return `${getCalendarDayDiff(publishedDateParts, currentDateParts)}日前`;
 }
 
 export function MessagePanel() {

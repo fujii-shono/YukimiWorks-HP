@@ -13,7 +13,15 @@ export type MessagePost = {
 };
 
 export const messagePosts: readonly MessagePost[] = [
-    {
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
+    publishedAt: '2026-07-29 16:22',
+    body: '新サービスの最終調整中です。',
+  },
+  {
     icon: {
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',

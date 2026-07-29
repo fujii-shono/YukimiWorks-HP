@@ -13,6 +13,14 @@ export type MessagePost = {
 };
 
 export const messagePosts: readonly MessagePost[] = [
+    {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
+    publishedAt: '2026-07-29 09:00',
+    body: 'キリ番判定仕込みました。踏んだ人にはお祝いメッセージが出ます！',
+  },
   {
     icon: {
       src: '/logo/yukimi_works_favicon.png',

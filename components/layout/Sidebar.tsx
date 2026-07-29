@@ -20,9 +20,29 @@ const navItems = [
   { href: '/contact', label: 'Contact', icon: '❄', iconImage: null },
 ] as const;
 
+const crackerPieces = Array.from({ length: 18 }, (_, index) => index);
+
+type CounterMilestone = {
+  count: number;
+  message: string;
+  effect?: 'cracker';
+};
+
 function formatCounterDisplay(value: number) {
   const minimumDigits = siteConfig.decorativeCounter.length;
   return String(Math.max(0, Math.floor(value))).padStart(minimumDigits, '0');
+}
+
+function isCounterMilestone(value: unknown): value is CounterMilestone {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as Partial<CounterMilestone>;
+  return (
+    typeof candidate.count === 'number' &&
+    Number.isFinite(candidate.count) &&
+    typeof candidate.message === 'string' &&
+    (candidate.effect === undefined || candidate.effect === 'cracker')
+  );
 }
 
 export function Sidebar() {
@@ -30,6 +50,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [counterDisplay, setCounterDisplay] = useState<string>(siteConfig.decorativeCounter);
   const [counterMessage, setCounterMessage] = useState<string | null>(null);
+  const [counterMilestone, setCounterMilestone] = useState<CounterMilestone | null>(null);
   const [isCounterPressed, setIsCounterPressed] = useState(false);
   const counterClickTimestamps = useRef<number[]>([]);
   const counterMessageTimer = useRef<number | null>(null);
@@ -105,8 +126,9 @@ export function Sidebar() {
       });
 
       if (!response.ok) throw new Error(`[counter] ${response.status}`);
-      const json = (await response.json()) as { count?: number };
+      const json = (await response.json()) as { count?: number; milestone?: unknown };
       if (typeof json.count === 'number' && isMounted) setCounterDisplay(formatCounterDisplay(json.count));
+      if (shouldCount && isCounterMilestone(json.milestone) && isMounted) setCounterMilestone(json.milestone);
 
       if (shouldCount) {
         try {
@@ -147,8 +169,30 @@ export function Sidebar() {
     };
   }, [clearCounterTimers]);
 
+  useEffect(() => {
+    if (!counterMilestone) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCounterMilestone(null);
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [counterMilestone]);
+
+  useEffect(() => {
+    const onDebugMilestone = (event: Event) => {
+      if (!(event instanceof CustomEvent) || !isCounterMilestone(event.detail)) return;
+      setCounterMilestone(event.detail);
+    };
+
+    window.addEventListener('yukimi-counter-debug-milestone', onDebugMilestone);
+    return () => window.removeEventListener('yukimi-counter-debug-milestone', onDebugMilestone);
+  }, []);
+
   return (
-    <aside className="sidebar" aria-label="サイドメニュー">
+    <>
+      <aside className="sidebar" aria-label="サイドメニュー">
       <section className="window-panel menu-panel">
         <h2 className="window-title window-title-menu">
           <span className="title-deco" aria-hidden="true">
@@ -294,6 +338,44 @@ export function Sidebar() {
         </div>
         <p>Since {siteConfig.since}</p>
       </section>
-    </aside>
+      </aside>
+
+      <AnimatePresence>
+        {counterMilestone ? (
+          <motion.div
+            className="counter-milestone-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="記念番号のお知らせ"
+            onClick={() => setCounterMilestone(null)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            {counterMilestone.effect === 'cracker' ? (
+              <div className="counter-cracker-effect" aria-hidden="true">
+                {crackerPieces.map((piece) => (
+                  <span key={piece} />
+                ))}
+              </div>
+            ) : null}
+            <motion.div
+              className="counter-milestone-modal"
+              onClick={(event) => event.stopPropagation()}
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <button type="button" className="counter-milestone-close" onClick={() => setCounterMilestone(null)} aria-label="閉じる">
+                ×
+              </button>
+              <p>{counterMilestone.message}</p>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </>
   );
 }

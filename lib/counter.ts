@@ -2,6 +2,7 @@ import { Redis } from '@upstash/redis';
 import { siteConfig } from '@/data/siteConfig';
 
 const COUNTER_KEY = 'site:counter:total';
+const COUNTER_MILESTONE_KEY = 'site:counter:last-milestone';
 const redisConnection = normalizeRedisConnection(
   [
     process.env.UPSTASH_REDIS_REST_URL,
@@ -15,6 +16,12 @@ const redisConnection = normalizeRedisConnection(
     process.env.KV_REST_API_TOKEN,
   ],
 );
+
+export type CounterMilestone = {
+  count: number;
+  message: string;
+  effect?: 'cracker';
+};
 
 function pickEnv(...values: Array<string | undefined>) {
   return values.find((value): value is string => typeof value === 'string' && value.length > 0);
@@ -76,13 +83,46 @@ function createRedisClient() {
   });
 }
 
-function isSeededCounterValue(value: number | null, minimum: number) {
+function isSeededCounterValue(value: number | null, minimum: number): value is number {
   return value !== null && value >= minimum;
 }
 
 async function seedCounterValue(redis: Redis, fallback: number) {
   await redis.set(COUNTER_KEY, fallback);
   return fallback;
+}
+
+function isRepdigit(value: number) {
+  const normalized = String(Math.max(0, Math.floor(value)));
+  return normalized.length >= 2 && normalized.split('').every((digit) => digit === normalized[0]);
+}
+
+function createCounterMilestone(value: number): CounterMilestone | null {
+  const normalized = Math.max(0, Math.floor(value));
+
+  if (normalized > 0 && normalized % 10_000 === 0) {
+    return {
+      count: normalized,
+      message: `記念すべき${normalized}番目！めっちゃめでたい！`,
+      effect: 'cracker',
+    };
+  }
+
+  if (normalized > 0 && normalized % 1_000 === 0) {
+    return {
+      count: normalized,
+      message: `あなたは${normalized}番目の訪問者です！おめでとう！`,
+    };
+  }
+
+  if (isRepdigit(normalized)) {
+    return {
+      count: normalized,
+      message: 'なんとゾロ目！すごいね！',
+    };
+  }
+
+  return null;
 }
 
 export async function getCounterValue() {
@@ -115,6 +155,20 @@ export async function incrementCounterValue() {
   const retried = await redis.incr(COUNTER_KEY);
   const parsedRetried = toCounterNumber(retried);
   return isSeededCounterValue(parsedRetried, fallback) ? parsedRetried : fallback + 1;
+}
+
+export async function getCounterMilestoneForVisitor(value: number) {
+  const redis = createRedisClient();
+  if (!redis) return null;
+
+  const milestone = createCounterMilestone(value);
+  if (!milestone) return null;
+
+  const lastShown = toCounterNumber(await redis.get<unknown>(COUNTER_MILESTONE_KEY));
+  if (lastShown !== null && lastShown >= milestone.count) return null;
+
+  await redis.set(COUNTER_MILESTONE_KEY, milestone.count);
+  return milestone;
 }
 
 export function formatCounterValue(value: number) {

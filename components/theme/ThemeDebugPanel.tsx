@@ -3,6 +3,20 @@
 import { debugControlsEnabled, debugTimeOptions, eventOptions, themeOptions } from '@/data/themeConfig';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 
+type DebugCounterMilestone = {
+  count: number;
+  message: string;
+  effect?: 'cracker';
+};
+
+function triggerDebugCounterMilestone(milestone: DebugCounterMilestone) {
+  window.dispatchEvent(
+    new CustomEvent('yukimi-counter-debug-milestone', {
+      detail: milestone,
+    }),
+  );
+}
+
 export function ThemeDebugPanel() {
   const {
     isDevelopment,
@@ -63,6 +77,43 @@ export function ThemeDebugPanel() {
         </label>
         <button type="button" className="debug-action-button" onClick={triggerDebugSprite}>
           debug.pngを流す
+        </button>
+        <button
+          type="button"
+          className="debug-action-button"
+          onClick={() =>
+            triggerDebugCounterMilestone({
+              count: 10000,
+              message: '記念すべき10000番目！めっちゃめでたい！',
+              effect: 'cracker',
+            })
+          }
+        >
+          キリ番 10000ごと
+        </button>
+        <button
+          type="button"
+          className="debug-action-button"
+          onClick={() =>
+            triggerDebugCounterMilestone({
+              count: 1000,
+              message: 'あなたは1000番目の訪問者です！おめでとう！',
+            })
+          }
+        >
+          キリ番 1000ごと
+        </button>
+        <button
+          type="button"
+          className="debug-action-button"
+          onClick={() =>
+            triggerDebugCounterMilestone({
+              count: 1111,
+              message: 'なんとゾロ目！すごいね！',
+            })
+          }
+        >
+          キリ番 ゾロ目
         </button>
       </div>
     </details>

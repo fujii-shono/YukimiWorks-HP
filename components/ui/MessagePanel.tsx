@@ -40,14 +40,15 @@ function parseJapaneseDateTime(value: string) {
 
 function formatMessageDate(value: string, now: Date) {
   const publishedAt = parseJapaneseDateTime(value);
+  const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - publishedAt.getTime()) / 60_000));
+
+  if (elapsedMinutes < 60) return `${elapsedMinutes}分前`;
+  if (elapsedMinutes < 1_440) return `${Math.floor(elapsedMinutes / 60)}時間前`;
+
   const publishedDateKey = getTokyoDateKey(publishedAt);
   const currentDateKey = getTokyoDateKey(now);
 
-  if (publishedDateKey === currentDateKey) {
-    const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - publishedAt.getTime()) / 60_000));
-    if (elapsedMinutes < 60) return `${elapsedMinutes}分前`;
-    return `${Math.floor(elapsedMinutes / 60)}時間前`;
-  }
+  if (publishedDateKey === currentDateKey) return `${Math.floor(elapsedMinutes / 60)}時間前`;
 
   const publishedDateParts = getTokyoDateParts(publishedAt);
   const currentDateParts = getTokyoDateParts(now);

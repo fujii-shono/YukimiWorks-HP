@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const title = `${item.title} | YukimiWorks`;
   const description = item.description ?? `${item.title} のポートフォリオ詳細ページです。`;
   const thumbnail = item.content.kind === 'image' ? item.content.src : item.content.thumbnail;
-  const ogImage = item.ogImage ?? thumbnail;
+  const ogImage = item.content.kind === 'html' ? item.content.thumbnail : (item.ogImage ?? thumbnail);
   const ogImageWidth = item.ogImageWidth;
   const ogImageHeight = item.ogImageHeight;
   const resolvedOgImage = ogImage

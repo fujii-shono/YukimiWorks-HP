@@ -1,5 +1,6 @@
 'use client';
 import { AnimatePresence, motion } from 'framer-motion';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
@@ -270,6 +271,23 @@ export function Sidebar() {
           </Link>
         </div>
       </section>
+
+      {/*
+        募金機能が公開準備中のため、サイト上の案内バナーは一時的に非表示にする。
+        直接URLを知っている場合のみ /bokin へアクセス可能。
+        {pathname !== '/bokin' ? (
+          <Link className="donation-sidebar-banner" href="/bokin" aria-label="募金ページへ移動する">
+            <Image
+              src="/bokin/header.png"
+              alt=""
+              width={4000}
+              height={1000}
+              className="donation-sidebar-banner-image"
+              unoptimized
+            />
+          </Link>
+        ) : null}
+      */}
 
       <MessagePanel />
 

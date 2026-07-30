@@ -18,6 +18,22 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    publishedAt: '2026-07-30 20:00',
+    body: '明日は募金機能の追加と、アクキーシミュレーターをアクスタ対応させます！',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
+    publishedAt: '2026-07-30 18:02',
+    body: '新サービス公開しました。バグはあるという前提で改善していきます。',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     publishedAt: '2026-07-29 16:22',
     body: '新サービスの最終調整中です。',
   },

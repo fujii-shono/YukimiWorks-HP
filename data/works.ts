@@ -32,6 +32,29 @@ export const workCategoryLabels: Record<WorkCategory, string> = {
 
 export const works: Work[] = [
   {
+    id: 'rss-matome-web',
+    title: '新サービス RSSまとめ',
+    description: '好きなwebサイトを集めてみんなに共有',
+    body: [
+      {
+        type: 'text',
+        value:
+          'RSSまとめはRSS機能を使いニュースサイトやyoutubeチャンネルを購読・共有できるサービスです。\n\nRSSリンクをフォローしてニュースを発掘したり、リアクションや評価をすることで記事への反応を共有できます。',
+      },
+      {
+        type: 'link',
+        label: 'サービスリンク',
+        href: 'https://rss-matome.com',
+      },
+    ],
+    category: 'apps',
+    tags: ['webサービス'],
+    thumbnail: '/works/rss-matome/hero.png',
+    media: [{ type: 'image', src: '/works/rss-matome/hero.png', alt: 'サービス紹介' }],
+    date: '2026-07-30',
+    featured: true,
+  },
+  {
     id: 'acrylic-keychain-tool',
     title: 'アクキーシミュレーター',
     description: '透過PNGから、アクリルキーホルダーっぽい画像を作れます。回転させて透明感を確認できます。',
@@ -94,8 +117,8 @@ export const works: Work[] = [
     ],
     category: 'apps',
     tags: ['webサービス'],
-    thumbnail: '/tarif/hero.png',
-    media: [{ type: 'image', src: '/tarif/hero.png', alt: 'サービス紹介' }],
+    thumbnail: '/works/tarif/hero.png',
+    media: [{ type: 'image', src: '/works/tarif/hero.png', alt: 'サービス紹介' }],
     date: '2026-07-14',
     featured: true,
   },
@@ -122,8 +145,8 @@ export const works: Work[] = [
     ],
     category: 'apps',
     tags: ['スマホアプリ', 'iOS'],
-    thumbnail: '/cocoa/hero.png',
-    media: [{ type: 'image', src: '/cocoa/hero.png', alt: 'アプリ紹介' }],
+    thumbnail: '/works/cocoa/hero.png',
+    media: [{ type: 'image', src: '/works/cocoa/hero.png', alt: 'アプリ紹介' }],
     featured: true,
   },
 ];

@@ -615,3 +615,42 @@
 - `npm run lint`
 - `npx tsc --noEmit`
 - `npm run build`
+
+---
+
+## 追加対応: 募金ページの仮設置
+
+### 対応する仕様
+
+- ユーザー依頼: `public/bokin/header.png` を使って `bokin` ページを作成する
+- ユーザー依頼: ページ上部に `header.png` を設定し、指定文言と「50円から支援する」ボタンを表示する
+- ユーザー依頼: Menu の下に `public/bokin/header.png` を使った案内バナーを配置し、募金ページへ遷移させる
+- ユーザー依頼: PC版の案内バナーは Message の上に配置する
+- ユーザー依頼: `/bokin` ページでは案内バナーを表示しない
+- ユーザー依頼: Stripe連携テスト用にCheckout作成APIを追加し、決済後は専用テスト画面へ移動する
+- ユーザー依頼: 専用画面は決済後以外ではアクセスできないようにする
+- ユーザー依頼: Stripeから戻る操作で404にならないようにし、支援額は50円以上を1円単位で任意入力できるようにする
+
+### 実装方針
+
+- 新規ページ `app/bokin/page.tsx` を既存の `SiteFrame` と `RetroPanel` で作成する
+- `header.png` は 4:1 画像として、ページ本文上部とサイドバー案内バナーで共用する
+- サイドバー案内は既存ナビ項目には追加せず、PCでは Message 直上、スマホでは What's New 直上の独立したリンクバナーにする
+- `POST /api/bokin/checkout` でStripe Checkout Sessionを作成し、成功時は `/bokin/thanks?session_id={CHECKOUT_SESSION_ID}` へ戻す
+- `/bokin/thanks` は `session_id` からStripe Sessionを取得し、募金用メタデータ、`paid`、`complete` を満たさない場合は `/bokin` へ戻す
+- Checkoutの戻り先URLはリクエスト元のhost/protocolを優先し、ローカルテスト中に本番URLへ戻らないようにする
+- 支援額は `type="number"` の入力欄で50円以上・1円単位とし、API側でも同条件を検証する
+
+### 変更予定のファイルと理由
+
+- `app/bokin/page.tsx`: 募金ページを追加するため
+- `app/bokin/thanks/page.tsx`: 決済後専用のテスト完了画面を追加するため
+- `app/api/bokin/checkout/route.ts`: Stripe Checkout Sessionを作成するため
+- `components/layout/Sidebar.tsx`: Menu 下に募金ページへの案内バナーを配置するため
+- `app/globals.css`: 募金ページ画像とサイドバー案内バナーの表示を整えるため
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`

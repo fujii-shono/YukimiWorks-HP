@@ -5,5 +5,6 @@ export type AppService = {
 
 export const appServices: AppService[] = [
   { value: 'cocoa', label: 'Cocoa' },
-  { value: 'tarif', label: 'Tarif' }
+  { value: 'tarif', label: 'Tarif' },
+  { value: 'rssmatome', label: 'RSSまとめ' }
 ];

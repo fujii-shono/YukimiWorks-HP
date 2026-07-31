@@ -16,6 +16,14 @@ export type MessagePost = {
 };
 
 export const messagePosts: readonly MessagePost[] = [
+    {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
+    publishedAt: '2026-07-31 15:44',
+    body: '募金機能実装できました。支援額の10%は震災募金に回すようにしています。',
+  },
   {
     icon: {
       src: '/logo/yukimi_works_favicon.png',

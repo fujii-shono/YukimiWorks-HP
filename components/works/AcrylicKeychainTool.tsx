@@ -7,6 +7,7 @@ type PreviewState = {
   acrylicSrc: string;
   edgeSrc: string;
   artworkSrc: string;
+  originalArtworkSrc: string;
   backSrc: string;
   width: number;
   height: number;
@@ -610,6 +611,7 @@ async function buildPreview(file: File, holeMode: HoleMode): Promise<PreviewStat
   const artworkContext = artworkCanvas.getContext('2d');
   if (!artworkContext) throw new Error('プレビューを作成できませんでした');
   artworkContext.drawImage(image, imageX, imageY, imageWidth, imageHeight);
+  const originalArtworkSrc = artworkCanvas.toDataURL('image/png');
 
   const tintCanvas = document.createElement('canvas');
   tintCanvas.width = width;
@@ -629,6 +631,7 @@ async function buildPreview(file: File, holeMode: HoleMode): Promise<PreviewStat
     acrylicSrc: acrylic.canvas.toDataURL('image/png'),
     edgeSrc: edge.canvas.toDataURL('image/png'),
     artworkSrc: artworkCanvas.toDataURL('image/png'),
+    originalArtworkSrc,
     backSrc: back.canvas.toDataURL('image/png'),
     width,
     height,
@@ -894,7 +897,7 @@ export function AcrylicKeychainTool() {
           fileName: fileBaseName,
           width: preview.width,
           height: preview.height,
-          artworkDataUrl: preview.artworkSrc,
+          artworkDataUrl: preview.originalArtworkSrc,
           holeMode,
           debug: EXPORT_DEBUG_SVG,
         }),

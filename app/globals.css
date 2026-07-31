@@ -2203,7 +2203,8 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   min-height: 38px;
   margin: 0 auto;
   padding: 7px 9px;
-  color: var(--site-text);
+  color: #000000;
+  caret-color: #000000;
   background: #ffffff;
   border: 1px solid var(--site-border);
   border-radius: 2px;

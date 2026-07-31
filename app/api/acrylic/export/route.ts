@@ -101,6 +101,11 @@ type ConnectedStraightLineGroup = {
   opIndices: number[];
 };
 
+type StraightPointRun = {
+  startIndex: number;
+  endIndex: number;
+};
+
 const MAX_EXPORT_SIZE = 2400;
 const MAX_PNG_BYTES = 12 * 1024 * 1024;
 const MAX_MASK_PIXELS = 2_400_000;
@@ -112,7 +117,7 @@ const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
 const BASE_KEYCHAIN_HOLE_GAP = 2;
 const CONTROL_POINT_RADIUS = 0.9;
 const CONTROL_POINT_STROKE_WIDTH = 0.2;
-const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 5;
+const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 20;
 const OUTER_CORNER_ROUND_MIN_ANGLE = 1;
 const OUTER_CORNER_ROUND_MAX_ANGLE = 179;
 const OUTER_CORNER_ROUND_MAX_TRIM = 18;
@@ -1167,14 +1172,19 @@ function buildPathPointDebugPoints(points: Point[], concavityPointKeys: Set<stri
   return points.map((point) => ({ point, kind: getControlPointKind(point, concavityPointKeys) }));
 }
 
-function buildPreSmoothingDebugPath(points: Point[], concavityPointKeys: Set<string>, closed: boolean): SvgPathResult {
+function buildPreSmoothingDebugPath(
+  points: Point[],
+  concavityPointKeys: Set<string>,
+  closed: boolean,
+  longStraightLines: Array<{ start: Point; end: Point }> = [],
+): SvgPathResult {
   if (points.length === 0) return createPathResult('');
   const commands = [`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`];
   points.slice(1).forEach((point) => {
     commands.push(lineToCommand(point));
   });
   if (closed) commands.push('Z');
-  return createPathResult(commands.join(' '), mergeDebugPoints(buildPathPointDebugPoints(points, concavityPointKeys)));
+  return createPathResult(commands.join(' '), mergeDebugPoints(buildPathPointDebugPoints(points, concavityPointKeys)), longStraightLines);
 }
 
 function simplifyPolyline(points: Point[], tolerance: number): Point[] {
@@ -1204,6 +1214,56 @@ function isPointSequenceNearlyStraight(points: Point[], tolerance: number) {
   const start = points[0];
   const end = points[points.length - 1];
   return points.slice(1, -1).every((point) => perpendicularDistance(point, start, end) <= tolerance);
+}
+
+function collectLongStraightPointRuns(points: Point[], minLength: number, tolerance: number) {
+  const runs: StraightPointRun[] = [];
+  if (!ENABLE_STRAIGHT_LINE_PROCESSING || points.length < 2) return runs;
+  void tolerance;
+
+  for (let startIndex = 0; startIndex < points.length - 1; startIndex += 1) {
+    const endIndex = startIndex + 1;
+    if (distance(points[startIndex], points[endIndex]) >= minLength) runs.push({ startIndex, endIndex });
+  }
+
+  return runs;
+}
+
+function buildStraightProtectedPointKeys(points: Point[], straightRuns: StraightPointRun[]) {
+  const keys = new Set<string>();
+  straightRuns.forEach((run) => {
+    [run.startIndex, run.endIndex].forEach((index) => {
+      const point = points[index];
+      if (point) keys.add(pointKey(point));
+    });
+  });
+  return keys;
+}
+
+function buildStraightAnchorPointSet(straightRuns: StraightPointRun[]) {
+  const anchors = new Set<number>();
+  straightRuns.forEach((run) => {
+    anchors.add(run.startIndex);
+    anchors.add(run.endIndex);
+  });
+  return anchors;
+}
+
+function buildStraightRunLines(points: Point[], straightRuns: StraightPointRun[]) {
+  if (!SHOW_LONG_STRAIGHT_LINE_MARKERS) return [];
+  return straightRuns.flatMap((run) => {
+    const start = points[run.startIndex];
+    const end = points[run.endIndex];
+    return start && end ? [{ start, end }] : [];
+  });
+}
+
+function mergePointSets(...sets: Array<Set<number>>) {
+  const merged = new Set<number>();
+  sets.forEach((set) => {
+    set.forEach((index) => merged.add(index));
+  });
+  return merged;
 }
 
 function signedPerpendicularDistance(point: Point, lineStart: Point, lineEnd: Point) {
@@ -1433,7 +1493,12 @@ function collectCyclicIndexRangePoints(points: Point[], startIndex: number, endI
   return segment;
 }
 
-function buildClosedSmoothOpsBetweenConcavities(points: Point[], concavityPointSet: Set<number>, tolerance: number, maxError: number) {
+function buildClosedSmoothOpsBetweenConcavities(
+  points: Point[],
+  concavityPointSet: Set<number>,
+  tolerance: number,
+  maxError: number,
+) {
   const anchorIndices = Array.from(concavityPointSet).sort((left, right) => left - right);
   if (anchorIndices.length < 2) return null;
 
@@ -1443,10 +1508,18 @@ function buildClosedSmoothOpsBetweenConcavities(points: Point[], concavityPointS
     const endIndex = anchorIndices[(index + 1) % anchorIndices.length];
     appendSmoothSegmentOps(ops, collectCyclicIndexRangePoints(points, startIndex, endIndex), tolerance, maxError);
   }
-  return { start: points[anchorIndices[0]], ops };
+  return {
+    start: points[anchorIndices[0]],
+    ops,
+  };
 }
 
-function buildOpenSmoothOpsBetweenConcavities(points: Point[], concavityPointSet: Set<number>, tolerance: number, maxError: number) {
+function buildOpenSmoothOpsBetweenConcavities(
+  points: Point[],
+  concavityPointSet: Set<number>,
+  tolerance: number,
+  maxError: number,
+) {
   if (concavityPointSet.size < 2) return null;
   const breakpoints = Array.from(new Set([0, ...Array.from(concavityPointSet), points.length - 1])).sort((left, right) => left - right);
   if (breakpoints.length < 2) return null;
@@ -1458,7 +1531,10 @@ function buildOpenSmoothOpsBetweenConcavities(points: Point[], concavityPointSet
     if (startIndex === endIndex) continue;
     appendSmoothSegmentOps(ops, points.slice(startIndex, endIndex + 1), tolerance, maxError);
   }
-  return { start: points[0], ops };
+  return {
+    start: points[0],
+    ops,
+  };
 }
 
 function removeConcavityControlPoints(points: Point[], concavityPointSet: Set<number>, closed: boolean) {
@@ -1528,16 +1604,25 @@ function getRoundedCornerData(loop: Point[]) {
 
 function roundedClosedPath(points: Point[], longStraightLineMinLength: number): SvgPathResult {
   if (points.length < 3) return createPathResult('');
-  const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: true }));
+  const tolerance = getSmoothCurveSimplifyTolerance(longStraightLineMinLength);
+  const maxError = getCurveFitMaxError(longStraightLineMinLength);
+  const rawStraightRuns = collectLongStraightPointRuns(points, longStraightLineMinLength, tolerance);
+  const rawProtectedPointKeys = buildStraightProtectedPointKeys(points, rawStraightRuns);
+  const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: true, protectedPointKeys: rawProtectedPointKeys }));
   const pathPoints = removeConcavityControlPoints(points, rawConcavityPointSet, true);
-  const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
-  const concavityPointKeys = buildConcavityPointKeys(pathPoints, concavityPointSet);
-  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, true);
+  const straightRuns = collectLongStraightPointRuns(pathPoints, longStraightLineMinLength, tolerance);
+  const protectedPointKeys = buildStraightProtectedPointKeys(pathPoints, straightRuns);
+  const straightAnchorPointSet = buildStraightAnchorPointSet(straightRuns);
+  const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true, protectedPointKeys }));
+  const smoothAnchorPointSet = mergePointSets(concavityPointSet, straightAnchorPointSet);
+  const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
+  const concavityPointKeys = buildConcavityPointKeys(pathPoints, debugConcavityPointSet);
+  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, true, buildStraightRunLines(pathPoints, straightRuns));
   const smoothPath = buildClosedSmoothOpsBetweenConcavities(
     pathPoints,
-    concavityPointSet,
-    getSmoothCurveSimplifyTolerance(longStraightLineMinLength),
-    getCurveFitMaxError(longStraightLineMinLength),
+    smoothAnchorPointSet,
+    tolerance,
+    maxError,
   );
   if (smoothPath) {
     const { commands, controlPoints, longStraightLines, connectedStraightLines } = buildPathFromOps(smoothPath.ops, smoothPath.start, longStraightLineMinLength);
@@ -1577,16 +1662,25 @@ function roundedOpenPath(points: Point[], longStraightLineMinLength: number, are
   if (points.length === 1) return createPathResult(`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`);
 
   const controlPoints: DebugPoint[] = [];
-  const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: false, areaSign }));
+  const tolerance = getSmoothCurveSimplifyTolerance(longStraightLineMinLength);
+  const maxError = getCurveFitMaxError(longStraightLineMinLength);
+  const rawStraightRuns = collectLongStraightPointRuns(points, longStraightLineMinLength, tolerance);
+  const rawProtectedPointKeys = buildStraightProtectedPointKeys(points, rawStraightRuns);
+  const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: false, areaSign, protectedPointKeys: rawProtectedPointKeys }));
   const pathPoints = removeConcavityControlPoints(points, rawConcavityPointSet, false);
-  const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign }));
-  const concavityPointKeys = buildConcavityPointKeys(pathPoints, concavityPointSet);
-  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, false);
+  const straightRuns = collectLongStraightPointRuns(pathPoints, longStraightLineMinLength, tolerance);
+  const protectedPointKeys = buildStraightProtectedPointKeys(pathPoints, straightRuns);
+  const straightAnchorPointSet = buildStraightAnchorPointSet(straightRuns);
+  const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign, protectedPointKeys }));
+  const smoothAnchorPointSet = mergePointSets(concavityPointSet, straightAnchorPointSet);
+  const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign }));
+  const concavityPointKeys = buildConcavityPointKeys(pathPoints, debugConcavityPointSet);
+  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, false, buildStraightRunLines(pathPoints, straightRuns));
   const smoothPath = buildOpenSmoothOpsBetweenConcavities(
     pathPoints,
-    concavityPointSet,
-    getSmoothCurveSimplifyTolerance(longStraightLineMinLength),
-    getCurveFitMaxError(longStraightLineMinLength),
+    smoothAnchorPointSet,
+    tolerance,
+    maxError,
   );
   if (smoothPath) {
     const pathData = buildPathFromOps(smoothPath.ops, smoothPath.start, longStraightLineMinLength);

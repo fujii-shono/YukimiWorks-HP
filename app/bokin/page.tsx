@@ -1,11 +1,13 @@
 import Image from 'next/image';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
+import { BokinSupportForm } from '@/components/ui/BokinSupportForm';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 
 export default function BokinPage() {
   return (
     <SiteFrame>
-      <RetroPanel title="Bokin" contentClassName="single-panel-body bokin-body">
+      <RetroPanel title="Bokin" className="bokin-panel" contentClassName="single-panel-body bokin-body">
         <Image
           src="/bokin/header.png"
           alt="YukimiWorks 募金ページ"
@@ -29,19 +31,17 @@ export default function BokinPage() {
           <br />
           おみくじを提供しております。
         </p> */}
-        <p>小さな運試しとしてお楽しみください。</p>
-        <form action="/api/bokin/checkout" method="post" className="bokin-support-form">
-          <label className="bokin-amount-field">
-            <span>支援金額</span>
-            <span className="bokin-amount-input-wrap">
-              <input type="number" name="amount" min="50" step="1" defaultValue="50" inputMode="numeric" required />
-              <span>円</span>
-            </span>
-          </label>
-          <button type="submit" className="bokin-support-button">
-            支援する
-          </button>
-        </form>
+        {/* <p>小さな運試しとしてお楽しみください。</p> */}
+        <p className="bokin-donation-note">
+          ※支援金の10%は熊本震災の募金に使用します
+          <br />
+          （８月末までにいただいたご支援が対象）
+          <br />
+          <Link href="https://donation.yahoo.co.jp/detail/925104" target="_blank" rel="noopener noreferrer">
+            https://donation.yahoo.co.jp/detail/925104
+          </Link>
+        </p>
+        <BokinSupportForm />
       </RetroPanel>
     </SiteFrame>
   );

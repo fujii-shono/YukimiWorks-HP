@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
+import { saveBokinSupportMessage } from '@/lib/bokinMessages';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,9 +12,12 @@ type StripeCheckoutSession = {
   currency: string | null;
   metadata?: {
     kind?: string;
+    amount?: string;
+    displayName?: string;
   } | null;
   payment_status: string;
   status: string | null;
+  created: number;
 };
 
 const omikujiResults = [
@@ -75,17 +79,26 @@ export default async function BokinThanksPage({
 
   const omikuji = chooseOmikuji(session.id);
   const amount = session.amount_total ?? 0;
+  try {
+    await saveBokinSupportMessage({
+      sessionId: session.id,
+      amount,
+      displayName: session.metadata?.displayName,
+      createdAt: session.created,
+    });
+  } catch (error) {
+    console.error('[bokin/thanks] 支援メッセージの保存に失敗しました。', error);
+  }
 
   return (
     <SiteFrame>
       <RetroPanel title="Thanks" contentClassName="single-panel-body bokin-thanks-body">
-        <p className="bokin-lead">ご支援ありがとうございます</p>
+        <p className="bokin-lead">ご支援ありがとうございます！</p>
         <p>{amount > 0 ? `${amount.toLocaleString('ja-JP')}円のご支援を受け付けました。` : 'ご支援を受け付けました。'}</p>
         <div className="bokin-omikuji" aria-label="おみくじ結果">
           <p className="bokin-omikuji-label">{omikuji.label}</p>
           <p>{omikuji.message}</p>
         </div>
-        <p>これはテスト用の完了画面です。</p>
         <Link href="/bokin" className="bokin-return-link">
           募金ページへ戻る
         </Link>

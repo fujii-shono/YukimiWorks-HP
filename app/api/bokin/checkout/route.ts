@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 const MIN_DONATION_AMOUNT = 50;
 const MAX_DONATION_AMOUNT = 99_999_999;
+const MAX_DISPLAY_NAME_LENGTH = 8;
+const DEFAULT_DISPLAY_NAME = '匿名希望';
 
 function getRequestOrigin(req: Request) {
   const url = new URL(req.url);
@@ -25,6 +27,14 @@ function parseAmount(value: FormDataEntryValue | null) {
   return amount;
 }
 
+function parseDisplayName(value: FormDataEntryValue | null) {
+  if (typeof value !== 'string') return DEFAULT_DISPLAY_NAME;
+
+  const displayName = value.trim();
+  if (!displayName) return DEFAULT_DISPLAY_NAME;
+  return displayName.slice(0, MAX_DISPLAY_NAME_LENGTH);
+}
+
 export async function POST(req: Request) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   const origin = getRequestOrigin(req);
@@ -37,6 +47,7 @@ export async function POST(req: Request) {
   const formData = await req.formData();
   const amount = parseAmount(formData.get('amount'));
   if (amount === null) return NextResponse.redirect(`${origin}/bokin?error=amount`, { status: 303 });
+  const displayName = parseDisplayName(formData.get('displayName'));
 
   const params = new URLSearchParams({
     mode: 'payment',
@@ -44,6 +55,8 @@ export async function POST(req: Request) {
     cancel_url: `${origin}/bokin?canceled=1`,
     'payment_method_types[0]': 'card',
     'metadata[kind]': 'bokin',
+    'metadata[displayName]': displayName,
+    'metadata[amount]': String(amount),
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': 'jpy',
     'line_items[0][price_data][unit_amount]': String(amount),

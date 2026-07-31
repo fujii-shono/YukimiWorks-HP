@@ -2,7 +2,11 @@
 
 import Image from 'next/image';
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import { messagePosts } from '@/data/messages';
+import { messagePosts, type MessagePost } from '@/data/messages';
+import { cn } from '@/lib/format';
+
+const RAINBOW_SHINE_ACTIVE_MS = 1_800;
+const RAINBOW_SHINE_WAIT_MS = 1_000;
 
 function getTokyoDateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -66,6 +70,8 @@ export function MessagePanel() {
   const postRefs = useRef<Array<HTMLElement | null>>([]);
   const [now, setNow] = useState<Date | null>(null);
   const [openPostIndex, setOpenPostIndex] = useState<number | null>(null);
+  const [dynamicPosts, setDynamicPosts] = useState<MessagePost[]>([]);
+  const [rainbowShineActive, setRainbowShineActive] = useState(false);
   const [tooltipTop, setTooltipTop] = useState(58);
   const [tooltipEnabled, setTooltipEnabled] = useState(false);
 
@@ -73,6 +79,52 @@ export function MessagePanel() {
     setNow(new Date());
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMessages = async () => {
+      try {
+        const response = await fetch('/api/messages', { cache: 'no-store' });
+        if (!response.ok) return;
+        const json = (await response.json()) as { bokinMessages?: MessagePost[] };
+        if (!cancelled && Array.isArray(json.bokinMessages)) setDynamicPosts(json.bokinMessages);
+      } catch {
+        return;
+      }
+    };
+
+    void loadMessages();
+    const timer = window.setInterval(loadMessages, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let activeTimer: number | null = null;
+    let waitTimer: number | null = null;
+    let frame: number | null = null;
+
+    const run = () => {
+      setRainbowShineActive(false);
+      frame = window.requestAnimationFrame(() => {
+        setRainbowShineActive(true);
+        activeTimer = window.setTimeout(() => {
+          setRainbowShineActive(false);
+          waitTimer = window.setTimeout(run, RAINBOW_SHINE_WAIT_MS);
+        }, RAINBOW_SHINE_ACTIVE_MS);
+      });
+    };
+
+    run();
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      if (activeTimer !== null) window.clearTimeout(activeTimer);
+      if (waitTimer !== null) window.clearTimeout(waitTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -124,7 +176,11 @@ export function MessagePanel() {
     });
   };
 
-  const openPost = openPostIndex !== null ? messagePosts[openPostIndex] : null;
+  const mergedPosts = [...dynamicPosts, ...messagePosts].sort(
+    (a, b) => parseJapaneseDateTime(b.publishedAt).getTime() - parseJapaneseDateTime(a.publishedAt).getTime(),
+  );
+  const visiblePosts = now ? mergedPosts.filter((post) => parseJapaneseDateTime(post.publishedAt).getTime() <= now.getTime()) : [];
+  const openPost = openPostIndex !== null ? visiblePosts[openPostIndex] : null;
   const visibleOpenPost = openPost && now && parseJapaneseDateTime(openPost.publishedAt).getTime() <= now.getTime() ? openPost : null;
   const openPostFormattedDate = visibleOpenPost && now ? formatMessageDate(visibleOpenPost.publishedAt, now) : '\u00a0';
   const openPostDateTime = openPost ? parseJapaneseDateTime(openPost.publishedAt).toISOString() : '';
@@ -141,8 +197,8 @@ export function MessagePanel() {
         </span>
       </h2>
       <div className="message-panel-list" tabIndex={0}>
-        {messagePosts.map((post, index) => {
-          if (!now || parseJapaneseDateTime(post.publishedAt).getTime() > now.getTime()) return null;
+        {visiblePosts.map((post, index) => {
+          if (!now) return null;
 
           const tooltipId = `${tooltipBaseId}-${index}`;
           const formattedDate = formatMessageDate(post.publishedAt, now);
@@ -154,7 +210,11 @@ export function MessagePanel() {
               ref={(element) => {
                 postRefs.current[index] = element;
               }}
-              className="message-panel-post"
+              className={cn(
+                'message-panel-post',
+                post.tone && `message-panel-post-${post.tone}`,
+                post.tone === 'rainbow' && rainbowShineActive && 'is-rainbow-shining',
+              )}
               key={`${index}-${post.body}`}
             >
               <button
@@ -167,7 +227,7 @@ export function MessagePanel() {
                 <span className="message-panel-summary">
                   <span className="message-panel-summary-main">
                     <span className="message-panel-meta">
-                      {post.icon ? (
+                      {post.icon && !post.tone ? (
                         <Image
                           src={post.icon.src}
                           alt={post.icon.alt}
@@ -209,7 +269,7 @@ export function MessagePanel() {
         >
           <div className="message-panel-tooltip-content">
             <div className="message-panel-meta">
-              {visibleOpenPost.icon ? (
+              {visibleOpenPost.icon && !visibleOpenPost.tone ? (
                 <Image
                   src={visibleOpenPost.icon.src}
                   alt={visibleOpenPost.icon.alt}
@@ -221,7 +281,14 @@ export function MessagePanel() {
               ) : null}
               <time dateTime={openPostDateTime}>{openPostFormattedDate}</time>
             </div>
-            <p>{visibleOpenPost.body}</p>
+            <p
+              className={cn(
+                visibleOpenPost.tone && `message-panel-body-${visibleOpenPost.tone}`,
+                visibleOpenPost.tone === 'rainbow' && rainbowShineActive && 'is-rainbow-shining',
+              )}
+            >
+              {visibleOpenPost.body}
+            </p>
             {visibleOpenPost.image ? (
               <Image
                 src={visibleOpenPost.image.src}

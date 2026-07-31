@@ -630,6 +630,11 @@
 - ユーザー依頼: Stripe連携テスト用にCheckout作成APIを追加し、決済後は専用テスト画面へ移動する
 - ユーザー依頼: 専用画面は決済後以外ではアクセスできないようにする
 - ユーザー依頼: Stripeから戻る操作で404にならないようにし、支援額は50円以上を1円単位で任意入力できるようにする
+- ユーザー依頼: 募金案内に「支援金の10%は熊本震災の募金に使用する」旨と対象期間、外部寄付URLを追加する
+- ユーザー依頼: 支援金額に「+100」「+1,000」「+10,000」の丸枠ボタンを追加し、手入力欄も残す
+- ユーザー依頼: 支援するボタン押下後にモーダルで任意の表示名入力欄を出し、未入力時は匿名希望として扱う旨を記載する
+- ユーザー依頼: 支援額に応じて名前付きの支援メッセージをMessage欄へ表示し、50〜499円は青、500〜2999円は黄色、3000〜9999円は赤、10000円以上は虹色にする
+- ユーザー依頼: `public/bokin/tensi.png` と `face1〜5.png` を募金ページ右下に重ねて配置し、支援額に応じて表情を切り替える
 
 ### 実装方針
 
@@ -640,14 +645,29 @@
 - `/bokin/thanks` は `session_id` からStripe Sessionを取得し、募金用メタデータ、`paid`、`complete` を満たさない場合は `/bokin` へ戻す
 - Checkoutの戻り先URLはリクエスト元のhost/protocolを優先し、ローカルテスト中に本番URLへ戻らないようにする
 - 支援額は `type="number"` の入力欄で50円以上・1円単位とし、API側でも同条件を検証する
+- 金額入力フォームはクライアントコンポーネント化し、加算ボタンで現在値へ指定額を加えられるようにする
+- 表示名は支援ボタン押下後のモーダルで任意入力、最大20文字、未入力時は `匿名希望` としてStripe metadataへ保存する
+- `REDIS_KEY_PREFIX=dev` の場合はアクセスカウンターとキリ番キーにも `dev:` を付け、本番の `site:counter:*` へ書き込まない
+- 決済後ページでpaid/complete確認後、セッションIDごとに一度だけRedis listへ支援メッセージを保存する
+- Messageパネルは `/api/messages` からRedis上の支援メッセージを取得し、既存の静的メッセージと時刻順に統合して表示する
+- 募金ページのキャラクターは画像レイヤーを同サイズで重ね、全レイヤー読み込み完了まで非表示にして、`tensi.png` 単体表示を防ぐ
+- キャラクター全体のサイズと右下位置はCSS変数で調整可能にし、顔レイヤーは本体と同一サイズ・同一位置で固定する
 
 ### 変更予定のファイルと理由
 
 - `app/bokin/page.tsx`: 募金ページを追加するため
+- `components/ui/BokinSupportForm.tsx`: 支援金額の加算ボタンと手入力欄を管理するため
+- `public/bokin/tensi.png`, `public/bokin/face1.png`〜`face5.png`: 募金ページキャラクター表示に使用するため
 - `app/bokin/thanks/page.tsx`: 決済後専用のテスト完了画面を追加するため
 - `app/api/bokin/checkout/route.ts`: Stripe Checkout Sessionを作成するため
+- `app/api/messages/route.ts`: MessageパネルへRedis上の支援メッセージを返すため
 - `components/layout/Sidebar.tsx`: Menu 下に募金ページへの案内バナーを配置するため
+- `components/ui/MessagePanel.tsx`: 支援メッセージを動的取得して色分け表示するため
 - `app/globals.css`: 募金ページ画像とサイドバー案内バナーの表示を整えるため
+- `lib/counter.ts`: 開発用Redis prefixで本番カウンターへの書き込みを避けるため
+- `lib/redis.ts`: Redis接続とprefix付きキー生成を共通化するため
+- `lib/bokinMessages.ts`: 支援メッセージの保存、取得、色分類を管理するため
+- `README.md`: `REDIS_KEY_PREFIX` のローカル運用を説明するため
 
 ### 検証方法
 

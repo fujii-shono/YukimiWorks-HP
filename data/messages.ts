@@ -1,3 +1,5 @@
+export type MessageTone = 'blue' | 'purple' | 'red' | 'rainbow';
+
 export type MessagePost = {
   icon?: {
     src: string;
@@ -10,6 +12,7 @@ export type MessagePost = {
   /** 日本時間で `YYYY-MM-DD HH:mm` の形式で指定する */
   publishedAt: string;
   body: string;
+  tone?: MessageTone;
 };
 
 export const messagePosts: readonly MessagePost[] = [

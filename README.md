@@ -30,16 +30,20 @@ MAIL_FROM_DOMAIN=yukimiworks.com
 NEXT_PUBLIC_SITE_URL=https://yukimiworks.com
 UPSTASH_REDIS_REST_URL=https://<your-redis-endpoint>.upstash.io
 UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
+REDIS_KEY_PREFIX=dev
 ```
 
 `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` は、カウンターを Redis に保存するために使用します。
 既存の接続情報をそのまま使う場合は、`KV_REST_API_URL` と `KV_REST_API_TOKEN` も後方互換で読み込みます。
 Vercel の Redis integration が `UPSTASH_REDIS_REST_KV_REST_API_URL` のような長い名前を作っても、コード側で読み込めるようにしてあります。
 カウンターは更新するので、`READ_ONLY_TOKEN` ではなく書き込み用 token を使います。
+`REDIS_KEY_PREFIX=dev` を設定すると、カウンターのRedisキーは `dev:site:counter:total` と `dev:site:counter:last-milestone` になり、本番用の既存キー `site:counter:*` へ書き込みません。
+本番環境では未設定、または `REDIS_KEY_PREFIX=prod` のままにすると従来の本番キーを使います。
 
 ## カウンターの仕組み
 
 - カウンター総数は Redis の `site:counter:total` に保存します
+- `REDIS_KEY_PREFIX=dev` の場合は開発用キー `dev:site:counter:total` と `dev:site:counter:last-milestone` を使います
 - 同じブラウザからは 1 日に 1 回だけ加算します
 - 1 日判定は `localStorage` の `yukimi-counter-last-counted-date` に保存した東京日付キーで行います
 - `localStorage` を消した場合、別ブラウザ、別端末は別訪問として扱います

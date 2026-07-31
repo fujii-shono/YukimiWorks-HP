@@ -31,6 +31,8 @@ NEXT_PUBLIC_SITE_URL=https://yukimiworks.com
 UPSTASH_REDIS_REST_URL=https://<your-redis-endpoint>.upstash.io
 UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
 REDIS_KEY_PREFIX=dev
+STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
 ```
 
 `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` は、カウンターを Redis に保存するために使用します。
@@ -39,6 +41,10 @@ Vercel の Redis integration が `UPSTASH_REDIS_REST_KV_REST_API_URL` のよう�
 カウンターは更新するので、`READ_ONLY_TOKEN` ではなく書き込み用 token を使います。
 `REDIS_KEY_PREFIX=dev` を設定すると、カウンターのRedisキーは `dev:site:counter:total` と `dev:site:counter:last-milestone` になり、本番用の既存キー `site:counter:*` へ書き込みません。
 本番環境では未設定、または `REDIS_KEY_PREFIX=prod` のままにすると従来の本番キーを使います。
+
+募金機能では `STRIPE_SECRET_KEY` で Checkout Session の作成と決済済みセッション確認を行い、`STRIPE_WEBHOOK_SECRET` で Stripe Webhook の署名検証を行います。
+Stripe 側の Webhook endpoint は `/api/bokin/webhook` に設定し、イベントは `checkout.session.completed` を送信してください。
+本番公開時は `sk_test_...` ではなく本番用の `sk_live_...` と、本番 endpoint 用の `whsec_...` を Vercel の Production 環境に設定します。
 
 ## カウンターの仕組み
 
@@ -66,10 +72,13 @@ MAIL_FROM_DOMAIN
 NEXT_PUBLIC_SITE_URL
 UPSTASH_REDIS_REST_URL
 UPSTASH_REDIS_REST_TOKEN
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
 ```
 
-6. 必要なら `siteConfig.decorativeCounter` を開始値として調整します。
-7. 再デプロイすると、初回アクセス時に Redis へ `site:counter:total` が作成されます。
+6. Stripe ダッシュボードで Webhook endpoint `https://<本番ドメイン>/api/bokin/webhook` を追加し、`checkout.session.completed` を選択します。
+7. 必要なら `siteConfig.decorativeCounter` を開始値として調整します。
+8. 再デプロイすると、初回アクセス時に Redis へ `site:counter:total` が作成されます。
 
 ## 備考
 

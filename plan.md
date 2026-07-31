@@ -55,6 +55,36 @@
 
 ---
 
+## 追加対応: 募金Webhook保存
+
+### 対応する仕様
+
+- ユーザー依頼: Stripe入金後の募金メッセージ保存を、Thanksページ到達ではなくWebhookで行う
+
+### 実装方針
+
+- Stripe Checkout Session 作成は既存の `/api/bokin/checkout` を維持する
+- Stripe の `checkout.session.completed` Webhook を `/api/bokin/webhook` で受け取る
+- `STRIPE_WEBHOOK_SECRET` と `stripe-signature` をHMACで検証し、Stripe由来のイベントだけ処理する
+- 決済済み、完了済み、募金用metadataを満たすCheckout SessionだけRedisへ保存する
+- 既存の processed session キーで二重保存を防止する
+- `/bokin/thanks` は決済済みセッション確認とおみくじ表示に限定する
+
+### 変更予定のファイルと理由
+
+- `app/api/bokin/webhook/route.ts`: Stripe Webhook 受信と署名検証、保存処理
+- `app/bokin/thanks/page.tsx`: Redis保存処理を削除し表示専用にする
+- `README.md`: 本番環境変数とStripe Webhook endpoint設定を追記
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- Stripe CLIまたはStripeダッシュボードのテスト送信でWebhook到達とRedis保存を確認する
+
+---
+
 ## 追加対応: カウンター実装
 
 ### 対応する仕様

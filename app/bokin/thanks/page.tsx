@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
-import { saveBokinSupportMessage } from '@/lib/bokinMessages';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,16 +78,6 @@ export default async function BokinThanksPage({
 
   const omikuji = chooseOmikuji(session.id);
   const amount = session.amount_total ?? 0;
-  try {
-    await saveBokinSupportMessage({
-      sessionId: session.id,
-      amount,
-      displayName: session.metadata?.displayName,
-      createdAt: session.created,
-    });
-  } catch (error) {
-    console.error('[bokin/thanks] 支援メッセージの保存に失敗しました。', error);
-  }
 
   return (
     <SiteFrame>

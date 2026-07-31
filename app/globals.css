@@ -3806,7 +3806,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   }
 
   .bokin-support-area {
-    --bokin-character-width: 250px;
+    --bokin-character-width: 210px;
     --bokin-character-right: -50px;
     --bokin-character-bottom: -15px;
   }

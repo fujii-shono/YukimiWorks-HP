@@ -117,7 +117,7 @@ const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
 const BASE_KEYCHAIN_HOLE_GAP = 2;
 const CONTROL_POINT_RADIUS = 0.9;
 const CONTROL_POINT_STROKE_WIDTH = 0.2;
-const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 20;
+const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 10;
 const OUTER_CORNER_ROUND_MIN_ANGLE = 1;
 const OUTER_CORNER_ROUND_MAX_ANGLE = 179;
 const OUTER_CORNER_ROUND_MAX_TRIM = 18;
@@ -139,10 +139,10 @@ const NORMAL_CONTROL_POINT_FILL = '#ff0000';
 const PARALLEL_LINE_MAX_ANGLE_DELTA = 8;
 const REMOVE_INNER_CONTROL_POINTS = true;
 const ENABLE_STRAIGHT_LINE_PROCESSING = true;
-const DEBUG_OUTPUT_PRE_SMOOTHING_PATH = false;
-const SHOW_CONTROL_POINT_MARKERS = false;
+const DEBUG_OUTPUT_PRE_SMOOTHING_PATH = true;
+const SHOW_CONTROL_POINT_MARKERS = true;
 const SHOW_LONG_STRAIGHT_LINE_MARKERS = false;
-const SHOW_CONNECTED_STRAIGHT_LINE_MARKERS = false;
+const SHOW_CONNECTED_STRAIGHT_LINE_MARKERS = true;
 const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ZIP_CENTRAL_DIRECTORY_HEADER_SIGNATURE = 0x02014b50;
 const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
@@ -1177,6 +1177,7 @@ function buildPreSmoothingDebugPath(
   concavityPointKeys: Set<string>,
   closed: boolean,
   longStraightLines: Array<{ start: Point; end: Point }> = [],
+  connectedStraightLines: Array<{ start: Point; end: Point }> = [],
 ): SvgPathResult {
   if (points.length === 0) return createPathResult('');
   const commands = [`M ${formatSvgNumber(points[0].x)} ${formatSvgNumber(points[0].y)}`];
@@ -1184,7 +1185,12 @@ function buildPreSmoothingDebugPath(
     commands.push(lineToCommand(point));
   });
   if (closed) commands.push('Z');
-  return createPathResult(commands.join(' '), mergeDebugPoints(buildPathPointDebugPoints(points, concavityPointKeys)), longStraightLines);
+  return createPathResult(
+    commands.join(' '),
+    mergeDebugPoints(buildPathPointDebugPoints(points, concavityPointKeys)),
+    longStraightLines,
+    connectedStraightLines,
+  );
 }
 
 function simplifyPolyline(points: Point[], tolerance: number): Point[] {
@@ -1249,13 +1255,38 @@ function buildStraightAnchorPointSet(straightRuns: StraightPointRun[]) {
   return anchors;
 }
 
-function buildStraightRunLines(points: Point[], straightRuns: StraightPointRun[]) {
-  if (!SHOW_LONG_STRAIGHT_LINE_MARKERS) return [];
-  return straightRuns.flatMap((run) => {
+function areStraightRunsConsecutive(left: StraightPointRun, right: StraightPointRun, pointCount: number, closed: boolean) {
+  if (left.endIndex === right.startIndex) return true;
+  return closed && left.endIndex === pointCount - 1 && right.startIndex === 0;
+}
+
+function buildStraightRunMarkers(points: Point[], straightRuns: StraightPointRun[], closed: boolean) {
+  const markers = {
+    longStraightLines: [] as Array<{ start: Point; end: Point }>,
+    connectedStraightLines: [] as Array<{ start: Point; end: Point }>,
+  };
+  const shouldBuildLongMarkers = SHOW_LONG_STRAIGHT_LINE_MARKERS;
+  const shouldBuildConnectedMarkers = SHOW_CONNECTED_STRAIGHT_LINE_MARKERS;
+  if (!shouldBuildLongMarkers && !shouldBuildConnectedMarkers) return markers;
+
+  straightRuns.forEach((run, index) => {
     const start = points[run.startIndex];
     const end = points[run.endIndex];
-    return start && end ? [{ start, end }] : [];
+    if (!start || !end) return;
+
+    const previous = straightRuns[(index - 1 + straightRuns.length) % straightRuns.length];
+    const next = straightRuns[(index + 1) % straightRuns.length];
+    const isConnectedToPrevious = (index > 0 || closed) ? areStraightRunsConsecutive(previous, run, points.length, closed) : false;
+    const isConnectedToNext = (index < straightRuns.length - 1 || closed) ? areStraightRunsConsecutive(run, next, points.length, closed) : false;
+    if (isConnectedToPrevious || isConnectedToNext) {
+      if (shouldBuildConnectedMarkers) markers.connectedStraightLines.push({ start, end });
+      return;
+    }
+
+    if (shouldBuildLongMarkers) markers.longStraightLines.push({ start, end });
   });
+
+  return markers;
 }
 
 function mergePointSets(...sets: Array<Set<number>>) {
@@ -1617,7 +1648,16 @@ function roundedClosedPath(points: Point[], longStraightLineMinLength: number): 
   const smoothAnchorPointSet = mergePointSets(concavityPointSet, straightAnchorPointSet);
   const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
   const concavityPointKeys = buildConcavityPointKeys(pathPoints, debugConcavityPointSet);
-  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, true, buildStraightRunLines(pathPoints, straightRuns));
+  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) {
+    const straightRunMarkers = buildStraightRunMarkers(pathPoints, straightRuns, true);
+    return buildPreSmoothingDebugPath(
+      pathPoints,
+      concavityPointKeys,
+      true,
+      straightRunMarkers.longStraightLines,
+      straightRunMarkers.connectedStraightLines,
+    );
+  }
   const smoothPath = buildClosedSmoothOpsBetweenConcavities(
     pathPoints,
     smoothAnchorPointSet,
@@ -1675,7 +1715,16 @@ function roundedOpenPath(points: Point[], longStraightLineMinLength: number, are
   const smoothAnchorPointSet = mergePointSets(concavityPointSet, straightAnchorPointSet);
   const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign }));
   const concavityPointKeys = buildConcavityPointKeys(pathPoints, debugConcavityPointSet);
-  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) return buildPreSmoothingDebugPath(pathPoints, concavityPointKeys, false, buildStraightRunLines(pathPoints, straightRuns));
+  if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) {
+    const straightRunMarkers = buildStraightRunMarkers(pathPoints, straightRuns, false);
+    return buildPreSmoothingDebugPath(
+      pathPoints,
+      concavityPointKeys,
+      false,
+      straightRunMarkers.longStraightLines,
+      straightRunMarkers.connectedStraightLines,
+    );
+  }
   const smoothPath = buildOpenSmoothOpsBetweenConcavities(
     pathPoints,
     smoothAnchorPointSet,

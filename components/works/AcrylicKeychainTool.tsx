@@ -66,7 +66,7 @@ const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
 const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
-const EXPORT_DEBUG_SVG = false;
+const EXPORT_DEBUG_SVG = true;
 
 function scaleArtworkMetric(value: number, artworkWidth: number, artworkHeight: number) {
   return value * (Math.max(artworkWidth, artworkHeight) / REFERENCE_ARTWORK_SIZE);

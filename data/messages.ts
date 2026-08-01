@@ -21,6 +21,14 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    publishedAt: '2026-08-01 23:00',
+    body: 'アクキー微調整終わった(T_T) まだ変なところあったら報告ください。',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     publishedAt: '2026-08-01 10:00',
     body: 'アクキーSVGを微調整してます。これが終わったらアクスタ対応もします。',
   },

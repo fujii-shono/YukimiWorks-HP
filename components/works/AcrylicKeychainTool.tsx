@@ -53,6 +53,7 @@ const REFERENCE_ARTWORK_SIZE = 500;
 const BASE_CLEAR_RADIUS = 10;
 const BASE_HIGHLIGHT_RADIUS = 1;
 const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
+const HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER = 1.18;
 const BASE_KEYCHAIN_HOLE_OUTER_RADIUS = 24;
 const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
 const BASE_KEYCHAIN_HOLE_GAP = 2;
@@ -66,7 +67,7 @@ const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
 const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
-const EXPORT_DEBUG_SVG = true;
+const EXPORT_DEBUG_SVG = false;
 
 function scaleArtworkMetric(value: number, artworkWidth: number, artworkHeight: number) {
   return value * (Math.max(artworkWidth, artworkHeight) / REFERENCE_ARTWORK_SIZE);
@@ -508,7 +509,7 @@ async function buildPreview(file: File, holeMode: HoleMode): Promise<PreviewStat
     filledBaseMask,
     maskWidth,
     maskHeight,
-    scaleMaskRadius(metrics.internalGapCloseRadius),
+    scaleMaskRadius(metrics.internalGapCloseRadius * HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER),
   );
   const keychainShape =
     holeMode === 'with-hole'
@@ -598,7 +599,7 @@ async function buildPreview(file: File, holeMode: HoleMode): Promise<PreviewStat
   edge.context.drawImage(edgeLow.canvas, 0, 0, width, height);
 
   const backLow = makeLayerFromMask(maskWidth, maskHeight, (index) =>
-    baseMask[index] ? BACK_FACE_MULTIPLY_COLOR : null,
+    gapClosedBaseMask[index] ? BACK_FACE_MULTIPLY_COLOR : null,
   );
   const back = makeLayerFromMask(width, height, () => null);
   back.context.imageSmoothingEnabled = true;

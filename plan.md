@@ -594,6 +594,13 @@
 - 内側点削除は、元の `pathPoints` に対して先に `detectConcavities(...)` を実行し、緑点として判定されたくぼみ中心点だけを削除する。短辺条件による別ロジック削除や反復削除は行わず、表示上の緑点と実際の削除対象を一致させる
 - 処理順は、元の `pathPoints` に対するくぼみ判定、緑点だけの削除、削除後 `pathPoints` に対する再くぼみ判定、緑点アンカーを使ったスムージングの順にする。くぼみ判定自体では赤点を追加削除しない
 - `DEBUG_OUTPUT_PRE_SMOOTHING_PATH` を `true` にすると、緑点削除と削除後くぼみ判定の直後、スムージング前の `pathPoints` をそのまま線で結んだ確認用SVGを出す
+- `DEBUG_OUTPUT_RAW_BASE_MASK_PATH` を `true` にすると、隙間埋め・穴追加後、`clearRadius` による最終アクリル余白の膨張前の `keychainMask` をそのまま外周ベクター化して返す。不要なアウトラインが発生する段階を切り分けるための確認用フラグとする
+- `DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH` を `true` にすると、`ENABLE_NARROW_EXIT_AREA_FILL` が実際に `filledBaseMask` へ追加する膨張済みパッチ領域だけを青く塗りつぶした確認用SVGとして返す。`false` の場合は青表示へ切り替えず、既存の最終カットパス生成へ進む
+- SVG出力APIでは `fillNarrowTransparentGaps` を使わず、通常経路では `filledBaseMask` をそのまま次工程へ渡す。`DEBUG_OUTPUT_NARROW_EXIT_AREA_MASK_PATH` と `DEBUG_OUTPUT_PRE_SMOOTHING_PATH` が `true` の場合は、スムージング前の確認用SVGに、`filledBaseMask` を膨張して狭い出口を仮に閉じたあと、穴埋めで `dilatedMask` から追加された大きな閉領域だけを青い補助パスとして重ねる
+- `ENABLE_NARROW_EXIT_AREA_FILL` を `true` にすると、青判定した閉領域をさらに膨張し、膨張後穴埋めマスク内に収まる範囲だけ `filledBaseMask` へ合成して、既存のパス生成を維持したまま以降のキーホール追加・最終余白生成に渡す
+- HTMLプレビュー側は軽さを優先し、従来の `fillNarrowTransparentGaps` を使用する
+- HTMLプレビュー側で小さな穴埋め残りが出る場合に備え、`fillNarrowTransparentGaps` の判定半径だけ `HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER` で広げる。複雑な領域判定は追加しない
+- HTMLプレビューの背面色レイヤーは、元の `baseMask` ではなく穴埋め済みの `gapClosedBaseMask` を使い、穴埋め後に広がった領域が白く抜けて見えないようにする
 - SVG出力APIは `debug` フラグで返却形式を切り替える。`debug: true` は現状の確認用SVGを返し、`debug: false` は背景や制御点を含まないピンクのカットパスだけのSVGと元PNGをZIPにまとめて返す
 - 最終出力の目視確認では制御点マーカーを非表示にし、アウトラインの線そのものだけを確認できる状態にする
 - 二重円の上半分と内側穴は境界追跡に頼らず、計算した中心・半径から正円として出力する

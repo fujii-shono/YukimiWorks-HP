@@ -2677,7 +2677,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
-  color: var(--site-text-muted);
+  color: #566783;
   text-align: center;
   border: 1px dashed color-mix(in srgb, var(--site-border) 65%, #ffffff);
 }

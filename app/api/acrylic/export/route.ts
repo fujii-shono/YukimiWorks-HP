@@ -66,6 +66,17 @@ type SvgPathResult = {
   controlPoints: DebugPoint[];
   longStraightLines: Array<{ start: Point; end: Point }>;
   connectedStraightLines: Array<{ start: Point; end: Point }>;
+  extraPaths?: Array<{
+    path: string;
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+  }>;
+  pathStyle?: {
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+  };
 };
 
 type PathOp =
@@ -140,7 +151,13 @@ const NORMAL_CONTROL_POINT_FILL = '#ff0000';
 const PARALLEL_LINE_MAX_ANGLE_DELTA = 8;
 const REMOVE_INNER_CONTROL_POINTS = true;
 const ENABLE_STRAIGHT_LINE_PROCESSING = true;
-const DEBUG_OUTPUT_PRE_SMOOTHING_PATH = true;
+const ENABLE_NARROW_EXIT_AREA_FILL = true;
+const DEBUG_OUTPUT_NARROW_EXIT_AREA_MASK_PATH = false;
+const DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH = false;
+const DEBUG_OUTPUT_RAW_BASE_MASK_PATH = false;
+const DEBUG_OUTPUT_PRE_SMOOTHING_PATH = false;
+const DEBUG_HOLE_FILL_TARGET_FILL = 'rgba(0, 102, 255, 0.72)';
+const DEBUG_HOLE_FILL_TARGET_STROKE = '#0066ff';
 const SHOW_CONTROL_POINT_MARKERS = false;
 const SHOW_LONG_STRAIGHT_LINE_MARKERS = false;
 const SHOW_CONNECTED_STRAIGHT_LINE_MARKERS = false;
@@ -153,8 +170,10 @@ function createPathResult(
   controlPoints: DebugPoint[] = [],
   longStraightLines: Array<{ start: Point; end: Point }> = [],
   connectedStraightLines: Array<{ start: Point; end: Point }> = [],
+  pathStyle?: SvgPathResult['pathStyle'],
+  extraPaths?: SvgPathResult['extraPaths'],
 ): SvgPathResult {
-  return { path, controlPoints, longStraightLines, connectedStraightLines };
+  return { path, controlPoints, longStraightLines, connectedStraightLines, extraPaths, pathStyle };
 }
 
 function lineToCommand(point: Point) {
@@ -766,6 +785,91 @@ function fillNarrowTransparentGaps(mask: Uint8Array, width: number, height: numb
   const output = mask.slice();
   for (let index = 0; index < width * height; index += 1) {
     if (patchMask[index] && closedMask[index]) output[index] = 1;
+  }
+  return output;
+}
+
+function detectNarrowExitTransparentAreas(mask: Uint8Array, width: number, height: number, radius: number) {
+  const closeRadius = Math.max(1, Math.round(radius));
+  const dilatedMask = dilateMask(mask, width, height, closeRadius);
+  const closedDilatedMask = fillEnclosedMaskHoles(dilatedMask, width, height);
+  const candidateMask = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (closedDilatedMask[index] && !dilatedMask[index]) candidateMask[index] = 1;
+  }
+
+  const detectedMask = new Uint8Array(width * height);
+  const visited = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  const component = new Int32Array(width * height);
+  const minimumInteriorArea = Math.max(32, Math.round(closeRadius * closeRadius * 1.5));
+  const minimumInteriorSpan = Math.max(4, Math.round(closeRadius * 1.5));
+
+  for (let start = 0; start < width * height; start += 1) {
+    if (!candidateMask[start] || visited[start]) continue;
+    let head = 0;
+    let tail = 0;
+    let count = 0;
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+    let touchesEdge = false;
+    visited[start] = 1;
+    queue[tail] = start;
+    tail += 1;
+
+    while (head < tail) {
+      const index = queue[head];
+      head += 1;
+      component[count] = index;
+      count += 1;
+      const x = index % width;
+      const y = Math.floor(index / width);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      if (x === 0 || x === width - 1 || y === 0 || y === height - 1) touchesEdge = true;
+      const neighbors = [x > 0 ? index - 1 : -1, x < width - 1 ? index + 1 : -1, y > 0 ? index - width : -1, y < height - 1 ? index + width : -1];
+      for (const next of neighbors) {
+        if (next < 0 || !candidateMask[next] || visited[next]) continue;
+        visited[next] = 1;
+        queue[tail] = next;
+        tail += 1;
+      }
+    }
+
+    const patchWidth = maxX - minX + 1;
+    const patchHeight = maxY - minY + 1;
+    const hasLargeInterior = count >= minimumInteriorArea && Math.max(patchWidth, patchHeight) >= minimumInteriorSpan;
+    if (touchesEdge || !hasLargeInterior) continue;
+    for (let index = 0; index < count; index += 1) {
+      detectedMask[component[index]] = 1;
+    }
+  }
+
+  return detectedMask;
+}
+
+function buildNarrowExitFillPatchMask(mask: Uint8Array, detectedMask: Uint8Array | null, width: number, height: number, radius: number) {
+  const output = new Uint8Array(width * height);
+  if (!detectedMask) return output;
+  const closeRadius = Math.max(1, Math.round(radius));
+  const dilatedMask = dilateMask(mask, width, height, closeRadius);
+  const closedDilatedMask = fillEnclosedMaskHoles(dilatedMask, width, height);
+  const patchMask = dilateMask(detectedMask, width, height, closeRadius);
+  for (let index = 0; index < width * height; index += 1) {
+    if (patchMask[index] && closedDilatedMask[index] && !mask[index]) output[index] = 1;
+  }
+  return output;
+}
+
+function fillNarrowExitTransparentAreas(mask: Uint8Array, patchMask: Uint8Array | null, width: number, height: number) {
+  if (!patchMask) return mask.slice();
+  const output = mask.slice();
+  for (let index = 0; index < width * height; index += 1) {
+    if (patchMask[index]) output[index] = 1;
   }
   return output;
 }
@@ -1952,6 +2056,22 @@ function circleToPath(circle: Circle): SvgPathResult {
   );
 }
 
+function rawBoundaryLoopsToPath(loops: Point[][], pathStyle?: SvgPathResult['pathStyle']): SvgPathResult {
+  return createPathResult(boundaryLoopsToPathData(loops), [], [], [], pathStyle);
+}
+
+function boundaryLoopsToPathData(loops: Point[][]) {
+  const commands = loops.flatMap((loop) => {
+    if (loop.length === 0) return [];
+    return [
+      `M ${formatSvgNumber(loop[0].x)} ${formatSvgNumber(loop[0].y)}`,
+      ...loop.slice(1).map(lineToCommand),
+      'Z',
+    ];
+  });
+  return commands.join(' ');
+}
+
 function buildServerCutPath(artwork: PngImage, holeMode: 'with-hole' | 'without-hole'): SvgPathResult {
   const baseMask = new Uint8Array(artwork.width * artwork.height);
   for (let index = 0; index < artwork.width * artwork.height; index += 1) {
@@ -1960,10 +2080,48 @@ function buildServerCutPath(artwork: PngImage, holeMode: 'with-hole' | 'without-
   const bounds = findMaskBounds(baseMask, artwork.width, artwork.height);
   const metrics = getAcrylicMetrics(bounds.width, bounds.height);
   const filledBaseMask = fillEnclosedMaskHoles(baseMask, artwork.width, artwork.height);
-  const gapClosedBaseMask = fillNarrowTransparentGaps(filledBaseMask, artwork.width, artwork.height, Math.max(1, Math.round(metrics.internalGapCloseRadius)));
+  const internalGapCloseRadius = Math.max(1, Math.round(metrics.internalGapCloseRadius));
+  const shouldDetectNarrowExitAreas = DEBUG_OUTPUT_NARROW_EXIT_AREA_MASK_PATH || DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH || ENABLE_NARROW_EXIT_AREA_FILL;
+  const narrowExitAreaMask = shouldDetectNarrowExitAreas
+    ? detectNarrowExitTransparentAreas(
+        filledBaseMask,
+        artwork.width,
+        artwork.height,
+        internalGapCloseRadius,
+      )
+    : null;
+  const narrowExitFillPatchMask = shouldDetectNarrowExitAreas
+    ? buildNarrowExitFillPatchMask(filledBaseMask, narrowExitAreaMask, artwork.width, artwork.height, internalGapCloseRadius)
+    : null;
+  const narrowExitDebugPath =
+    DEBUG_OUTPUT_NARROW_EXIT_AREA_MASK_PATH && narrowExitAreaMask && DEBUG_OUTPUT_PRE_SMOOTHING_PATH
+      ? boundaryLoopsToPathData(maskToBoundaryLoops(narrowExitAreaMask, artwork.width, artwork.height))
+      : '';
+  if (DEBUG_OUTPUT_NARROW_EXIT_AREA_MASK_PATH && narrowExitAreaMask && !DEBUG_OUTPUT_PRE_SMOOTHING_PATH) {
+    return rawBoundaryLoopsToPath(maskToBoundaryLoops(narrowExitAreaMask, artwork.width, artwork.height), {
+      fill: DEBUG_HOLE_FILL_TARGET_FILL,
+      stroke: DEBUG_HOLE_FILL_TARGET_STROKE,
+      strokeWidth: 0.5,
+    });
+  }
+  if (DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH && narrowExitFillPatchMask) {
+    return rawBoundaryLoopsToPath(maskToBoundaryLoops(narrowExitFillPatchMask, artwork.width, artwork.height), {
+      fill: DEBUG_HOLE_FILL_TARGET_FILL,
+      stroke: DEBUG_HOLE_FILL_TARGET_STROKE,
+      strokeWidth: 0.5,
+    });
+  }
+  const gapClosedBaseMask = ENABLE_NARROW_EXIT_AREA_FILL
+    ? fillNarrowExitTransparentAreas(filledBaseMask, narrowExitFillPatchMask, artwork.width, artwork.height)
+    : filledBaseMask;
   const keychainShape = holeMode === 'with-hole' ? addKeychainHoleToMask(gapClosedBaseMask, artwork.width, artwork.height, bounds.minX + bounds.width / 2, bounds.width, metrics) : null;
+  const keychainMask = keychainShape?.mask ?? gapClosedBaseMask;
+  if (DEBUG_OUTPUT_RAW_BASE_MASK_PATH && !DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH) {
+    return rawBoundaryLoopsToPath(maskToBoundaryLoops(keychainMask, artwork.width, artwork.height));
+  }
   const clearRadius = Math.max(1, Math.round(metrics.clearRadius));
-  const clearMask = fillEnclosedMaskHoles(dilateMask(keychainShape?.mask ?? gapClosedBaseMask, artwork.width, artwork.height, clearRadius), artwork.width, artwork.height);
+  const dilatedClearMask = dilateMask(keychainMask, artwork.width, artwork.height, clearRadius);
+  const clearMask = fillEnclosedMaskHoles(dilatedClearMask, artwork.width, artwork.height);
   const hole = keychainShape ? { ...keychainShape.hole } : null;
   if (hole) paintCircleOnMask(clearMask, artwork.width, artwork.height, hole.centerX, hole.centerY, hole.radius, 0);
 
@@ -1978,6 +2136,19 @@ function buildServerCutPath(artwork: PngImage, holeMode: 'with-hole' | 'without-
     controlPoints: pathResults.flatMap((result) => result.controlPoints),
     longStraightLines: pathResults.flatMap((result) => result.longStraightLines),
     connectedStraightLines: pathResults.flatMap((result) => result.connectedStraightLines),
+    extraPaths: [
+      ...(narrowExitDebugPath
+        ? [
+            {
+              path: narrowExitDebugPath,
+              fill: DEBUG_HOLE_FILL_TARGET_FILL,
+              stroke: DEBUG_HOLE_FILL_TARGET_STROKE,
+              strokeWidth: 0.5,
+            },
+          ]
+        : []),
+      ...pathResults.flatMap((result) => result.extraPaths ?? []),
+    ],
   };
 }
 
@@ -2012,11 +2183,23 @@ function buildSvg(fileName: string, width: number, height: number, artworkDataUr
   const controlPointMarkers = SHOW_CONTROL_POINT_MARKERS ? buildControlPointMarkers(cutPath.controlPoints) : '';
   const longStraightLineMarkers = SHOW_LONG_STRAIGHT_LINE_MARKERS ? buildLongStraightLineMarkers(cutPath.longStraightLines) : '';
   const connectedStraightLineMarkers = SHOW_CONNECTED_STRAIGHT_LINE_MARKERS ? buildConnectedStraightLineMarkers(cutPath.connectedStraightLines) : '';
+  const extraPaths = (cutPath.extraPaths ?? [])
+    .map((path) => {
+      const fill = path.fill ?? 'none';
+      const stroke = path.stroke ?? 'none';
+      const strokeWidth = path.strokeWidth ?? 1;
+      return `<path d="${path.path}" fill="${escapeXml(fill)}" fill-rule="evenodd" stroke="${escapeXml(stroke)}" stroke-width="${formatSvgNumber(strokeWidth)}" vector-effect="non-scaling-stroke"/>`;
+    })
+    .join('\n  ');
+  const pathFill = cutPath.pathStyle?.fill ?? 'rgba(179, 229, 252, 0.18)';
+  const pathStroke = cutPath.pathStyle?.stroke ?? '#ff2f7d';
+  const pathStrokeWidth = cutPath.pathStyle?.strokeWidth ?? 1;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(fileName)} acrylic keychain cut line">
   <title>${escapeXml(fileName)} acrylic keychain cut line</title>
   <image href="${escapeXml(artworkDataUrl)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="none"/>
-  <path d="${cutPath.path}" fill="rgba(179, 229, 252, 0.18)" fill-rule="evenodd" stroke="#ff2f7d" stroke-width="1" vector-effect="non-scaling-stroke"/>
+  ${extraPaths}
+  <path d="${cutPath.path}" fill="${escapeXml(pathFill)}" fill-rule="evenodd" stroke="${escapeXml(pathStroke)}" stroke-width="${formatSvgNumber(pathStrokeWidth)}" vector-effect="non-scaling-stroke"/>
   ${longStraightLineMarkers}
   ${connectedStraightLineMarkers}
   ${controlPointMarkers}

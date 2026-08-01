@@ -16,7 +16,15 @@ export type MessagePost = {
 };
 
 export const messagePosts: readonly MessagePost[] = [
-    {
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
+    publishedAt: '2026-08-01 10:00',
+    body: 'アクキーSVGを微調整してます。これが終わったらアクスタ対応もします。',
+  },
+  {
     icon: {
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',

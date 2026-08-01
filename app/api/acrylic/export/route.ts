@@ -117,7 +117,7 @@ const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
 const BASE_KEYCHAIN_HOLE_GAP = 2;
 const CONTROL_POINT_RADIUS = 0.9;
 const CONTROL_POINT_STROKE_WIDTH = 0.2;
-const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 10;
+const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 7;
 const OUTER_CORNER_ROUND_MIN_ANGLE = 1;
 const OUTER_CORNER_ROUND_MAX_ANGLE = 179;
 const OUTER_CORNER_ROUND_MAX_TRIM = 18;
@@ -134,15 +134,16 @@ const CONNECTED_STRAIGHT_LINE_STROKE = '#ffd400';
 const CONNECTED_STRAIGHT_LINE_MAX_GAP = 4;
 const BASE_STRAIGHT_ADJACENT_CONTROL_MAX_GAP = 8;
 const STRAIGHT_OFF_DIRECTION_CONTROL_MIN_ANGLE = 8;
+const STRAIGHT_TO_CONCAVITY_STEEP_MIN_ANGLE = 28;
 const GREEN_POINT_FILL = '#00a651';
 const NORMAL_CONTROL_POINT_FILL = '#ff0000';
 const PARALLEL_LINE_MAX_ANGLE_DELTA = 8;
 const REMOVE_INNER_CONTROL_POINTS = true;
 const ENABLE_STRAIGHT_LINE_PROCESSING = true;
 const DEBUG_OUTPUT_PRE_SMOOTHING_PATH = true;
-const SHOW_CONTROL_POINT_MARKERS = true;
+const SHOW_CONTROL_POINT_MARKERS = false;
 const SHOW_LONG_STRAIGHT_LINE_MARKERS = false;
-const SHOW_CONNECTED_STRAIGHT_LINE_MARKERS = true;
+const SHOW_CONNECTED_STRAIGHT_LINE_MARKERS = false;
 const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ZIP_CENTRAL_DIRECTORY_HEADER_SIGNATURE = 0x02014b50;
 const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
@@ -1235,6 +1236,110 @@ function collectLongStraightPointRuns(points: Point[], minLength: number, tolera
   return runs;
 }
 
+function nextIndexInDirection(index: number, step: 1 | -1, pointCount: number, closed: boolean) {
+  const nextIndex = index + step;
+  if (closed) return (nextIndex + pointCount) % pointCount;
+  if (nextIndex < 0 || nextIndex >= pointCount) return undefined;
+  return nextIndex;
+}
+
+function findNextConcavityPointIndex(
+  startIndex: number,
+  step: 1 | -1,
+  pointCount: number,
+  concavityPointSet: Set<number>,
+  closed: boolean,
+) {
+  let index = startIndex;
+  for (let guard = 0; guard < pointCount - 1; guard += 1) {
+    const nextIndex = nextIndexInDirection(index, step, pointCount, closed);
+    if (nextIndex === undefined) return undefined;
+    if (concavityPointSet.has(nextIndex)) return nextIndex;
+    index = nextIndex;
+  }
+  return undefined;
+}
+
+function maxAngleFromStraightToConcavity(
+  points: Point[],
+  endpointIndex: number,
+  concavityIndex: number,
+  step: 1 | -1,
+  straightDirection: number,
+  closed: boolean,
+) {
+  let maxAngle = 0;
+  let previousIndex = endpointIndex;
+  let currentIndex = endpointIndex;
+
+  for (let guard = 0; guard < points.length - 1; guard += 1) {
+    const nextIndex = nextIndexInDirection(currentIndex, step, points.length, closed);
+    if (nextIndex === undefined) break;
+    const previous = points[previousIndex];
+    const next = points[nextIndex];
+    if (previous && next && distance(previous, next) > 0.001) {
+      maxAngle = Math.max(maxAngle, angleDelta(straightDirection, lineAngle(previous, next)));
+      previousIndex = nextIndex;
+    }
+    currentIndex = nextIndex;
+    if (currentIndex === concavityIndex) break;
+  }
+
+  const endpoint = points[endpointIndex];
+  const concavity = points[concavityIndex];
+  if (endpoint && concavity && distance(endpoint, concavity) > 0.001) {
+    maxAngle = Math.max(maxAngle, angleDelta(straightDirection, lineAngle(endpoint, concavity)));
+  }
+
+  return maxAngle;
+}
+
+function straightRunSideAngleToConcavity(
+  points: Point[],
+  run: StraightPointRun,
+  side: 'start' | 'end',
+  concavityPointSet: Set<number>,
+  closed: boolean,
+) {
+  const endpointIndex = side === 'start' ? run.startIndex : run.endIndex;
+  const otherEndpointIndex = side === 'start' ? run.endIndex : run.startIndex;
+  const step: 1 | -1 = side === 'start' ? -1 : 1;
+  const concavityIndex = findNextConcavityPointIndex(endpointIndex, step, points.length, concavityPointSet, closed);
+  const endpoint = points[endpointIndex];
+  const otherEndpoint = points[otherEndpointIndex];
+  if (concavityIndex === undefined || !endpoint || !otherEndpoint) return undefined;
+
+  const straightDirection = lineAngle(otherEndpoint, endpoint);
+  return maxAngleFromStraightToConcavity(points, endpointIndex, concavityIndex, step, straightDirection, closed);
+}
+
+function shouldKeepStraightRunByConcavityMotion(
+  points: Point[],
+  run: StraightPointRun,
+  concavityPointSet: Set<number>,
+  closed: boolean,
+) {
+  if (concavityPointSet.has(run.startIndex) || concavityPointSet.has(run.endIndex)) return true;
+
+  const startSideAngle = straightRunSideAngleToConcavity(points, run, 'start', concavityPointSet, closed);
+  const endSideAngle = straightRunSideAngleToConcavity(points, run, 'end', concavityPointSet, closed);
+  if (startSideAngle === undefined || endSideAngle === undefined) return true;
+
+  return (
+    startSideAngle >= STRAIGHT_TO_CONCAVITY_STEEP_MIN_ANGLE &&
+    endSideAngle >= STRAIGHT_TO_CONCAVITY_STEEP_MIN_ANGLE
+  );
+}
+
+function filterStraightRunsByConcavityMotion(
+  points: Point[],
+  straightRuns: StraightPointRun[],
+  concavityPointSet: Set<number>,
+  closed: boolean,
+) {
+  return straightRuns.filter((run) => shouldKeepStraightRunByConcavityMotion(points, run, concavityPointSet, closed));
+}
+
 function buildStraightProtectedPointKeys(points: Point[], straightRuns: StraightPointRun[]) {
   const keys = new Set<string>();
   straightRuns.forEach((run) => {
@@ -1641,12 +1746,17 @@ function roundedClosedPath(points: Point[], longStraightLineMinLength: number): 
   const rawProtectedPointKeys = buildStraightProtectedPointKeys(points, rawStraightRuns);
   const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: true, protectedPointKeys: rawProtectedPointKeys }));
   const pathPoints = removeConcavityControlPoints(points, rawConcavityPointSet, true);
-  const straightRuns = collectLongStraightPointRuns(pathPoints, longStraightLineMinLength, tolerance);
+  const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
+  const straightRuns = filterStraightRunsByConcavityMotion(
+    pathPoints,
+    collectLongStraightPointRuns(pathPoints, longStraightLineMinLength, tolerance),
+    debugConcavityPointSet,
+    true,
+  );
   const protectedPointKeys = buildStraightProtectedPointKeys(pathPoints, straightRuns);
   const straightAnchorPointSet = buildStraightAnchorPointSet(straightRuns);
   const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true, protectedPointKeys }));
   const smoothAnchorPointSet = mergePointSets(concavityPointSet, straightAnchorPointSet);
-  const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
   const concavityPointKeys = buildConcavityPointKeys(pathPoints, debugConcavityPointSet);
   if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) {
     const straightRunMarkers = buildStraightRunMarkers(pathPoints, straightRuns, true);
@@ -1708,12 +1818,17 @@ function roundedOpenPath(points: Point[], longStraightLineMinLength: number, are
   const rawProtectedPointKeys = buildStraightProtectedPointKeys(points, rawStraightRuns);
   const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: false, areaSign, protectedPointKeys: rawProtectedPointKeys }));
   const pathPoints = removeConcavityControlPoints(points, rawConcavityPointSet, false);
-  const straightRuns = collectLongStraightPointRuns(pathPoints, longStraightLineMinLength, tolerance);
+  const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign }));
+  const straightRuns = filterStraightRunsByConcavityMotion(
+    pathPoints,
+    collectLongStraightPointRuns(pathPoints, longStraightLineMinLength, tolerance),
+    debugConcavityPointSet,
+    false,
+  );
   const protectedPointKeys = buildStraightProtectedPointKeys(pathPoints, straightRuns);
   const straightAnchorPointSet = buildStraightAnchorPointSet(straightRuns);
   const concavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign, protectedPointKeys }));
   const smoothAnchorPointSet = mergePointSets(concavityPointSet, straightAnchorPointSet);
-  const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: false, areaSign }));
   const concavityPointKeys = buildConcavityPointKeys(pathPoints, debugConcavityPointSet);
   if (DEBUG_OUTPUT_PRE_SMOOTHING_PATH) {
     const straightRunMarkers = buildStraightRunMarkers(pathPoints, straightRuns, false);

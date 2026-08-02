@@ -9,9 +9,20 @@ type PreviewState = {
   artworkSrc: string;
   originalArtworkSrc: string;
   backSrc: string;
+  highlightSrc: string;
+  standBaseSrc: string;
+  standBaseFrame: {
+    x: number;
+    y: number;
+    contactY: number;
+    width: number;
+    height: number;
+    depthOffset: number;
+  } | null;
   width: number;
   height: number;
   fileName: string;
+  productMode: ProductMode;
 };
 
 type PreviewRotation = {
@@ -20,23 +31,28 @@ type PreviewRotation = {
 
 type RotationVelocity = PreviewRotation;
 
+type ProductMode = 'keychain' | 'stand';
+
 type HoleMode = 'with-hole' | 'without-hole';
 
-type PreviewCache = Partial<Record<HoleMode, PreviewState>>;
+type StandMode = 'simple' | 'stable';
 
-type AcrylicMetrics = {
-  clearRadius: number;
-  highlightRadius: number;
-  internalGapCloseRadius: number;
-  holeOuterRadius: number;
-  holeInnerRadius: number;
-  holeGap: number;
-  paddingSpace: number;
-  edgeShadowWidth: number;
-  innerShineWidth: number;
+type ShapeMode = HoleMode | StandMode;
+
+type PreviewCacheKey = `${ProductMode}:${ShapeMode}`;
+
+type PreviewCache = Partial<Record<PreviewCacheKey, PreviewState>>;
+
+type PreviewStageSize = {
+  width: number;
+  height: number;
 };
 
-const MAX_IMAGE_SIZE = 820;
+type StandPreviewStyles = {
+  base: CSSProperties;
+  circle: CSSProperties;
+};
+
 const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
 const PREVIEW_STAGE_WIDTH = 960;
 const PREVIEW_STAGE_HEIGHT = 620;
@@ -46,279 +62,100 @@ const PREVIEW_ARTWORK_MAX_WIDTH_RATIO = 0.98;
 const PREVIEW_ARTWORK_MAX_HEIGHT_RATIO = 0.98;
 const MOBILE_PREVIEW_ARTWORK_MAX_WIDTH_RATIO = 0.98;
 const MOBILE_PREVIEW_ARTWORK_MAX_HEIGHT_RATIO = 0.98;
-const MASK_RENDER_SCALE = 0.5;
 const ROTATION_MIN_SPEED = 0.015;
 const HIGHLIGHT_VISIBLE_START = 0.78;
-const REFERENCE_ARTWORK_SIZE = 500;
-const BASE_CLEAR_RADIUS = 10;
-const BASE_HIGHLIGHT_RADIUS = 1;
-const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
-const HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER = 1.18;
-const BASE_KEYCHAIN_HOLE_OUTER_RADIUS = 24;
-const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
-const BASE_KEYCHAIN_HOLE_GAP = 2;
-const BASE_PADDING_SPACE = 20;
-const ARTWORK_MULTIPLY_COLOR = 'rgb(242, 241, 241)';
-const BASE_EDGE_SHADOW_WIDTH = 4;
-const BASE_INNER_SHINE_WIDTH = 2;
 const SURFACE_GLOSS_OPACITY = 0.46;
-const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124, 58];
-const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
-const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
-const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
-const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
 const EXPORT_DEBUG_SVG = false;
+const ACRYLIC_PREVIEW_FRONT_Z = 6;
+const ACRYLIC_PREVIEW_BACK_Z = -4;
+const STAND_CIRCLE_DEPTH_PX = ACRYLIC_PREVIEW_FRONT_Z - ACRYLIC_PREVIEW_BACK_Z;
+const SHOW_STAND_BASE_SVG = false;
+const STAND_BASE_SVG_VIEW_WIDTH = 1000;
+const STAND_BASE_SVG_VIEW_HEIGHT = 300;
+const STAND_BASE_SVG_VIEW_BOX = `0 0 ${STAND_BASE_SVG_VIEW_WIDTH} ${STAND_BASE_SVG_VIEW_HEIGHT}`;
+const STAND_BASE_SVG_LEFT = 34;
+const STAND_BASE_SVG_RIGHT = 966;
+const STAND_BASE_SVG_TOP_CENTER_Y = 118;
+const STAND_BASE_SVG_TOP_HEIGHT = 130;
+const STAND_BASE_SVG_SAMPLE_COUNT = 48;
+const STAND_BASE_SVG_TILT_DEGREES = 78;
+const STAND_BASE_SVG_PERSPECTIVE = 2200;
+const STAND_BASE_SVG_THICKNESS_Y = 26;
+const STAND_BASE_SIDE_HIGHLIGHT_X = 34;
+const STAND_BASE_SIDE_HIGHLIGHT_WIDTH = 40;
 
-function scaleArtworkMetric(value: number, artworkWidth: number, artworkHeight: number) {
-  return value * (Math.max(artworkWidth, artworkHeight) / REFERENCE_ARTWORK_SIZE);
+type SvgPoint = {
+  x: number;
+  y: number;
+};
+
+function formatSvgNumber(value: number) {
+  return Number(value.toFixed(2));
 }
 
-function getAcrylicMetrics(artworkWidth: number, artworkHeight: number): AcrylicMetrics {
-  return {
-    clearRadius: scaleArtworkMetric(BASE_CLEAR_RADIUS, artworkWidth, artworkHeight),
-    highlightRadius: scaleArtworkMetric(BASE_HIGHLIGHT_RADIUS, artworkWidth, artworkHeight),
-    internalGapCloseRadius: scaleArtworkMetric(BASE_INTERNAL_GAP_CLOSE_RADIUS, artworkWidth, artworkHeight),
-    holeOuterRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_OUTER_RADIUS, artworkWidth, artworkHeight),
-    holeInnerRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_INNER_RADIUS, artworkWidth, artworkHeight),
-    holeGap: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_GAP, artworkWidth, artworkHeight),
-    paddingSpace: scaleArtworkMetric(BASE_PADDING_SPACE, artworkWidth, artworkHeight),
-    edgeShadowWidth: scaleArtworkMetric(BASE_EDGE_SHADOW_WIDTH, artworkWidth, artworkHeight),
-    innerShineWidth: scaleArtworkMetric(BASE_INNER_SHINE_WIDTH, artworkWidth, artworkHeight),
-  };
+function pointsToSvgPath(points: SvgPoint[], close = false) {
+  const [firstPoint, ...restPoints] = points;
+  const commands = [`M ${formatSvgNumber(firstPoint.x)} ${formatSvgNumber(firstPoint.y)}`];
+  for (const point of restPoints) {
+    commands.push(`L ${formatSvgNumber(point.x)} ${formatSvgNumber(point.y)}`);
+  }
+  if (close) commands.push('Z');
+  return commands.join(' ');
 }
 
-function createCircleOffsets(radius: number) {
-  const offsets: Array<[number, number]> = [];
-  const squaredRadius = radius * radius;
-  for (let y = -radius; y <= radius; y += 1) {
-    for (let x = -radius; x <= radius; x += 1) {
-      if (x * x + y * y <= squaredRadius) offsets.push([x, y]);
-    }
-  }
-  return offsets;
+function offsetSvgPoints(points: SvgPoint[], offsetY: number) {
+  return points.map((point) => ({ x: point.x, y: point.y + offsetY }));
 }
 
-async function dilateMask(mask: Uint8Array, width: number, height: number, radius: number) {
-  const output = new Uint8Array(width * height);
-  const offsets = createCircleOffsets(radius);
+function createStandBaseSvgGeometry() {
+  const radius = 1;
+  const tilt = (STAND_BASE_SVG_TILT_DEGREES * Math.PI) / 180;
+  const projectedPoints: SvgPoint[] = [];
 
-  for (let index = 0; index < width * height; index += 1) {
-    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
-    if (!mask[index]) continue;
-    const sourceX = index % width;
-    const sourceY = Math.floor(index / width);
-    for (const [offsetX, offsetY] of offsets) {
-      const x = sourceX + offsetX;
-      const y = sourceY + offsetY;
-      if (x < 0 || x >= width || y < 0 || y >= height) continue;
-      output[y * width + x] = 1;
-    }
+  for (let index = 0; index < STAND_BASE_SVG_SAMPLE_COUNT; index += 1) {
+    const angle = (index / STAND_BASE_SVG_SAMPLE_COUNT) * Math.PI * 2;
+    const circleX = Math.cos(angle) * radius;
+    const circleY = Math.sin(angle) * radius;
+    const rotatedY = circleY * Math.cos(tilt);
+    const rotatedZ = circleY * Math.sin(tilt);
+    const perspectiveScale = STAND_BASE_SVG_PERSPECTIVE / (STAND_BASE_SVG_PERSPECTIVE - rotatedZ);
+    projectedPoints.push({
+      x: circleX * perspectiveScale,
+      y: rotatedY * perspectiveScale,
+    });
   }
 
-  return output;
-}
+  const minX = Math.min(...projectedPoints.map((point) => point.x));
+  const maxX = Math.max(...projectedPoints.map((point) => point.x));
+  const minY = Math.min(...projectedPoints.map((point) => point.y));
+  const maxY = Math.max(...projectedPoints.map((point) => point.y));
+  const centerY = STAND_BASE_SVG_TOP_CENTER_Y;
+  const topY = centerY - STAND_BASE_SVG_TOP_HEIGHT / 2;
+  const widthScale = (STAND_BASE_SVG_RIGHT - STAND_BASE_SVG_LEFT) / (maxX - minX);
+  const heightScale = STAND_BASE_SVG_TOP_HEIGHT / (maxY - minY);
 
-async function fillEnclosedMaskHoles(mask: Uint8Array, width: number, height: number) {
-  const visited = new Uint8Array(width * height);
-  const queue = new Int32Array(width * height);
-  let head = 0;
-  let tail = 0;
-
-  const pushTransparentEdge = (x: number, y: number) => {
-    const index = y * width + x;
-    if (mask[index] || visited[index]) return;
-    visited[index] = 1;
-    queue[tail] = index;
-    tail += 1;
-  };
-
-  for (let x = 0; x < width; x += 1) {
-    pushTransparentEdge(x, 0);
-    pushTransparentEdge(x, height - 1);
-  }
-  for (let y = 0; y < height; y += 1) {
-    pushTransparentEdge(0, y);
-    pushTransparentEdge(width - 1, y);
-  }
-
-  while (head < tail) {
-    if (head > 0 && head % 12000 === 0) await waitForNextFrame();
-    const index = queue[head];
-    head += 1;
-    const x = index % width;
-    const y = Math.floor(index / width);
-    const neighbors = [
-      x > 0 ? index - 1 : -1,
-      x < width - 1 ? index + 1 : -1,
-      y > 0 ? index - width : -1,
-      y < height - 1 ? index + width : -1,
-    ];
-
-    for (const nextIndex of neighbors) {
-      if (nextIndex < 0 || mask[nextIndex] || visited[nextIndex]) continue;
-      visited[nextIndex] = 1;
-      queue[tail] = nextIndex;
-      tail += 1;
-    }
-  }
-
-  const output = mask.slice();
-  for (let index = 0; index < width * height; index += 1) {
-    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
-    if (!output[index] && !visited[index]) output[index] = 1;
-  }
-
-  return output;
-}
-
-async function fillNarrowTransparentGaps(mask: Uint8Array, width: number, height: number, radius: number) {
-  if (radius <= 0) return mask.slice();
-
-  const expandedMask = await dilateMask(mask, width, height, radius);
-  const closedMask = await fillEnclosedMaskHoles(expandedMask, width, height);
-  const closedTransparentAreas = new Uint8Array(width * height);
-
-  for (let index = 0; index < width * height; index += 1) {
-    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
-    if (closedMask[index] && !expandedMask[index]) closedTransparentAreas[index] = 1;
-  }
-
-  const patchMask = await dilateMask(closedTransparentAreas, width, height, radius);
-  const output = mask.slice();
-  for (let index = 0; index < width * height; index += 1) {
-    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
-    if (patchMask[index] && closedMask[index]) output[index] = 1;
-  }
-
-  return output;
-}
-
-function paintCircleOnMask(mask: Uint8Array, width: number, height: number, centerX: number, centerY: number, radius: number, value: 0 | 1) {
-  const squaredRadius = radius * radius;
-  for (let y = centerY - radius; y <= centerY + radius; y += 1) {
-    if (y < 0 || y >= height) continue;
-    for (let x = centerX - radius; x <= centerX + radius; x += 1) {
-      if (x < 0 || x >= width) continue;
-      const offsetX = x - centerX;
-      const offsetY = y - centerY;
-      if (offsetX * offsetX + offsetY * offsetY > squaredRadius) continue;
-      mask[y * width + x] = value;
-    }
-  }
-}
-
-function paintSplitBottomConnectorOnMask(
-  mask: Uint8Array,
-  width: number,
-  height: number,
-  left: number,
-  right: number,
-  top: number,
-  leftBottom: number,
-  rightBottom: number,
-) {
-  const minX = Math.max(0, Math.min(left, right));
-  const maxX = Math.min(width - 1, Math.max(left, right));
-  const topY = Math.max(0, top);
-  const span = Math.max(1, maxX - minX);
-
-  for (let x = minX; x <= maxX; x += 1) {
-    const progress = (x - minX) / span;
-    const bottomY = Math.min(height - 1, Math.round(leftBottom + (rightBottom - leftBottom) * progress));
-    for (let y = topY; y <= bottomY; y += 1) {
-      mask[y * width + x] = 1;
-    }
-  }
-}
-
-function findTopMaskYNearX(mask: Uint8Array, width: number, height: number, centerX: number, halfWidth: number) {
-  const minX = Math.max(0, centerX - halfWidth);
-  const maxX = Math.min(width - 1, centerX + halfWidth);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = minX; x <= maxX; x += 1) {
-      if (mask[y * width + x]) return y;
-    }
-  }
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (mask[y * width + x]) return y;
-    }
-  }
-
-  return 0;
-}
-
-function findConnectorEdgeContactY(mask: Uint8Array, width: number, height: number, x: number, radius: number, startY: number) {
-  const minX = Math.max(0, x - radius);
-  const maxX = Math.min(width - 1, x + radius);
-  const top = Math.max(0, startY);
-
-  for (let y = top; y < height; y += 1) {
-    for (let x = minX; x <= maxX; x += 1) {
-      if (mask[y * width + x]) return y;
-    }
-  }
-
-  return null;
-}
-
-function addKeychainHoleToMask(
-  mask: Uint8Array,
-  width: number,
-  height: number,
-  artworkCenterX: number,
-  artworkWidth: number,
-  metrics: AcrylicMetrics,
-) {
-  const loopMask = mask.slice();
-  const centerX = Math.round(artworkCenterX * MASK_RENDER_SCALE);
-  const centerBandHalfWidth = Math.max(3, Math.round(artworkWidth * 0.16 * MASK_RENDER_SCALE));
-  const artworkTopY = findTopMaskYNearX(loopMask, width, height, centerX, centerBandHalfWidth);
-  const outerRadius = scaleMaskRadius(metrics.holeOuterRadius);
-  const innerRadius = scaleMaskRadius(metrics.holeInnerRadius);
-  const clearRadius = scaleMaskRadius(metrics.clearRadius);
-  const gap = Math.round(metrics.holeGap * MASK_RENDER_SCALE);
-  const clearTopY = Math.max(0, artworkTopY - clearRadius);
-  const centerY = Math.max(outerRadius + 1, clearTopY - innerRadius - gap);
-  const connectorLeft = centerX - outerRadius;
-  const connectorRight = centerX + outerRadius;
-  const edgeProbeRadius = Math.max(1, Math.round(clearRadius * 0.35));
-  const probeStartY = centerY + outerRadius + 1;
-  const leftContactY = findConnectorEdgeContactY(loopMask, width, height, connectorLeft, edgeProbeRadius, probeStartY) ?? artworkTopY;
-  const rightContactY = findConnectorEdgeContactY(loopMask, width, height, connectorRight, edgeProbeRadius, probeStartY) ?? artworkTopY;
-  const leftConnectorEndY = Math.min(height - 1, leftContactY + clearRadius);
-  const rightConnectorEndY = Math.min(height - 1, rightContactY + clearRadius);
-
-  paintCircleOnMask(loopMask, width, height, centerX, centerY, outerRadius, 1);
-  paintSplitBottomConnectorOnMask(loopMask, width, height, connectorLeft, connectorRight, centerY, leftConnectorEndY, rightConnectorEndY);
-  paintCircleOnMask(loopMask, width, height, centerX, centerY, innerRadius, 0);
+  const topPoints = projectedPoints.map((point) => ({
+    x: STAND_BASE_SVG_LEFT + (point.x - minX) * widthScale,
+    y: topY + (point.y - minY) * heightScale,
+  }));
+  const bottomPoints = offsetSvgPoints(topPoints, STAND_BASE_SVG_THICKNESS_Y);
+  const lowerTopPoints = topPoints.slice(0, STAND_BASE_SVG_SAMPLE_COUNT / 2 + 1);
+  const lowerBottomPoints = bottomPoints.slice(0, STAND_BASE_SVG_SAMPLE_COUNT / 2 + 1).reverse();
+  const rightPoint = topPoints[0];
+  const leftPoint = topPoints[STAND_BASE_SVG_SAMPLE_COUNT / 2];
+  const bottomRightPoint = bottomPoints[0];
+  const bottomLeftPoint = bottomPoints[STAND_BASE_SVG_SAMPLE_COUNT / 2];
 
   return {
-    mask: loopMask,
-    hole: {
-      centerX,
-      centerY,
-      radius: innerRadius,
-    },
+    topPath: pointsToSvgPath(topPoints, true),
+    bottomPath: pointsToSvgPath(bottomPoints, true),
+    sideFillPath: pointsToSvgPath([...lowerTopPoints, ...lowerBottomPoints], true),
+    sideLeftPath: pointsToSvgPath([leftPoint, bottomLeftPoint]),
+    sideRightPath: pointsToSvgPath([rightPoint, bottomRightPoint]),
   };
 }
 
-function drawMaskLayer(
-  context: CanvasRenderingContext2D,
-  mask: Uint8Array,
-  width: number,
-  height: number,
-  color: [number, number, number, number],
-  filter = 'none',
-  offset = { x: 0, y: 0 },
-) {
-  const { canvas } = makeLayerFromMask(width, height, (index) => (mask[index] ? color : null));
-  context.save();
-  context.filter = filter;
-  context.drawImage(canvas, offset.x, offset.y);
-  context.restore();
-}
+const STAND_BASE_SVG_GEOMETRY = createStandBaseSvgGeometry();
 
 function drawImageSource(context: CanvasRenderingContext2D, src: string) {
   return new Promise<void>((resolve, reject) => {
@@ -331,6 +168,26 @@ function drawImageSource(context: CanvasRenderingContext2D, src: string) {
     image.onerror = () => reject(new Error('プレビュー画像を描画できませんでした'));
     image.src = src;
   });
+}
+
+function findCanvasAlphaBounds(context: CanvasRenderingContext2D, width: number, height: number) {
+  const pixels = context.getImageData(0, 0, width, height).data;
+  let minX = width;
+  let maxX = -1;
+  let minY = height;
+  let maxY = -1;
+
+  for (let index = 0; index < width * height; index += 1) {
+    if (pixels[index * 4 + 3] <= 0) continue;
+    const x = index % width;
+    const y = Math.floor(index / width);
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+
+  return maxX >= 0 ? { minX, maxX, minY, maxY } : null;
 }
 
 function waitForNextFrame() {
@@ -352,6 +209,10 @@ function downloadBlob(blob: Blob, fileName: string) {
 
 function getExportFileBaseName(fileName: string) {
   return fileName.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'acrylic-keychain';
+}
+
+function getPreviewCacheKey(productMode: ProductMode, shapeMode: ShapeMode): PreviewCacheKey {
+  return `${productMode}:${shapeMode}`;
 }
 
 function getPreviewArtworkRatios() {
@@ -380,8 +241,39 @@ function getPreviewStageSize() {
   };
 }
 
-function scaleMaskRadius(radius: number) {
-  return Math.max(1, Math.round(radius * MASK_RENDER_SCALE));
+function createStandPreviewStyles(preview: PreviewState, stage: PreviewStageSize, contactYOverride?: number): StandPreviewStyles | null {
+  if (preview.productMode !== 'stand' || !preview.standBaseFrame) return null;
+
+  const ratios = getPreviewArtworkRatios();
+  const scale = Math.min(
+    (stage.width * ratios.width) / preview.width,
+    (stage.height * ratios.height) / preview.height,
+  );
+  const drawWidth = preview.width * scale;
+  const drawHeight = preview.height * scale;
+  const drawX = (stage.width - drawWidth) / 2;
+  const drawY = (stage.height - drawHeight) / 2;
+  const frame = preview.standBaseFrame;
+  const contactY = contactYOverride ?? drawY + frame.contactY * scale;
+  const standWidth = frame.width * scale;
+  const standHeight = frame.height * scale;
+  const displayHeight = Math.max(1, standHeight * (STAND_BASE_SVG_VIEW_HEIGHT / STAND_BASE_SVG_TOP_HEIGHT));
+  const top = (contactY - displayHeight * (STAND_BASE_SVG_TOP_CENTER_Y / STAND_BASE_SVG_VIEW_HEIGHT)) / stage.height;
+
+  return {
+    base: {
+      '--stand-base-left': `${((drawX + frame.x * scale) / stage.width) * 100}%`,
+      '--stand-base-top': `${top * 100}%`,
+      '--stand-base-width': `${(standWidth / stage.width) * 100}%`,
+      '--stand-base-height': `${(displayHeight / stage.height) * 100}%`,
+    } as CSSProperties,
+    circle: {
+      '--stand-circle-left': `${((drawX + frame.x * scale) / stage.width) * 100}%`,
+      '--stand-circle-top': `${((contactY - standWidth / 2) / stage.height) * 100}%`,
+      '--stand-circle-size': `${(standWidth / stage.width) * 100}%`,
+      '--stand-circle-depth': `${STAND_CIRCLE_DEPTH_PX}px`,
+    } as CSSProperties,
+  };
 }
 
 function wait(ms: number) {
@@ -390,46 +282,16 @@ function wait(ms: number) {
   });
 }
 
-function makeLayerFromMask(
-  width: number,
-  height: number,
-  paint: (index: number) => [number, number, number, number] | null,
-) {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('Canvasを初期化できませんでした');
-
-  const imageData = context.createImageData(width, height);
-  for (let index = 0; index < width * height; index += 1) {
-    const color = paint(index);
-    if (!color) continue;
-    const offset = index * 4;
-    imageData.data[offset] = color[0];
-    imageData.data[offset + 1] = color[1];
-    imageData.data[offset + 2] = color[2];
-    imageData.data[offset + 3] = color[3];
-  }
-  context.putImageData(imageData, 0, 0);
-  return { canvas, context };
-}
-
-async function fileToImage(file: File) {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
+async function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(new Error('PNGを読み込めませんでした'));
     reader.readAsDataURL(file);
   });
-  const image = new Image();
-  image.decoding = 'async';
-  image.src = dataUrl;
-  await image.decode();
-  return image;
 }
 
-async function buildPreview(file: File, holeMode: HoleMode): Promise<PreviewState> {
+async function buildPreview(file: File, productMode: ProductMode, shapeMode: ShapeMode): Promise<PreviewState> {
   if (file.type !== 'image/png') {
     throw new Error('PNGファイルを選択してください');
   }
@@ -437,207 +299,25 @@ async function buildPreview(file: File, holeMode: HoleMode): Promise<PreviewStat
     throw new Error('3MB以下のPNGファイルを選択してください');
   }
 
-  const image = await fileToImage(file);
-  const scale = Math.min(1, MAX_IMAGE_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
-  const imageWidth = Math.max(1, Math.round(image.naturalWidth * scale));
-  const imageHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+  const response = await fetch('/api/acrylic/preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fileName: file.name,
+      imageDataUrl: await fileToDataUrl(file),
+      productMode,
+      shapeMode,
+    }),
+  });
 
-  const sourceCanvas = document.createElement('canvas');
-  sourceCanvas.width = imageWidth;
-  sourceCanvas.height = imageHeight;
-  const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
-  if (!sourceContext) throw new Error('PNGを解析できませんでした');
-  sourceContext.drawImage(image, 0, 0, imageWidth, imageHeight);
-
-  const sourcePixels = sourceContext.getImageData(0, 0, imageWidth, imageHeight).data;
-  let sourceMinX = imageWidth;
-  let sourceMaxX = 0;
-  let sourceMinY = imageHeight;
-  let sourceMaxY = 0;
-
-  for (let index = 0; index < imageWidth * imageHeight; index += 1) {
-    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
-    if (sourcePixels[index * 4 + 3] <= 8) continue;
-    const x = index % imageWidth;
-    const y = Math.floor(index / imageWidth);
-    sourceMinX = Math.min(sourceMinX, x);
-    sourceMaxX = Math.max(sourceMaxX, x);
-    sourceMinY = Math.min(sourceMinY, y);
-    sourceMaxY = Math.max(sourceMaxY, y);
+  const data = (await response.json().catch(() => null)) as (PreviewState & { error?: string }) | null;
+  if (!response.ok || !data) {
+    throw new Error(data?.error ?? 'プレビューを作成できませんでした');
   }
 
-  if (sourceMinX > sourceMaxX || sourceMinY > sourceMaxY) {
-    throw new Error('透明ではない部分が見つかりませんでした');
-  }
-
-  const cropWidth = sourceMaxX - sourceMinX + 1;
-  const cropHeight = sourceMaxY - sourceMinY + 1;
-  const metrics = getAcrylicMetrics(cropWidth, cropHeight);
-  const padding = Math.ceil(metrics.clearRadius + metrics.highlightRadius + metrics.paddingSpace);
-  const topLoopSpace = holeMode === 'with-hole' ? Math.ceil(metrics.holeOuterRadius * 2 + metrics.holeGap * 2) : 0;
-  const width = cropWidth + padding * 2;
-  const height = cropHeight + padding * 2 + topLoopSpace;
-  const imageX = padding - sourceMinX;
-  const imageY = padding + topLoopSpace - sourceMinY;
-
-  const maskWidth = Math.max(1, Math.ceil(width * MASK_RENDER_SCALE));
-  const maskHeight = Math.max(1, Math.ceil(height * MASK_RENDER_SCALE));
-  const maskCanvas = document.createElement('canvas');
-  maskCanvas.width = maskWidth;
-  maskCanvas.height = maskHeight;
-  const maskContext = maskCanvas.getContext('2d', { willReadFrequently: true });
-  if (!maskContext) throw new Error('PNGを解析できませんでした');
-
-  maskContext.drawImage(
-    image,
-    imageX * MASK_RENDER_SCALE,
-    imageY * MASK_RENDER_SCALE,
-    imageWidth * MASK_RENDER_SCALE,
-    imageHeight * MASK_RENDER_SCALE,
-  );
-  const pixels = maskContext.getImageData(0, 0, maskWidth, maskHeight).data;
-  const baseMask = new Uint8Array(maskWidth * maskHeight);
-
-  for (let index = 0; index < maskWidth * maskHeight; index += 1) {
-    if (index > 0 && index % 12000 === 0) await waitForNextFrame();
-    if (pixels[index * 4 + 3] <= 8) continue;
-    baseMask[index] = 1;
-  }
-
-  const filledBaseMask = await fillEnclosedMaskHoles(baseMask, maskWidth, maskHeight);
-  const gapClosedBaseMask = await fillNarrowTransparentGaps(
-    filledBaseMask,
-    maskWidth,
-    maskHeight,
-    scaleMaskRadius(metrics.internalGapCloseRadius * HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER),
-  );
-  const keychainShape =
-    holeMode === 'with-hole'
-      ? addKeychainHoleToMask(gapClosedBaseMask, maskWidth, maskHeight, padding + cropWidth / 2, cropWidth, metrics)
-      : null;
-  const keychainMask = keychainShape?.mask ?? gapClosedBaseMask;
-
-  const clearRadius = scaleMaskRadius(metrics.clearRadius);
-  const edgeRadius = scaleMaskRadius(metrics.clearRadius + metrics.edgeShadowWidth);
-  const highlightRadius = scaleMaskRadius(metrics.clearRadius + metrics.highlightRadius);
-  const innerShineRadius = Math.max(0, Math.round((metrics.clearRadius - metrics.innerShineWidth) * MASK_RENDER_SCALE));
-  const clearMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, clearRadius), maskWidth, maskHeight);
-  const edgeMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, edgeRadius), maskWidth, maskHeight);
-  const highlightMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, highlightRadius), maskWidth, maskHeight);
-  const innerShineMask = await fillEnclosedMaskHoles(await dilateMask(keychainMask, maskWidth, maskHeight, innerShineRadius), maskWidth, maskHeight);
-  if (keychainShape) {
-    const holeTransparentRadius = Math.max(1, keychainShape.hole.radius);
-    const holeLineWidth = Math.max(1, Math.round(metrics.edgeShadowWidth * MASK_RENDER_SCALE));
-    const holeLineInnerRadius = Math.max(1, holeTransparentRadius - holeLineWidth);
-    paintCircleOnMask(clearMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
-    paintCircleOnMask(edgeMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
-    paintCircleOnMask(highlightMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeLineInnerRadius, 0);
-    paintCircleOnMask(innerShineMask, maskWidth, maskHeight, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
-  }
-  const acrylicLow = makeLayerFromMask(maskWidth, maskHeight, () => null);
-
-  drawMaskLayer(acrylicLow.context, highlightMask, maskWidth, maskHeight, [255, 255, 255, 58]);
-
-  acrylicLow.context.save();
-  acrylicLow.context.globalCompositeOperation = 'destination-out';
-  drawMaskLayer(acrylicLow.context, clearMask, maskWidth, maskHeight, [0, 0, 0, 255]);
-  acrylicLow.context.restore();
-
-  const darkEdgeLine = makeLayerFromMask(maskWidth, maskHeight, (index) =>
-    edgeMask[index] && !clearMask[index] ? ACRYLIC_DARK_EDGE_COLOR : null,
-  );
-  const whiteHighlightLine = makeLayerFromMask(maskWidth, maskHeight, (index) =>
-    highlightMask[index] && !innerShineMask[index] ? ACRYLIC_WHITE_HIGHLIGHT_COLOR : null,
-  );
-  const edgeLow = makeLayerFromMask(maskWidth, maskHeight, () => null);
-  drawMaskLayer(edgeLow.context, edgeMask, maskWidth, maskHeight, [88, 96, 112, 34], 'blur(0.7px)');
-  edgeLow.context.save();
-  edgeLow.context.globalCompositeOperation = 'destination-out';
-  drawMaskLayer(edgeLow.context, clearMask, maskWidth, maskHeight, [0, 0, 0, 255]);
-  edgeLow.context.restore();
-  edgeLow.context.drawImage(
-    darkEdgeLine.canvas,
-    ACRYLIC_DARK_EDGE_OFFSET.x * MASK_RENDER_SCALE,
-    ACRYLIC_DARK_EDGE_OFFSET.y * MASK_RENDER_SCALE,
-  );
-  acrylicLow.context.drawImage(
-    whiteHighlightLine.canvas,
-    ACRYLIC_WHITE_HIGHLIGHT_OFFSET.x * MASK_RENDER_SCALE,
-    ACRYLIC_WHITE_HIGHLIGHT_OFFSET.y * MASK_RENDER_SCALE,
-  );
-
-  acrylicLow.context.save();
-  acrylicLow.context.globalCompositeOperation = 'source-atop';
-  const edgeGloss = acrylicLow.context.createLinearGradient(0, 0, maskWidth, maskHeight);
-  edgeGloss.addColorStop(0, 'rgba(255,255,255,0.72)');
-  edgeGloss.addColorStop(0.28, 'rgba(255,255,255,0.36)');
-  edgeGloss.addColorStop(0.5, 'rgba(255,255,255,0.04)');
-  edgeGloss.addColorStop(1, 'rgba(142,146,158,0.22)');
-  acrylicLow.context.fillStyle = edgeGloss;
-  acrylicLow.context.fillRect(0, 0, maskWidth, maskHeight);
-  acrylicLow.context.restore();
-
-  acrylicLow.context.save();
-  acrylicLow.context.globalCompositeOperation = 'source-atop';
-  const shine = acrylicLow.context.createLinearGradient(0, 0, maskWidth, maskHeight);
-  shine.addColorStop(0, 'rgba(255,255,255,0)');
-  shine.addColorStop(0.35, 'rgba(255,255,255,0.18)');
-  shine.addColorStop(0.48, 'rgba(255,255,255,0.02)');
-  shine.addColorStop(1, 'rgba(255,255,255,0)');
-  acrylicLow.context.fillStyle = shine;
-  acrylicLow.context.fillRect(0, 0, maskWidth, maskHeight);
-  acrylicLow.context.restore();
-
-  const acrylic = makeLayerFromMask(width, height, () => null);
-  acrylic.context.imageSmoothingEnabled = true;
-  acrylic.context.imageSmoothingQuality = 'high';
-  acrylic.context.drawImage(acrylicLow.canvas, 0, 0, width, height);
-
-  const edge = makeLayerFromMask(width, height, () => null);
-  edge.context.imageSmoothingEnabled = true;
-  edge.context.imageSmoothingQuality = 'high';
-  edge.context.drawImage(edgeLow.canvas, 0, 0, width, height);
-
-  const backLow = makeLayerFromMask(maskWidth, maskHeight, (index) =>
-    gapClosedBaseMask[index] ? BACK_FACE_MULTIPLY_COLOR : null,
-  );
-  const back = makeLayerFromMask(width, height, () => null);
-  back.context.imageSmoothingEnabled = true;
-  back.context.imageSmoothingQuality = 'high';
-  back.context.drawImage(backLow.canvas, 0, 0, width, height);
-
-  const artworkCanvas = document.createElement('canvas');
-  artworkCanvas.width = width;
-  artworkCanvas.height = height;
-  const artworkContext = artworkCanvas.getContext('2d');
-  if (!artworkContext) throw new Error('プレビューを作成できませんでした');
-  artworkContext.drawImage(image, imageX, imageY, imageWidth, imageHeight);
-  const originalArtworkSrc = artworkCanvas.toDataURL('image/png');
-
-  const tintCanvas = document.createElement('canvas');
-  tintCanvas.width = width;
-  tintCanvas.height = height;
-  const tintContext = tintCanvas.getContext('2d');
-  if (!tintContext) throw new Error('乗算色を作成できませんでした');
-  tintContext.fillStyle = ARTWORK_MULTIPLY_COLOR;
-  tintContext.fillRect(0, 0, width, height);
-  tintContext.globalCompositeOperation = 'destination-in';
-  tintContext.drawImage(artworkCanvas, 0, 0);
-
-  artworkContext.globalCompositeOperation = 'multiply';
-  artworkContext.drawImage(tintCanvas, 0, 0);
-  artworkContext.globalCompositeOperation = 'source-over';
-
-  return {
-    acrylicSrc: acrylic.canvas.toDataURL('image/png'),
-    edgeSrc: edge.canvas.toDataURL('image/png'),
-    artworkSrc: artworkCanvas.toDataURL('image/png'),
-    originalArtworkSrc,
-    backSrc: back.canvas.toDataURL('image/png'),
-    width,
-    height,
-    fileName: file.name,
-  };
+  return data;
 }
 
 export function AcrylicKeychainTool() {
@@ -651,12 +331,16 @@ export function AcrylicKeychainTool() {
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewCache, setPreviewCache] = useState<PreviewCache>({});
+  const [productMode, setProductMode] = useState<ProductMode>('keychain');
   const [holeMode, setHoleMode] = useState<HoleMode>('with-hole');
+  const [standMode, setStandMode] = useState<StandMode>('simple');
   const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
   const [renderedEdgeSrc, setRenderedEdgeSrc] = useState('');
   const [renderedArtworkSrc, setRenderedArtworkSrc] = useState('');
   const [renderedBackArtworkSrc, setRenderedBackArtworkSrc] = useState('');
   const [renderedHighlightSrc, setRenderedHighlightSrc] = useState('');
+  const [standBaseStyle, setStandBaseStyle] = useState<CSSProperties | null>(null);
+  const [standCircleStyle, setStandCircleStyle] = useState<CSSProperties | null>(null);
   const [rotation, setRotation] = useState<PreviewRotation>({ y: 0 });
   const [isRotating, setIsRotating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -665,6 +349,10 @@ export function AcrylicKeychainTool() {
   const [processingDotCount, setProcessingDotCount] = useState(1);
   const [previewLayoutKey, setPreviewLayoutKey] = useState(0);
   const [status, setStatus] = useState('PNGを選択してください');
+  const immediateStandPreviewStyles =
+    preview && preview.productMode === 'stand' && preview.standBaseFrame ? createStandPreviewStyles(preview, getPreviewStageSize()) : null;
+  const visibleStandBaseStyle = preview?.productMode === 'stand' ? (immediateStandPreviewStyles?.base ?? standBaseStyle ?? null) : null;
+  const visibleStandCircleStyle = preview?.productMode === 'stand' ? (immediateStandPreviewStyles?.circle ?? standCircleStyle ?? null) : null;
 
   useEffect(() => {
     if (!preview) {
@@ -673,6 +361,8 @@ export function AcrylicKeychainTool() {
       setRenderedArtworkSrc('');
       setRenderedBackArtworkSrc('');
       setRenderedHighlightSrc('');
+      setStandBaseStyle(null);
+      setStandCircleStyle(null);
       return;
     }
     let cancelled = false;
@@ -693,7 +383,23 @@ export function AcrylicKeychainTool() {
     backCanvas.width = stage.width;
     backCanvas.height = stage.height;
     const backContext = backCanvas.getContext('2d');
-    if (!acrylicContext || !edgeContext || !artworkContext || !backContext) return;
+    const highlightCanvas = document.createElement('canvas');
+    highlightCanvas.width = stage.width;
+    highlightCanvas.height = stage.height;
+    const highlightContext = highlightCanvas.getContext('2d');
+    if (!acrylicContext || !edgeContext || !artworkContext || !backContext || !highlightContext) return;
+
+    const setStandPreviewStyles = (contactYOverride?: number) => {
+      const nextStyles = createStandPreviewStyles(preview, stage, contactYOverride);
+      if (!nextStyles) {
+        setStandBaseStyle(null);
+        setStandCircleStyle(null);
+        return;
+      }
+
+      setStandBaseStyle(nextStyles.base);
+      setStandCircleStyle(nextStyles.circle);
+    };
 
     const draw = async () => {
       const ratios = getPreviewArtworkRatios();
@@ -710,10 +416,13 @@ export function AcrylicKeychainTool() {
       edgeContext.clearRect(0, 0, stage.width, stage.height);
       artworkContext.clearRect(0, 0, stage.width, stage.height);
       backContext.clearRect(0, 0, stage.width, stage.height);
+      highlightContext.clearRect(0, 0, stage.width, stage.height);
+      setStandPreviewStyles();
       acrylicContext.save();
       edgeContext.save();
       artworkContext.save();
       backContext.save();
+      highlightContext.save();
       try {
         acrylicContext.translate(drawX, drawY);
         acrylicContext.scale(scale, scale);
@@ -739,26 +448,29 @@ export function AcrylicKeychainTool() {
         await drawImageSource(backContext, preview.backSrc);
         if (cancelled) return;
 
-        const highlightCanvas = document.createElement('canvas');
-        highlightCanvas.width = stage.width;
-        highlightCanvas.height = stage.height;
-        const highlightContext = highlightCanvas.getContext('2d');
-        if (!highlightContext) return;
-        highlightContext.fillStyle = 'rgba(255, 255, 255, 0.98)';
-        highlightContext.fillRect(0, 0, stage.width, stage.height);
-        highlightContext.globalCompositeOperation = 'destination-in';
-        highlightContext.drawImage(backCanvas, 0, 0);
+        highlightContext.translate(drawX, drawY);
+        highlightContext.scale(scale, scale);
+        await drawImageSource(highlightContext, preview.highlightSrc);
+        if (cancelled) return;
 
         setRenderedAcrylicSrc(acrylicCanvas.toDataURL('image/png'));
         setRenderedEdgeSrc(edgeCanvas.toDataURL('image/png'));
         setRenderedArtworkSrc(artworkCanvas.toDataURL('image/png'));
         setRenderedBackArtworkSrc(backCanvas.toDataURL('image/png'));
         setRenderedHighlightSrc(highlightCanvas.toDataURL('image/png'));
+        if (preview.productMode === 'stand' && preview.standBaseFrame) {
+          const acrylicBounds = findCanvasAlphaBounds(acrylicContext, stage.width, stage.height);
+          setStandPreviewStyles(acrylicBounds?.maxY);
+        } else {
+          setStandBaseStyle(null);
+          setStandCircleStyle(null);
+        }
       } finally {
         acrylicContext.restore();
         edgeContext.restore();
         artworkContext.restore();
         backContext.restore();
+        highlightContext.restore();
       }
     };
 
@@ -818,7 +530,9 @@ export function AcrylicKeychainTool() {
   const loadFile = async (file: File | undefined) => {
     if (!file) return;
     const startedAt = Date.now();
-    const nextHoleMode = holeMode;
+    const nextProductMode = productMode;
+    const nextShapeMode = nextProductMode === 'keychain' ? holeMode : standMode;
+    const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode);
     setIsProcessing(true);
     setStatus('プレビューを作成中です');
     setSelectedFile(file);
@@ -826,10 +540,10 @@ export function AcrylicKeychainTool() {
     try {
       await waitForNextFrame();
       await waitForNextFrame();
-      const nextPreview = await buildPreview(file, nextHoleMode);
+      const nextPreview = await buildPreview(file, nextProductMode, nextShapeMode);
       const elapsed = Date.now() - startedAt;
       if (elapsed < 900) await wait(900 - elapsed);
-      setPreviewCache({ [nextHoleMode]: nextPreview });
+      setPreviewCache({ [nextCacheKey]: nextPreview });
       setPreview(nextPreview);
       setRotation({ y: 0 });
       rotationVelocityRef.current = { y: 0 };
@@ -846,9 +560,16 @@ export function AcrylicKeychainTool() {
     }
   };
 
-  const switchHoleMode = async (nextHoleMode: HoleMode) => {
-    setHoleMode(nextHoleMode);
-    const cachedPreview = previewCache[nextHoleMode];
+  const switchPreviewMode = async (nextProductMode: ProductMode, nextShapeMode: ShapeMode) => {
+    setProductMode(nextProductMode);
+    if (nextProductMode === 'keychain') {
+      setHoleMode(nextShapeMode as HoleMode);
+    } else {
+      setStandMode(nextShapeMode as StandMode);
+    }
+
+    const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode);
+    const cachedPreview = previewCache[nextCacheKey];
     if (cachedPreview) {
       setPreview(cachedPreview);
       setRotation({ y: 0 });
@@ -866,10 +587,10 @@ export function AcrylicKeychainTool() {
     try {
       await waitForNextFrame();
       await waitForNextFrame();
-      const nextPreview = await buildPreview(selectedFile, nextHoleMode);
+      const nextPreview = await buildPreview(selectedFile, nextProductMode, nextShapeMode);
       const elapsed = Date.now() - startedAt;
       if (elapsed < 900) await wait(900 - elapsed);
-      setPreviewCache((current) => ({ ...current, [nextHoleMode]: nextPreview }));
+      setPreviewCache((current) => ({ ...current, [nextCacheKey]: nextPreview }));
       setPreview(nextPreview);
       setRotation({ y: 0 });
       rotationVelocityRef.current = { y: 0 };
@@ -884,7 +605,7 @@ export function AcrylicKeychainTool() {
   };
 
   const exportOrderFiles = async () => {
-    if (!preview || isExporting) return;
+    if (!preview || isExporting || productMode !== 'keychain') return;
     setIsExporting(true);
     setStatus('SVGを作成中です');
     try {
@@ -974,6 +695,33 @@ export function AcrylicKeychainTool() {
           event.currentTarget.value = '';
         }}
       />
+      <div className="acrylic-product-toggle" role="group" aria-label="作成タイプ">
+        <button
+          type="button"
+          className={cn('acrylic-product-toggle-button', productMode === 'keychain' && 'is-active')}
+          aria-pressed={productMode === 'keychain'}
+          disabled={isProcessing}
+          onClick={() => {
+            if (productMode !== 'keychain') void switchPreviewMode('keychain', holeMode);
+          }}
+        >
+          アクキー
+        </button>
+        <span className="acrylic-product-toggle-separator" aria-hidden="true">
+          ｜
+        </span>
+        <button
+          type="button"
+          className={cn('acrylic-product-toggle-button', productMode === 'stand' && 'is-active')}
+          aria-pressed={productMode === 'stand'}
+          disabled={isProcessing}
+          onClick={() => {
+            if (productMode !== 'stand') void switchPreviewMode('stand', standMode);
+          }}
+        >
+          アクスタ
+        </button>
+      </div>
       <div
         className={cn('acrylic-preview-wrap', preview && 'has-preview', isDragging && 'is-dragging')}
         role={preview ? undefined : 'button'}
@@ -1012,7 +760,15 @@ export function AcrylicKeychainTool() {
           <div
             className={cn('acrylic-preview', isRotating && 'is-rotating')}
             onPointerDown={(event) => {
-              if (!renderedAcrylicSrc || !renderedEdgeSrc || !renderedArtworkSrc || !renderedBackArtworkSrc || !renderedHighlightSrc) return;
+              if (
+                !renderedAcrylicSrc ||
+                !renderedEdgeSrc ||
+                !renderedArtworkSrc ||
+                !renderedBackArtworkSrc ||
+                !renderedHighlightSrc
+              ) {
+                return;
+              }
               event.preventDefault();
               if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
               inertiaFrameRef.current = null;
@@ -1046,37 +802,81 @@ export function AcrylicKeychainTool() {
               setIsRotating(false);
             }}
           >
-            {renderedAcrylicSrc && renderedEdgeSrc && renderedArtworkSrc && renderedBackArtworkSrc && renderedHighlightSrc ? (
+            {preview.productMode === 'stand' && visibleStandCircleStyle ? (
               <div
-                className="acrylic-preview-object"
+                className="acrylic-preview-object acrylic-preview-stand-circle-object"
                 style={{
                   transform: `rotateY(${rotation.y}deg)`,
                 } as CSSProperties}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="acrylic-preview-image acrylic-preview-edge-image" src={renderedEdgeSrc} alt="" aria-hidden="true" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="acrylic-preview-image acrylic-preview-acrylic-image" src={renderedAcrylicSrc} alt="" aria-hidden="true" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className="acrylic-preview-image acrylic-preview-artwork-image"
-                  src={isBackSide ? renderedBackArtworkSrc : renderedArtworkSrc}
-                  alt={`${preview.fileName}のアクキー完成予想`}
-                  style={{
-                    '--acrylic-right-shade': rightShadeOpacity,
-                  } as CSSProperties}
-                />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className="acrylic-preview-image acrylic-preview-light-image"
-                  src={renderedHighlightSrc}
-                  alt=""
-                  style={{
-                    '--acrylic-left-light': leftHighlightOpacity,
-                  } as CSSProperties}
-                  aria-hidden="true"
-                />
+                <span className="acrylic-preview-stand-test-circle" style={visibleStandCircleStyle} aria-hidden="true">
+                  <span className="acrylic-preview-stand-test-circle-bottom" />
+                  <span className="acrylic-preview-stand-test-circle-top" />
+                </span>
               </div>
+            ) : null}
+            {renderedAcrylicSrc && renderedEdgeSrc && renderedArtworkSrc && renderedBackArtworkSrc && renderedHighlightSrc ? (
+              <>
+                {SHOW_STAND_BASE_SVG && preview.productMode === 'stand' && visibleStandBaseStyle ? (
+                  <div className="acrylic-preview-stand-base" style={visibleStandBaseStyle} aria-hidden="true">
+                    <svg className="acrylic-preview-stand-base-svg" viewBox={STAND_BASE_SVG_VIEW_BOX} preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="acrylicStandBaseSideHighlight" x1="0" x2="1" y1="0" y2="0">
+                          <stop offset="0" stopColor="#ffffff" stopOpacity="0.62" />
+                          <stop offset="0.42" stopColor="#ffffff" stopOpacity="0.22" />
+                          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+                        </linearGradient>
+                        <clipPath id="acrylicStandBaseSideClip">
+                          <path d={STAND_BASE_SVG_GEOMETRY.sideFillPath} />
+                        </clipPath>
+                      </defs>
+                      <path className="acrylic-preview-stand-base-side-fill" d={STAND_BASE_SVG_GEOMETRY.sideFillPath} />
+                      <rect
+                        className="acrylic-preview-stand-base-side-highlight"
+                        x={STAND_BASE_SIDE_HIGHLIGHT_X}
+                        y="0"
+                        width={STAND_BASE_SIDE_HIGHLIGHT_WIDTH}
+                        height={STAND_BASE_SVG_VIEW_HEIGHT}
+                        clipPath="url(#acrylicStandBaseSideClip)"
+                      />
+                      <path className="acrylic-preview-stand-base-bottom" d={STAND_BASE_SVG_GEOMETRY.bottomPath} />
+                      <path className="acrylic-preview-stand-base-side-left" d={STAND_BASE_SVG_GEOMETRY.sideLeftPath} />
+                      <path className="acrylic-preview-stand-base-side-right" d={STAND_BASE_SVG_GEOMETRY.sideRightPath} />
+                      <path className="acrylic-preview-stand-base-top" d={STAND_BASE_SVG_GEOMETRY.topPath} />
+                    </svg>
+                  </div>
+                ) : null}
+                <div
+                  className="acrylic-preview-object"
+                  style={{
+                    transform: `rotateY(${rotation.y}deg)`,
+                  } as CSSProperties}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="acrylic-preview-image acrylic-preview-edge-image" src={renderedEdgeSrc} alt="" aria-hidden="true" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="acrylic-preview-image acrylic-preview-acrylic-image" src={renderedAcrylicSrc} alt="" aria-hidden="true" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="acrylic-preview-image acrylic-preview-artwork-image"
+                    src={isBackSide ? renderedBackArtworkSrc : renderedArtworkSrc}
+                    alt={`${preview.fileName}の${preview.productMode === 'stand' ? 'アクスタ' : 'アクキー'}完成予想`}
+                    style={{
+                      '--acrylic-right-shade': rightShadeOpacity,
+                    } as CSSProperties}
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="acrylic-preview-image acrylic-preview-light-image"
+                    src={renderedHighlightSrc}
+                    alt=""
+                    style={{
+                      '--acrylic-left-light': leftHighlightOpacity,
+                    } as CSSProperties}
+                    aria-hidden="true"
+                  />
+                </div>
+              </>
             ) : null}
           </div>
         ) : (
@@ -1085,38 +885,70 @@ export function AcrylicKeychainTool() {
           </div>
         )}
       </div>
-      <div className="acrylic-hole-toggle" role="group" aria-label="ボールチェーン穴">
-        <button
-          type="button"
-          className={cn('acrylic-hole-toggle-button', holeMode === 'with-hole' && 'is-active')}
-          aria-pressed={holeMode === 'with-hole'}
-          disabled={isProcessing}
-          onClick={() => {
-            if (holeMode !== 'with-hole') void switchHoleMode('with-hole');
-          }}
-        >
-          穴あり
-        </button>
-        <span className="acrylic-hole-toggle-separator" aria-hidden="true">
-          ｜
-        </span>
-        <button
-          type="button"
-          className={cn('acrylic-hole-toggle-button', holeMode === 'without-hole' && 'is-active')}
-          aria-pressed={holeMode === 'without-hole'}
-          disabled={isProcessing}
-          onClick={() => {
-            if (holeMode !== 'without-hole') void switchHoleMode('without-hole');
-          }}
-        >
-          穴なし
-        </button>
+      <div className="acrylic-hole-toggle" role="group" aria-label={productMode === 'stand' ? 'アクスタ底面タイプ' : 'ボールチェーン穴'}>
+        {productMode === 'keychain' ? (
+          <>
+            <button
+              type="button"
+              className={cn('acrylic-hole-toggle-button', holeMode === 'with-hole' && 'is-active')}
+              aria-pressed={holeMode === 'with-hole'}
+              disabled={isProcessing}
+              onClick={() => {
+                if (holeMode !== 'with-hole') void switchPreviewMode('keychain', 'with-hole');
+              }}
+            >
+              穴あり
+            </button>
+            <span className="acrylic-hole-toggle-separator" aria-hidden="true">
+              ｜
+            </span>
+            <button
+              type="button"
+              className={cn('acrylic-hole-toggle-button', holeMode === 'without-hole' && 'is-active')}
+              aria-pressed={holeMode === 'without-hole'}
+              disabled={isProcessing}
+              onClick={() => {
+                if (holeMode !== 'without-hole') void switchPreviewMode('keychain', 'without-hole');
+              }}
+            >
+              穴なし
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={cn('acrylic-hole-toggle-button', standMode === 'simple' && 'is-active')}
+              aria-pressed={standMode === 'simple'}
+              disabled={isProcessing}
+              onClick={() => {
+                if (standMode !== 'simple') void switchPreviewMode('stand', 'simple');
+              }}
+            >
+              シンプル
+            </button>
+            <span className="acrylic-hole-toggle-separator" aria-hidden="true">
+              ｜
+            </span>
+            <button
+              type="button"
+              className={cn('acrylic-hole-toggle-button', standMode === 'stable' && 'is-active')}
+              aria-pressed={standMode === 'stable'}
+              disabled={isProcessing}
+              onClick={() => {
+                if (standMode !== 'stable') void switchPreviewMode('stand', 'stable');
+              }}
+            >
+              安定
+            </button>
+          </>
+        )}
       </div>
       <div className="acrylic-tool-actions">
         <button type="button" className="acrylic-file-button" onClick={() => inputRef.current?.click()}>
           {preview ? '新しいPNGを選択' : 'PNGを選択'}
         </button>
-        {preview ? (
+        {preview && productMode === 'keychain' ? (
           <button type="button" className="acrylic-file-button" disabled={isProcessing || isExporting} onClick={() => void exportOrderFiles()}>
             {isExporting ? '作成中' : 'SVGを書き出す'}
           </button>

@@ -2670,8 +2670,15 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 .acrylic-preview-stand-circle-object {
   position: absolute;
   inset: 0;
-  z-index: 2;
   will-change: transform;
+}
+
+.acrylic-preview-stand-circle-object-back {
+  z-index: 0;
+}
+
+.acrylic-preview-stand-circle-object-front {
+  z-index: 3;
 }
 
 .acrylic-preview-image {
@@ -2755,18 +2762,64 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .acrylic-preview-stand-test-circle-top,
-.acrylic-preview-stand-test-circle-bottom {
+.acrylic-preview-stand-test-circle-bottom,
+.acrylic-preview-stand-test-cylinder-side,
+.acrylic-preview-stand-test-circle-back-line,
+.acrylic-preview-stand-test-circle-front-line,
+.acrylic-preview-stand-test-circle-front {
   position: absolute;
-  inset: 0;
   display: block;
-  border-radius: 50%;
   transform-origin: center;
   backface-visibility: visible;
   will-change: transform;
 }
 
-.acrylic-preview-stand-test-circle-top {
+.acrylic-preview-stand-test-circle-top,
+.acrylic-preview-stand-test-circle-bottom,
+.acrylic-preview-stand-test-circle-back-line,
+.acrylic-preview-stand-test-circle-front-line,
+.acrylic-preview-stand-test-circle-front {
+  inset: 0;
+  border-radius: 50%;
+}
+
+.acrylic-preview-stand-test-cylinder-side {
+  inset: 0;
+  transform: rotateZ(var(--stand-cylinder-side-angle));
+  transform-style: preserve-3d;
+}
+
+.acrylic-preview-stand-test-cylinder-side::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: block;
+  width: var(--stand-cylinder-side-width);
+  height: var(--stand-circle-depth);
+  content: "";
+  background: rgba(116, 122, 138, 0.16);
+  transform: translateX(-50%) rotateX(-90deg);
+  transform-origin: 50% 0;
+}
+
+.acrylic-preview-stand-test-circle-back-line,
+.acrylic-preview-stand-test-circle-front-line {
   border: 2.4px solid #ffffff;
+  transform: rotateZ(var(--stand-front-arc-angle, 0deg));
+}
+
+.acrylic-preview-stand-test-circle-back-line {
+  clip-path: inset(-8px -8px 50% -8px);
+}
+
+.acrylic-preview-stand-test-circle-front-line {
+  clip-path: inset(50% -8px -8px -8px);
+}
+
+.acrylic-preview-stand-test-circle-front {
+  border: 4.2px solid #ffffff;
+  clip-path: inset(50% -8px -8px -8px);
+  transform: translateZ(0.4px) rotateZ(var(--stand-front-arc-angle, 0deg));
 }
 
 .acrylic-preview-stand-test-circle-bottom {

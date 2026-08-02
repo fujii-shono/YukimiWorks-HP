@@ -69,6 +69,11 @@ const EXPORT_DEBUG_SVG = false;
 const ACRYLIC_PREVIEW_FRONT_Z = 6;
 const ACRYLIC_PREVIEW_BACK_Z = -4;
 const STAND_CIRCLE_DEPTH_PX = ACRYLIC_PREVIEW_FRONT_Z - ACRYLIC_PREVIEW_BACK_Z;
+const STAND_CYLINDER_SIDE_SEGMENTS = 48;
+const STAND_CYLINDER_SIDE_PANELS = Array.from({ length: STAND_CYLINDER_SIDE_SEGMENTS }, (_, index) => ({
+  angle: (index / STAND_CYLINDER_SIDE_SEGMENTS) * 360,
+  width: (Math.PI * 100) / STAND_CYLINDER_SIDE_SEGMENTS,
+}));
 const SHOW_STAND_BASE_SVG = false;
 const STAND_BASE_SVG_VIEW_WIDTH = 1000;
 const STAND_BASE_SVG_VIEW_HEIGHT = 300;
@@ -804,14 +809,35 @@ export function AcrylicKeychainTool() {
           >
             {preview.productMode === 'stand' && visibleStandCircleStyle ? (
               <div
-                className="acrylic-preview-object acrylic-preview-stand-circle-object"
+                className="acrylic-preview-object acrylic-preview-stand-circle-object acrylic-preview-stand-circle-object-back"
                 style={{
                   transform: `rotateY(${rotation.y}deg)`,
                 } as CSSProperties}
               >
-                <span className="acrylic-preview-stand-test-circle" style={visibleStandCircleStyle} aria-hidden="true">
+                <span
+                  className="acrylic-preview-stand-test-circle acrylic-preview-stand-test-circle-back"
+                  style={
+                    {
+                      ...visibleStandCircleStyle,
+                      '--stand-front-arc-angle': `${rotation.y}deg`,
+                    } as CSSProperties
+                  }
+                  aria-hidden="true"
+                >
                   <span className="acrylic-preview-stand-test-circle-bottom" />
-                  <span className="acrylic-preview-stand-test-circle-top" />
+                  {STAND_CYLINDER_SIDE_PANELS.map((panel) => (
+                    <span
+                      key={panel.angle}
+                      className="acrylic-preview-stand-test-cylinder-side"
+                      style={
+                        {
+                          '--stand-cylinder-side-angle': `${panel.angle}deg`,
+                          '--stand-cylinder-side-width': `${panel.width}%`,
+                        } as CSSProperties
+                      }
+                    />
+                  ))}
+                  <span className="acrylic-preview-stand-test-circle-back-line" />
                 </span>
               </div>
             ) : null}
@@ -877,6 +903,28 @@ export function AcrylicKeychainTool() {
                   />
                 </div>
               </>
+            ) : null}
+            {preview.productMode === 'stand' && visibleStandCircleStyle ? (
+              <div
+                className="acrylic-preview-object acrylic-preview-stand-circle-object acrylic-preview-stand-circle-object-front"
+                style={{
+                  transform: `rotateY(${rotation.y}deg)`,
+                } as CSSProperties}
+              >
+                <span
+                  className="acrylic-preview-stand-test-circle acrylic-preview-stand-test-circle-front-layer"
+                  style={
+                    {
+                      ...visibleStandCircleStyle,
+                      '--stand-front-arc-angle': `${rotation.y}deg`,
+                    } as CSSProperties
+                  }
+                  aria-hidden="true"
+                >
+                  <span className="acrylic-preview-stand-test-circle-front-line" />
+                  <span className="acrylic-preview-stand-test-circle-front" />
+                </span>
+              </div>
             ) : null}
           </div>
         ) : (

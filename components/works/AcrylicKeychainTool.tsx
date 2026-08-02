@@ -536,7 +536,7 @@ export function AcrylicKeychainTool() {
     if (!file) return;
     const startedAt = Date.now();
     const nextProductMode = productMode;
-    const nextShapeMode = nextProductMode === 'keychain' ? holeMode : standMode;
+    const nextShapeMode = nextProductMode === 'keychain' ? holeMode : 'simple';
     const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode);
     setIsProcessing(true);
     setStatus('プレビューを作成中です');
@@ -721,7 +721,7 @@ export function AcrylicKeychainTool() {
           aria-pressed={productMode === 'stand'}
           disabled={isProcessing}
           onClick={() => {
-            if (productMode !== 'stand') void switchPreviewMode('stand', standMode);
+            if (productMode !== 'stand') void switchPreviewMode('stand', 'simple');
           }}
         >
           アクスタ
@@ -974,20 +974,6 @@ export function AcrylicKeychainTool() {
               }}
             >
               シンプル
-            </button>
-            <span className="acrylic-hole-toggle-separator" aria-hidden="true">
-              ｜
-            </span>
-            <button
-              type="button"
-              className={cn('acrylic-hole-toggle-button', standMode === 'stable' && 'is-active')}
-              aria-pressed={standMode === 'stable'}
-              disabled={isProcessing}
-              onClick={() => {
-                if (standMode !== 'stable') void switchPreviewMode('stand', 'stable');
-              }}
-            >
-              安定
             </button>
           </>
         )}

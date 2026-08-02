@@ -31,6 +31,12 @@ type RgbaImage = {
   rgba: Uint8Array;
 };
 
+type StandContactLine = {
+  leftX: number;
+  rightX: number;
+  y: number;
+} | null;
+
 type AcrylicMetrics = {
   clearRadius: number;
   highlightRadius: number;
@@ -60,11 +66,14 @@ const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 24
 const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124, 58];
 const ACRYLIC_EDGE_SHADOW_COLOR: [number, number, number, number] = [88, 96, 112, 34];
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
+const STAND_CLAW_FILL_COLOR: [number, number, number, number] = [116, 122, 138, 41];
 const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
 const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
 const BASE_EDGE_SHADOW_WIDTH = 4;
 const BASE_INNER_SHINE_WIDTH = 2;
 const BASE_STAND_BOTTOM_NEAR_HEIGHT_DELTA = 40;
+const BASE_STAND_CLAW_EDGE_GAP = 16;
+const BASE_STAND_CLAW_CONTACT_LINE_WIDTH = 3;
 const BASE_STAND_BASE_WIDTH_RATIO_PERCENT = 100;
 const BASE_STAND_BASE_HEIGHT_RATIO_PERCENT = 22;
 const BASE_STAND_BASE_MIN_HEIGHT = 18;
@@ -382,23 +391,84 @@ function findNearBottomSidePoint(mask: Uint8Array, width: number, bottomPoint: B
   return farthestPoint;
 }
 
-function addStandBottomOutlineToMask(mask: Uint8Array, width: number, height: number, artworkWidth: number, artworkHeight: number) {
+function addStandClawsToMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  contactLeftX: number,
+  contactRightX: number,
+  contactY: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  artworkHeight: number,
+  standBaseDepthOffset: number,
+) {
+  const edgeGap = Math.max(0, Math.round(scaleArtworkMetric(BASE_STAND_CLAW_EDGE_GAP, artworkWidth, artworkHeight)));
+  const safeLeftX = Math.min(contactRightX, contactLeftX + edgeGap);
+  const safeRightX = Math.max(contactLeftX, contactRightX - edgeGap);
+  const centerX = Math.round(artworkCenterX);
+  const leftSpan = Math.max(0, centerX - safeLeftX);
+  const rightSpan = Math.max(0, safeRightX - centerX);
+  const halfSpan = Math.floor(Math.min(leftSpan, rightSpan));
+  if (halfSpan <= 0) return;
+
+  const clawLeftX = Math.max(contactLeftX, centerX - halfSpan);
+  const clawRightX = Math.min(contactRightX, centerX + halfSpan);
+  const clawBottomY = Math.min(height - 1, contactY + Math.max(1, Math.round(standBaseDepthOffset)));
+  if (clawBottomY <= contactY) return;
+
+  paintLineOnMask(mask, width, height, clawLeftX, contactY, clawLeftX, clawBottomY);
+  paintLineOnMask(mask, width, height, clawRightX, contactY, clawRightX, clawBottomY);
+  paintLineOnMask(mask, width, height, clawLeftX, clawBottomY, clawRightX, clawBottomY);
+}
+
+function addStandBottomOutlineToMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  artworkHeight: number,
+  standBaseDepthOffset: number,
+  standMode: StandMode,
+) {
   const standMask = mask.slice();
   const bottomPoint = findBottomMaskPoint(mask, width, height);
-  if (!bottomPoint) return standMask;
+  let contactLine: StandContactLine = null;
+  if (!bottomPoint) return { mask: standMask, maskWithoutClaws: standMask.slice(), contactY: null, contactLine };
   paintLineOnMask(standMask, width, height, bottomPoint.minX, bottomPoint.y, bottomPoint.maxX, bottomPoint.y);
   const nearHeightDelta = Math.max(1, Math.round(scaleArtworkMetric(BASE_STAND_BOTTOM_NEAR_HEIGHT_DELTA, artworkWidth, artworkHeight)));
   const leftPoint = findNearBottomSidePoint(mask, width, bottomPoint, 'left', nearHeightDelta);
   const rightPoint = findNearBottomSidePoint(mask, width, bottomPoint, 'right', nearHeightDelta);
+  let contactLeftX = bottomPoint.minX;
+  let contactRightX = bottomPoint.maxX;
   if (leftPoint) {
     paintLineOnMask(standMask, width, height, bottomPoint.minX, bottomPoint.y, leftPoint.x, bottomPoint.y);
     paintLineOnMask(standMask, width, height, leftPoint.x, bottomPoint.y, leftPoint.x, leftPoint.y);
+    contactLeftX = Math.min(contactLeftX, leftPoint.x);
   }
   if (rightPoint) {
     paintLineOnMask(standMask, width, height, bottomPoint.maxX, bottomPoint.y, rightPoint.x, bottomPoint.y);
     paintLineOnMask(standMask, width, height, rightPoint.x, bottomPoint.y, rightPoint.x, rightPoint.y);
+    contactRightX = Math.max(contactRightX, rightPoint.x);
   }
-  return standMask;
+  const maskWithoutClaws = standMask.slice();
+  if (standMode === 'simple') {
+    addStandClawsToMask(
+      standMask,
+      width,
+      height,
+      contactLeftX,
+      contactRightX,
+      bottomPoint.y,
+      artworkCenterX,
+      artworkWidth,
+      artworkHeight,
+      standBaseDepthOffset,
+    );
+    contactLine = { leftX: contactLeftX, rightX: contactRightX, y: bottomPoint.y };
+  }
+  return { mask: standMask, maskWithoutClaws, contactY: bottomPoint.y, contactLine };
 }
 
 function maskBounds(mask: Uint8Array, width: number, height: number) {
@@ -551,6 +621,41 @@ function buildAcrylicLayer(width: number, height: number, clearMask: Uint8Array,
   return acrylic;
 }
 
+function compositeStandContactLine(
+  image: RgbaImage,
+  contactLine: StandContactLine,
+  artworkWidth: number,
+  artworkHeight: number,
+  clearRadius: number,
+) {
+  if (!contactLine) return;
+  const lineMask = new Uint8Array(image.width * image.height);
+  const lineY = Math.min(image.height - 1, Math.round(contactLine.y + clearRadius));
+  paintLineOnMask(lineMask, image.width, image.height, contactLine.leftX, lineY, contactLine.rightX, lineY);
+  const lineRadius = Math.max(1, Math.round(scaleArtworkMetric(BASE_STAND_CLAW_CONTACT_LINE_WIDTH, artworkWidth, artworkHeight) / 2));
+  compositeMaskLayer(image, dilateMask(lineMask, image.width, image.height, lineRadius), [255, 255, 255, 245]);
+}
+
+function compositeStandClawFill(image: RgbaImage, clawFillMask: Uint8Array | null) {
+  if (!clawFillMask) return;
+  for (let index = 0; index < image.width * image.height; index += 1) {
+    if (!clawFillMask[index]) continue;
+    const x = index % image.width;
+    const y = Math.floor(index / image.width);
+    compositePixel(image, x, y, STAND_CLAW_FILL_COLOR);
+  }
+}
+
+function buildStandClawFillMask(clearMask: Uint8Array, clearMaskWithoutClaws: Uint8Array, width: number, height: number) {
+  const fillMask = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (clearMask[index] && !clearMaskWithoutClaws[index]) {
+      fillMask[index] = 1;
+    }
+  }
+  return fillMask;
+}
+
 function buildEdgeLayer(width: number, height: number, clearMask: Uint8Array, edgeMask: Uint8Array) {
   const edge: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
   compositeMaskLayer(edge, edgeMask, ACRYLIC_EDGE_SHADOW_COLOR);
@@ -610,9 +715,13 @@ function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMod
       ? Math.round(standBaseContactY - standBaseHeight / 2)
       : 0;
   const standBaseBottomY = estimatedStandBaseY + standBaseHeight + standBaseDepthOffset;
+  const simpleStandClawBottomY =
+    productMode === 'stand' && shapeMode === 'simple'
+      ? padding + topLoopSpace + bounds.height + standBaseDepthOffset + Math.ceil(metrics.clearRadius)
+      : 0;
   const height =
     productMode === 'stand'
-      ? Math.max(bounds.height + padding * 2 + topLoopSpace, standBaseBottomY + padding)
+      ? Math.max(bounds.height + padding * 2 + topLoopSpace, standBaseBottomY + padding, simpleStandClawBottomY + padding)
       : bounds.height + padding * 2 + topLoopSpace;
   if (width * height > MAX_MASK_PIXELS) throw new Error('PNGサイズが大きすぎます');
 
@@ -639,10 +748,28 @@ function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMod
     productMode === 'keychain' && shapeMode === 'with-hole'
       ? addKeychainHoleToMask(gapClosedBaseMask, width, height, padding + bounds.width / 2, bounds.width, metrics)
       : null;
-  const standShapeMask =
-    productMode === 'stand' ? fillEnclosedMaskHoles(addStandBottomOutlineToMask(gapClosedBaseMask, width, height, bounds.width, bounds.height), width, height) : null;
+  const standShape =
+    productMode === 'stand'
+      ? addStandBottomOutlineToMask(
+          gapClosedBaseMask,
+          width,
+          height,
+          imageX + bounds.minX + bounds.width / 2,
+          bounds.width,
+          bounds.height,
+          standBaseDepthOffset,
+          shapeMode as StandMode,
+        )
+      : null;
+  const standShapeMask = standShape ? fillEnclosedMaskHoles(standShape.mask, width, height) : null;
+  const standShapeMaskWithoutClaws = standShape ? fillEnclosedMaskHoles(standShape.maskWithoutClaws, width, height) : null;
   const shapeMask = keychainShape?.mask ?? standShapeMask ?? gapClosedBaseMask;
   const clearMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius))), width, height);
+  const clearMaskWithoutClaws =
+    productMode === 'stand' && shapeMode === 'simple' && standShapeMaskWithoutClaws
+      ? fillEnclosedMaskHoles(dilateMask(standShapeMaskWithoutClaws, width, height, Math.max(1, Math.round(metrics.clearRadius))), width, height)
+      : null;
+  const standClawFillMask = clearMaskWithoutClaws ? buildStandClawFillMask(clearMask, clearMaskWithoutClaws, width, height) : null;
   const edgeMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.edgeShadowWidth))), width, height);
   const highlightMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.highlightRadius))), width, height);
   const innerShineMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(0, Math.round(metrics.clearRadius - metrics.innerShineWidth))), width, height);
@@ -657,7 +784,9 @@ function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMod
   }
 
   const acrylic = buildAcrylicLayer(width, height, clearMask, highlightMask, innerShineMask);
+  compositeStandContactLine(acrylic, standShape?.contactLine ?? null, bounds.width, bounds.height, metrics.clearRadius);
   const edge = buildEdgeLayer(width, height, clearMask, edgeMask);
+  compositeStandClawFill(edge, standClawFillMask);
   const back = layerFromMask(width, height, gapClosedBaseMask, BACK_FACE_MULTIPLY_COLOR);
   const originalArtwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
   const artwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
@@ -666,12 +795,16 @@ function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMod
   const highlight = conditionalLayer(width, height, (index) => (innerShineMask[index] ? [255, 255, 255, 252] : null));
   const standBase: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
   const clearBounds = productMode === 'stand' ? maskBounds(clearMask, width, height) : null;
+  const standContactY =
+    productMode === 'stand' && standShape && standShape.contactY !== null
+      ? Math.min(height - 1, Math.round(standShape.contactY + metrics.clearRadius))
+      : clearBounds?.maxY ?? standBaseContactY;
   const standBaseFrame: StandBaseFrame | null =
     productMode === 'stand'
       ? {
           x: standBaseX,
-          y: Math.round((clearBounds?.maxY ?? standBaseContactY) - standBaseHeight / 2),
-          contactY: clearBounds?.maxY ?? standBaseContactY,
+          y: Math.round(standContactY - standBaseHeight / 2),
+          contactY: standContactY,
           width: standBaseWidth,
           height: standBaseHeight,
           depthOffset: standBaseDepthOffset,

@@ -819,28 +819,29 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .portfolio-preview-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px 12px;
-  padding: 18px 29px 22px;
-  justify-content: flex-start;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+  padding: 18px 22px 22px;
+  align-items: start;
 }
 
 .portfolio-preview-item {
   display: grid;
-  grid-template-rows: 96px auto;
+  grid-template-rows: auto auto;
   justify-items: center;
   align-content: start;
   gap: 8px;
+  min-width: 0;
   color: inherit;
   text-decoration: none;
 }
 
 .portfolio-preview-thumb {
   display: block;
-  width: 96px;
-  height: 96px;
+  width: min(100%, 84px);
+  height: auto;
+  aspect-ratio: 1 / 1;
   border: 1px solid var(--site-border);
 }
 
@@ -855,8 +856,12 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 .portfolio-media-shell-preview {
   width: 96px;
   height: 96px;
-  flex: 0 0 96px;
   aspect-ratio: 1 / 1;
+}
+
+.portfolio-preview-list .portfolio-media-shell-preview {
+  width: min(100%, 84px);
+  height: auto;
 }
 
 .portfolio-card-image {
@@ -1893,7 +1898,8 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
 .portfolio-preview-title {
   display: block;
-  max-width: 96px;
+  width: 100%;
+  max-width: 84px;
   line-height: 1.35;
   color: var(--site-accent);
   text-align: center;
@@ -3886,6 +3892,8 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
   .portfolio-preview-panel {
     order: 3;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .works-panel {
@@ -4054,13 +4062,40 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   }
 
   .portfolio-preview-list {
-    gap: 12px 10px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 14px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    padding-block: 18px 20px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .portfolio-preview-thumb,
+  .portfolio-preview-item {
+    grid-template-rows: auto auto;
+    gap: 10px;
+    flex: 0 0 180px;
+    scroll-snap-align: start;
+  }
+
+  .portfolio-preview-thumb {
+    width: 180px;
+    max-width: none;
+  }
+
+  .portfolio-preview-list .portfolio-media-shell-preview {
+    width: 180px;
+  }
+
   .portfolio-preview-title {
-    max-width: 82px;
-    width: 82px;
-    height: auto;
+    width: 180px;
+    max-width: none;
+    font-size: 1rem;
   }
 }

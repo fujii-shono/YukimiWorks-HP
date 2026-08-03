@@ -21,6 +21,14 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    publishedAt: '2026-08-03 17:25',
+    body: 'skebひとつ完了しました。',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     publishedAt: '2026-08-02 20:50',
     body: 'アクスタのプレビュー機能だけ完成&公開しました！今日はもう遅いので明日改めて紹介します。',
   },

@@ -50,6 +50,22 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 
 export const portfolioItems: PortfolioItem[] = [
   {
+    id: 'to-kiririno',
+    title: '🐈️🩵',
+    href: '/portfolio/to-kiririno',
+    category: 'illustration',
+    content: {
+      kind: 'image',  
+      src: '/portfolio/skeb/to-kiririno.png',
+      alt: 'きりりの様ご依頼'
+    },
+    description: 'きりりの様からのご依頼でした！ありがとうございました。',
+    date: '2026-08-03',
+    year: 2026,
+    tags: ['イラスト'],
+    featured: true,
+  },
+  {
     id: 'dame-tensi',
     title: 'だめ天使',
     href: '/portfolio/dame-tensi',

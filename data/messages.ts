@@ -21,6 +21,18 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    image: {
+      src: '/message/20260803.png',
+      alt: 'メシ',
+    },
+    publishedAt: '2026-08-04 13:17',
+    body: '',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     publishedAt: '2026-08-04 09:08',
     body: 'アクスタシミュレーターに「安定」ボタン追加しました。下側が安定した生成になるので、ポーズが不安定な場合などにお使いください！',
   },

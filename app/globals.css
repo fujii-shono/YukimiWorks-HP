@@ -1195,6 +1195,200 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   z-index: 5;
 }
 
+.hanabi-scene {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  aspect-ratio: 681 / 1000;
+  height: auto;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hanabi-scene-preview,
+.hanabi-scene-card,
+.hanabi-scene-modal {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 681 / 1000;
+}
+
+.hanabi-asset-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hanabi-asset-frame {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 681 / 1000;
+  max-width: 100%;
+  overflow: hidden;
+  background: rgb(6, 6, 10);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hanabi-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  object-fit: contain;
+}
+
+.hanabi-starry-canvas,
+.hanabi-firework-canvas,
+.hanabi-light-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.hanabi-starry-canvas {
+  z-index: 0;
+  opacity: 1;
+  transition: opacity 900ms ease;
+}
+
+.hanabi-starry-canvas.is-hidden {
+  opacity: 0;
+}
+
+.hanabi-firework-canvas {
+  z-index: 0;
+}
+
+.hanabi-light-canvas {
+  z-index: 5;
+}
+
+.hanabi-audio-button {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 2px;
+  padding: 0;
+  background: rgba(6, 6, 10, 0.82);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.hanabi-audio-button:hover,
+.hanabi-audio-button:focus-visible {
+  background: rgba(255, 255, 255, 0.92);
+  color: rgb(6, 6, 10);
+  outline: none;
+}
+
+.hanabi-mode-button {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  z-index: 10;
+  min-width: 96px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 2px;
+  padding: 7px 10px;
+  background: rgba(6, 6, 10, 0.82);
+  color: #ffffff;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transform: translateX(-50%);
+}
+
+.hanabi-pattern-controls {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.hanabi-pattern-button {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 2px;
+  padding: 7px 4px;
+  background: rgba(6, 6, 10, 0.82);
+  color: #ffffff;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hanabi-mode-button:hover,
+.hanabi-mode-button:focus-visible,
+.hanabi-mode-button.is-active,
+.hanabi-pattern-button:hover,
+.hanabi-pattern-button:focus-visible,
+.hanabi-pattern-button.is-active {
+  background: rgba(255, 255, 255, 0.92);
+  color: rgb(6, 6, 10);
+  outline: none;
+}
+
+.hanabi-audio-icon {
+  display: block;
+  width: 21px;
+  height: 21px;
+}
+
+.hanabi-layer-base {
+  z-index: 1;
+}
+
+.hanabi-layer-highlight {
+  z-index: 2;
+}
+
+.hanabi-layer-hair-highlight {
+  z-index: 3;
+}
+
+.hanabi-layer.is-hidden-in-fireworks {
+  opacity: 0;
+}
+
+.hanabi-firework-layer {
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 720ms ease;
+}
+
+.hanabi-firework-layer.is-active {
+  opacity: 1;
+}
+
 @keyframes maid-wind-sway {
   0%,
   100% {

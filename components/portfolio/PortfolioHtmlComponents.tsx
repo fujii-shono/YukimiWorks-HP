@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { PortfolioHtmlComponentId, PortfolioItem, PortfolioMediaVariant } from '@/data/portfolio';
 import { cn } from '@/lib/format';
+import { HanabiScene } from '@/components/portfolio/HanabiScene';
 import { HikageScene } from '@/components/portfolio/HikageScene';
 import { KokoroScene } from '@/components/portfolio/KokoroScene';
 import { MaidScene } from '@/components/portfolio/MaidScene';
@@ -54,4 +55,5 @@ export const portfolioHtmlComponents: Record<PortfolioHtmlComponentId, (props: P
   'rainy-day-scene': ({ variant }) => <RainyDayScene variant={variant} />,
   'saru-demo-scene': ({ variant }) => <SaruDemoScene variant={variant} />,
   'maid-scene': ({ variant }) => <MaidScene variant={variant} />,
+  'hanabi-scene': ({ variant }) => <HanabiScene variant={variant} />,
 };

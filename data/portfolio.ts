@@ -7,7 +7,8 @@ export type PortfolioHtmlComponentId =
   | 'rainy-day-scene'
   | 'saru-demo-scene'
   | 'kokoro-scene'
-  | 'maid-scene';
+  | 'maid-scene'
+  | 'hanabi-scene';
 
 export type PortfolioImageContent = {
   kind: 'image';
@@ -49,6 +50,26 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 };
 
 export const portfolioItems: PortfolioItem[] = [
+  {
+    id: 'hanabi',
+    title: '花火',
+    href: '/portfolio/hanabi',
+    category: 'html-art',
+    content: {
+      kind: 'html',
+      componentId: 'hanabi-scene',
+      width: 681,
+      height: 1000,
+    },
+    ogImage: '/portfolio/hanabi/base.png',
+    ogImageWidth: 681,
+    ogImageHeight: 1000,
+    description: '黒背景にイラストレイヤーを重ねたHTMLアートです。',
+    date: '2026-08-05',
+    year: 2026,
+    tags: ['HTML', 'レイヤー', 'イラスト'],
+    featured: true,
+  },
   {
     id: 'to-kiririno',
     title: '🐈️🩵',

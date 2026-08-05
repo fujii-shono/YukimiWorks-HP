@@ -21,6 +21,14 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    publishedAt: '2026-08-05 14:31',
+    body: 'tarifをもっと使いやすく改良しています。',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     image: {
       src: '/message/20260803.png',
       alt: 'メシ',

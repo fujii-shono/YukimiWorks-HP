@@ -21,6 +21,14 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    publishedAt: '2026-08-07 09:29',
+    body: '新作ができました！今回は時間限定イベントです。音も流せたので、これでゲームもできそう。',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     publishedAt: '2026-08-05 14:31',
     body: 'tarifをもっと使いやすく改良しています。',
   },

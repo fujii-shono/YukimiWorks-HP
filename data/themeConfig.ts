@@ -24,6 +24,7 @@ export const debugTimeOptions = [
   { value: '12:15', label: '昼 12:15' },
   { value: '15:15', label: '3時 15:15' },
   { value: '17:30', label: '夕方 17:30' },
+  { value: '19:00', label: '花火開催 19:00' },
   { value: '21:30', label: '夜 21:30' },
   { value: '00:30', label: '深夜 00:30' },
   { value: '02:15', label: '警告 02:15' },

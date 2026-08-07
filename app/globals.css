@@ -1346,6 +1346,24 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   -webkit-user-select: none;
 }
 
+.hanabi-event-message {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 10;
+  max-width: calc(100% - 24px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 2px;
+  padding: 8px 12px;
+  background: rgba(6, 6, 10, 0.82);
+  color: #ffffff;
+  font: inherit;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
 .hanabi-mode-button:hover,
 .hanabi-mode-button:focus-visible,
 .hanabi-mode-button.is-active,

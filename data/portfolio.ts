@@ -52,7 +52,7 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 export const portfolioItems: PortfolioItem[] = [
   {
     id: 'hanabi',
-    title: '花火',
+    title: '花火大会',
     href: '/portfolio/hanabi',
     category: 'html-art',
     content: {
@@ -64,10 +64,10 @@ export const portfolioItems: PortfolioItem[] = [
     ogImage: '/portfolio/hanabi/base.png',
     ogImageWidth: 681,
     ogImageHeight: 1000,
-    description: '黒背景にイラストレイヤーを重ねたHTMLアートです。',
+    description: '開催時刻 毎日19:00〜21:00',
     date: '2026-08-05',
     year: 2026,
-    tags: ['HTML', 'レイヤー', 'イラスト'],
+    tags: ['HTML', '時間イベント', 'イラスト'],
     featured: true,
   },
   {
@@ -120,7 +120,7 @@ export const portfolioItems: PortfolioItem[] = [
     description: '「すっごい気が散るにゃ...」\n（タップに合わせて目線が動くよ）',
     date: '2026-07-24',
     year: 2026,
-    tags: ['HTML', 'レイヤー', 'イラスト'],
+    tags: ['HTML', 'クリックイベント', 'イラスト'],
     featured: true,
   },
   {

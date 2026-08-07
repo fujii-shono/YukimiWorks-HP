@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- This static layered artwork intentionally avoids next/image overhead. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import type { PortfolioMediaVariant } from '@/data/portfolio';
 import { cn } from '@/lib/format';
 
@@ -11,10 +12,18 @@ const SHOW_HANABI_STARRY_BACKGROUND = true;
 const STARRY_BACKGROUND_COUNT = 180;
 const STARRY_BACKGROUND_TOP_RATIO = 0.4;
 const STARRY_BACKGROUND_SEED = 20260805;
+const HANABI_DEBUG_CONTROLS = false;
+const HANABI_EVENT_START_HOUR = 19;
+const HANABI_EVENT_END_HOUR = 21;
+const HANABI_PROGRAM_AUTO_START_DELAY_MS = 5000;
 const HANABI_AMBIENT_AUDIO_SRC = '/portfolio/hanabi/suzumushi.mp3';
 const HANABI_AMBIENT_AUDIO_VOLUME = 0.05;
+const HANABI_AMBIENT_TOUCH_VOLUME_MULTIPLIER = 0.25;
 const HANABI_FIREWORK_BURST_AUDIO_SRC = '/portfolio/hanabi/hanabi2.mp3';
 const HANABI_FIREWORK_BURST_AUDIO_VOLUME = 0.28;
+const HANABI_FIREWORK_TOUCH_VOLUME_MULTIPLIER = 1.0;
+const HANABI_FIREWORK_TOUCH_VOLUME_MAX = 0.62;
+const HANABI_AUDIO_UNLOCK_VOLUME = 0;
 const FIREWORK_ROCKET_DURATION_SECONDS = 1.6;
 const FIREWORKS_PER_LAUNCH = 2;
 const FIREWORK_LAUNCH_DELAY_SECONDS = 0.42;
@@ -26,6 +35,7 @@ const HANABI_FIREWORK_AUDIO = {
 } as const;
 
 type HanabiMode = 'normal' | 'fireworks';
+type HanabiEventStatus = 'before' | 'open' | 'after';
 type FireworkSoundId = keyof typeof HANABI_FIREWORK_AUDIO;
 type FireworkColor = { r: number; g: number; b: number };
 type FireworkPalette = { outer: FireworkColor; core: FireworkColor };
@@ -188,6 +198,26 @@ function particleVisibleUntilEnd(age: number, life: number) {
 function createAudioContext() {
   const AudioContextConstructor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   return AudioContextConstructor ? new AudioContextConstructor() : null;
+}
+
+function isTouchAudioDevice() {
+  if (typeof navigator === 'undefined') return false;
+
+  return navigator.maxTouchPoints > 0;
+}
+
+function getAmbientAudioVolume() {
+  return isTouchAudioDevice() ? HANABI_AMBIENT_AUDIO_VOLUME * HANABI_AMBIENT_TOUCH_VOLUME_MULTIPLIER : HANABI_AMBIENT_AUDIO_VOLUME;
+}
+
+function getFireworkAudioVolume(baseVolume: number) {
+  return isTouchAudioDevice() ? Math.min(HANABI_FIREWORK_TOUCH_VOLUME_MAX, baseVolume * HANABI_FIREWORK_TOUCH_VOLUME_MULTIPLIER) : baseVolume;
+}
+
+function getHanabiEventStatus(hour: number): HanabiEventStatus {
+  if (hour >= HANABI_EVENT_END_HOUR) return 'after';
+  if (hour >= HANABI_EVENT_START_HOUR) return 'open';
+  return 'before';
 }
 
 function createFireworkRocket(
@@ -803,15 +833,23 @@ function drawFireworkParticle(context: CanvasRenderingContext2D, particle: Firew
 }
 
 export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
+  const { hour } = useTimeTheme();
   const starryCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fireworkCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const lightCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const ambientAudioPlayingRef = useRef(false);
   const fireworkAudioContextRef = useRef<AudioContext | null>(null);
+  const ambientAudioBufferRef = useRef<AudioBuffer | null>(null);
+  const ambientAudioLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const ambientAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const ambientAudioGainRef = useRef<GainNode | null>(null);
   const fireworkAudioBuffersRef = useRef<Partial<Record<FireworkSoundId, AudioBuffer>>>({});
   const fireworkAudioLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const fireworkGestureSoundTimeRef = useRef(0);
+  const fireworkAudioUnlockedRef = useRef(false);
+  const autoProgramStartedRef = useRef(false);
+  const autoProgramEndedRef = useRef(false);
   const fireworkActiveRef = useRef(false);
   const fireworkExplosionActiveRef = useRef(false);
   const specialPatternRef = useRef<FireworkSpecialPattern>('normal');
@@ -820,6 +858,8 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
   const [ambientAudioPlaying, setAmbientAudioPlaying] = useState(false);
   const [hanabiMode, setHanabiMode] = useState<HanabiMode>('normal');
   const [specialPattern, setSpecialPattern] = useState<FireworkSpecialPattern>('normal');
+  const [autoProgramStarted, setAutoProgramStarted] = useState(false);
+  const [autoProgramEnded, setAutoProgramEnded] = useState(false);
   const [fireworkHighlightActive, setFireworkHighlightActive] = useState(false);
   const [fireworkExplosionActive, setFireworkExplosionActive] = useState(false);
   const starryBackground = useMemo(() => createStarryBackground(), []);
@@ -845,7 +885,6 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
     const audioContext = fireworkAudioContextRef.current;
     if (!audioContext) return Promise.resolve();
 
-    const resumePromise = audioContext.state === 'suspended' ? audioContext.resume().catch(() => undefined) : Promise.resolve();
     if (!fireworkAudioLoadPromiseRef.current) {
       fireworkAudioLoadPromiseRef.current = Promise.all(
         (Object.entries(HANABI_FIREWORK_AUDIO) as [FireworkSoundId, (typeof HANABI_FIREWORK_AUDIO)[FireworkSoundId]][]).map(async ([id, sound]) => {
@@ -862,52 +901,150 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
         });
     }
 
-    return resumePromise.then(() => fireworkAudioLoadPromiseRef.current ?? undefined);
+    return fireworkAudioLoadPromiseRef.current ?? Promise.resolve();
   }, []);
 
-  const playAmbientAudio = useCallback((audio: HTMLAudioElement, options?: { reload?: boolean }) => {
-    audio.volume = HANABI_AMBIENT_AUDIO_VOLUME;
-    audio.muted = false;
-
-    if (options?.reload) {
-      audio.load();
+  const ensureAmbientAudio = useCallback(() => {
+    if (!fireworkAudioContextRef.current) {
+      fireworkAudioContextRef.current = createAudioContext();
     }
 
-    try {
-      void audio
-        .play()
-        .then(() => {
-          ambientAudioPlayingRef.current = true;
-          setAmbientAudioPlaying(true);
-          void ensureFireworkAudio();
+    const audioContext = fireworkAudioContextRef.current;
+    if (!audioContext) return Promise.resolve();
+    if (ambientAudioBufferRef.current) return Promise.resolve();
+
+    if (!ambientAudioLoadPromiseRef.current) {
+      ambientAudioLoadPromiseRef.current = fetch(HANABI_AMBIENT_AUDIO_SRC)
+        .then((response) => response.arrayBuffer())
+        .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
+        .then((buffer) => {
+          ambientAudioBufferRef.current = buffer;
         })
         .catch(() => {
-          audio.pause();
-          ambientAudioPlayingRef.current = false;
-          setAmbientAudioPlaying(false);
+          ambientAudioLoadPromiseRef.current = null;
         });
-    } catch {
-      audio.pause();
-      ambientAudioPlayingRef.current = false;
-      setAmbientAudioPlaying(false);
     }
-  }, [ensureFireworkAudio]);
 
-  const playFireworkSound = useCallback((id: FireworkSoundId) => {
-    if (!ambientAudioPlayingRef.current) return;
+    return ambientAudioLoadPromiseRef.current;
+  }, []);
+
+  const unlockFireworkAudio = useCallback(() => {
+    if (!fireworkAudioContextRef.current) {
+      fireworkAudioContextRef.current = createAudioContext();
+    }
+
+    const audioContext = fireworkAudioContextRef.current;
+    if (!audioContext) return;
+
+    const source = audioContext.createBufferSource();
+    const gain = audioContext.createGain();
+    source.buffer = audioContext.createBuffer(1, Math.max(1, Math.round(audioContext.sampleRate * 0.02)), audioContext.sampleRate);
+    gain.gain.value = HANABI_AUDIO_UNLOCK_VOLUME;
+    source.connect(gain);
+    gain.connect(audioContext.destination);
+    source.start(0);
+    fireworkAudioUnlockedRef.current = true;
+
+    if (audioContext.state === 'suspended') {
+      void audioContext.resume().catch(() => undefined);
+    }
+  }, []);
+
+  const startAmbientAudio = useCallback(() => {
+    const startBuffer = () => {
+      const audioContext = fireworkAudioContextRef.current;
+      const buffer = ambientAudioBufferRef.current;
+      if (!audioContext || !buffer || ambientAudioSourceRef.current) return;
+
+      const source = audioContext.createBufferSource();
+      const gain = audioContext.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      gain.gain.value = getAmbientAudioVolume();
+      source.connect(gain);
+      gain.connect(audioContext.destination);
+      source.start(0);
+      source.onended = () => {
+        if (ambientAudioSourceRef.current === source) {
+          ambientAudioSourceRef.current = null;
+          ambientAudioGainRef.current = null;
+        }
+      };
+      ambientAudioSourceRef.current = source;
+      ambientAudioGainRef.current = gain;
+      ambientAudioPlayingRef.current = true;
+      setAmbientAudioPlaying(true);
+    };
+
+    void ensureAmbientAudio()
+      .then(() => {
+        const audioContext = fireworkAudioContextRef.current;
+        if (!audioContext) return;
+
+        if (audioContext.state === 'suspended') {
+          void audioContext
+            .resume()
+            .then(() => {
+              startBuffer();
+            })
+            .catch(() => {
+              ambientAudioPlayingRef.current = false;
+              setAmbientAudioPlaying(false);
+            });
+          return;
+        }
+
+        startBuffer();
+      })
+      .catch(() => {
+        ambientAudioPlayingRef.current = false;
+        setAmbientAudioPlaying(false);
+      });
+  }, [ensureAmbientAudio]);
+
+  const stopAmbientAudio = useCallback(() => {
+    const source = ambientAudioSourceRef.current;
+    if (source) {
+      source.onended = null;
+      try {
+        source.stop();
+      } catch {
+        // Source may already be stopped.
+      }
+      source.disconnect();
+    }
+
+    ambientAudioGainRef.current?.disconnect();
+    ambientAudioSourceRef.current = null;
+    ambientAudioGainRef.current = null;
+    ambientAudioPlayingRef.current = false;
+    setAmbientAudioPlaying(false);
+  }, []);
+
+  const playAmbientAudio = useCallback(() => {
+    const gain = ambientAudioGainRef.current;
+    if (gain) {
+      gain.gain.value = getAmbientAudioVolume();
+    }
+
+    startAmbientAudio();
+  }, [startAmbientAudio]);
+
+  const playFireworkSound = useCallback((id: FireworkSoundId, options?: { force?: boolean }) => {
+    if (!options?.force && !ambientAudioPlayingRef.current) return false;
 
     const audioContext = fireworkAudioContextRef.current;
     const buffer = fireworkAudioBuffersRef.current[id];
     if (!audioContext || !buffer) {
       void ensureFireworkAudio();
-      return;
+      return false;
     }
 
     const playBuffer = () => {
       const source = audioContext.createBufferSource();
       const gain = audioContext.createGain();
       source.buffer = buffer;
-      gain.gain.value = HANABI_FIREWORK_AUDIO[id].volume;
+      gain.gain.value = getFireworkAudioVolume(HANABI_FIREWORK_AUDIO[id].volume);
       source.connect(gain);
       gain.connect(audioContext.destination);
       source.start();
@@ -915,62 +1052,104 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
 
     if (audioContext.state === 'suspended') {
       void audioContext.resume().then(playBuffer).catch(() => undefined);
-      return;
+      return true;
     }
 
     playBuffer();
+    return true;
   }, [ensureFireworkAudio]);
+
+  const playFireworkSoundForGesture = useCallback(() => {
+    if (ambientAudioPlayingRef.current) return;
+
+    const now = performance.now();
+    if (now - fireworkGestureSoundTimeRef.current < 500) return;
+    fireworkGestureSoundTimeRef.current = now;
+
+    unlockFireworkAudio();
+    void ensureFireworkAudio();
+  }, [ensureFireworkAudio, unlockFireworkAudio]);
 
   useEffect(() => {
     if (variant !== 'modal') return;
 
-    const audio = audioRef.current;
-    if (!audio) return;
+    void ensureFireworkAudio();
+    void ensureAmbientAudio();
+  }, [ensureAmbientAudio, ensureFireworkAudio, variant]);
 
-    audio.volume = HANABI_AMBIENT_AUDIO_VOLUME;
+  useEffect(() => {
+    if (variant !== 'modal') return;
 
-    const handlePlay = () => {
-      ambientAudioPlayingRef.current = true;
-      setAmbientAudioPlaying(true);
+    const handleVisibilityChange = () => {
+      const audioContext = fireworkAudioContextRef.current;
+      if (document.visibilityState === 'visible' && audioContext?.state === 'suspended' && fireworkAudioUnlockedRef.current) {
+        void audioContext.resume().catch(() => undefined);
+      }
     };
-    const handlePause = () => {
-      ambientAudioPlayingRef.current = false;
-      setAmbientAudioPlaying(false);
-    };
 
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.pause();
-      audio.currentTime = 0;
-      ambientAudioPlayingRef.current = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [variant]);
+
+  useEffect(() => {
+    if (variant !== 'modal') return;
+
+    return () => {
+      stopAmbientAudio();
       if (fireworkAudioContextRef.current && fireworkAudioContextRef.current.state !== 'closed') {
         void fireworkAudioContextRef.current.close().catch(() => undefined);
       }
       fireworkAudioContextRef.current = null;
+      ambientAudioBufferRef.current = null;
+      ambientAudioLoadPromiseRef.current = null;
       fireworkAudioBuffersRef.current = {};
       fireworkAudioLoadPromiseRef.current = null;
-      setAmbientAudioPlaying(false);
+      fireworkAudioUnlockedRef.current = false;
     };
-  }, [variant]);
+  }, [stopAmbientAudio, variant]);
 
   const handleAmbientAudioToggle = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
     if (ambientAudioPlaying) {
-      audio.pause();
-      ambientAudioPlayingRef.current = false;
-      setAmbientAudioPlaying(false);
+      stopAmbientAudio();
       return;
     }
 
+    playFireworkSoundForGesture();
     void ensureFireworkAudio();
-    playAmbientAudio(audio, { reload: audio.readyState === HTMLMediaElement.HAVE_NOTHING });
+    playAmbientAudio();
   };
+
+  const markAutoProgramEnded = useCallback(() => {
+    if (HANABI_DEBUG_CONTROLS || !autoProgramStartedRef.current || autoProgramEndedRef.current) return;
+
+    autoProgramEndedRef.current = true;
+    setAutoProgramEnded(true);
+  }, []);
+
+  const hanabiEventStatus = getHanabiEventStatus(hour);
+
+  useEffect(() => {
+    if (HANABI_DEBUG_CONTROLS || variant !== 'modal') return;
+    if (hanabiEventStatus !== 'open' || autoProgramStarted || autoProgramEnded) return;
+
+    const timeoutId = window.setTimeout(() => {
+      if (autoProgramStartedRef.current || autoProgramEndedRef.current) return;
+
+      autoProgramStartedRef.current = true;
+      setAutoProgramStarted(true);
+      specialPatternRef.current = 'program';
+      patternVersionRef.current += 1;
+      setSpecialPattern('program');
+      setHanabiMode('fireworks');
+    }, HANABI_PROGRAM_AUTO_START_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [autoProgramEnded, autoProgramStarted, hanabiEventStatus, variant]);
 
   const toggleSpecialPattern = useCallback((pattern: Exclude<FireworkSpecialPattern, 'normal'>) => {
     setSpecialPattern((current) => {
@@ -1324,6 +1503,9 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
         if (!fireworksVisible) {
           finaleComplete = true;
           directFireworkQueue.length = 0;
+          if (specialPatternRef.current === 'program') {
+            markAutoProgramEnded();
+          }
         }
         return;
       }
@@ -1369,6 +1551,9 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
       if (!fireworksVisible) {
         if (finalePhase === 5) {
           finaleComplete = true;
+          if (specialPatternRef.current === 'program') {
+            markAutoProgramEnded();
+          }
           return;
         }
 
@@ -1537,7 +1722,7 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
       setFireworkActive(false);
       setFireworkExplosion(false);
     };
-  }, [canvasSize.dpr, canvasSize.height, canvasSize.width, hanabiMode, playFireworkSound]);
+  }, [canvasSize.dpr, canvasSize.height, canvasSize.width, hanabiMode, markAutoProgramEnded, playFireworkSound]);
 
   useEffect(() => {
     const canvas = lightCanvasRef.current;
@@ -1597,6 +1782,15 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
     };
   }, [canvasSize.dpr, canvasSize.height, canvasSize.width, particleMotion]);
 
+  const hanabiEventMessage =
+    !HANABI_DEBUG_CONTROLS && variant === 'modal'
+      ? autoProgramEnded || hanabiEventStatus === 'after'
+        ? '本日の花火大会は終了しました'
+        : hanabiEventStatus === 'before'
+          ? '開催時間 19:00〜21:00'
+          : null
+      : null;
+
   return (
     <div className={cn('hanabi-scene', `hanabi-scene-${variant}`)}>
       <div className="hanabi-asset-stage">
@@ -1628,73 +1822,79 @@ export function HanabiScene({ variant }: { variant: PortfolioMediaVariant }) {
           ))}
           {variant === 'modal' ? (
             <>
-              <audio ref={audioRef} src={HANABI_AMBIENT_AUDIO_SRC} loop preload="auto" aria-hidden="true" />
               <button
                 type="button"
                 className="hanabi-audio-button"
+                onPointerDown={playFireworkSoundForGesture}
+                onTouchEnd={playFireworkSoundForGesture}
                 onClick={handleAmbientAudioToggle}
                 aria-label={ambientAudioPlaying ? '虫の音を消音' : '虫の音を再生'}
               >
                 <SpeakerIcon muted={!ambientAudioPlaying} />
               </button>
-              <button
-                type="button"
-                className={cn('hanabi-mode-button', hanabiMode === 'fireworks' && 'is-active')}
-                onClick={() => setHanabiMode((current) => (current === 'fireworks' ? 'normal' : 'fireworks'))}
-                aria-pressed={hanabiMode === 'fireworks'}
-              >
-                {hanabiMode === 'fireworks' ? '花火モード' : '通常モード'}
-              </button>
-              <div className="hanabi-pattern-controls" aria-label="花火パターン">
-                <button
-                  type="button"
-                  className={cn('hanabi-pattern-button', specialPattern === 'cascade' && 'is-active')}
-                  onClick={() => toggleSpecialPattern('cascade')}
-                  aria-pressed={specialPattern === 'cascade'}
-                >
-                  残像花火
-                </button>
-                <button
-                  type="button"
-                  className={cn('hanabi-pattern-button', specialPattern === 'rainbow' && 'is-active')}
-                  onClick={() => toggleSpecialPattern('rainbow')}
-                  aria-pressed={specialPattern === 'rainbow'}
-                >
-                  多色花火
-                </button>
-                <button
-                  type="button"
-                  className={cn('hanabi-pattern-button', specialPattern === 'shape' && 'is-active')}
-                  onClick={() => toggleSpecialPattern('shape')}
-                  aria-pressed={specialPattern === 'shape'}
-                >
-                  形花火
-                </button>
-                <button
-                  type="button"
-                  className={cn('hanabi-pattern-button', specialPattern === 'rapid' && 'is-active')}
-                  onClick={() => toggleSpecialPattern('rapid')}
-                  aria-pressed={specialPattern === 'rapid'}
-                >
-                  連発花火
-                </button>
-                <button
-                  type="button"
-                  className={cn('hanabi-pattern-button', specialPattern === 'finale' && 'is-active')}
-                  onClick={() => toggleSpecialPattern('finale')}
-                  aria-pressed={specialPattern === 'finale'}
-                >
-                  終幕
-                </button>
-                <button
-                  type="button"
-                  className={cn('hanabi-pattern-button', specialPattern === 'program' && 'is-active')}
-                  onClick={() => toggleSpecialPattern('program')}
-                  aria-pressed={specialPattern === 'program'}
-                >
-                  プログラム
-                </button>
-              </div>
+              {HANABI_DEBUG_CONTROLS ? (
+                <>
+                  <button
+                    type="button"
+                    className={cn('hanabi-mode-button', hanabiMode === 'fireworks' && 'is-active')}
+                    onClick={() => setHanabiMode((current) => (current === 'fireworks' ? 'normal' : 'fireworks'))}
+                    aria-pressed={hanabiMode === 'fireworks'}
+                  >
+                    {hanabiMode === 'fireworks' ? '花火モード' : '通常モード'}
+                  </button>
+                  <div className="hanabi-pattern-controls" aria-label="花火パターン">
+                    <button
+                      type="button"
+                      className={cn('hanabi-pattern-button', specialPattern === 'cascade' && 'is-active')}
+                      onClick={() => toggleSpecialPattern('cascade')}
+                      aria-pressed={specialPattern === 'cascade'}
+                    >
+                      残像花火
+                    </button>
+                    <button
+                      type="button"
+                      className={cn('hanabi-pattern-button', specialPattern === 'rainbow' && 'is-active')}
+                      onClick={() => toggleSpecialPattern('rainbow')}
+                      aria-pressed={specialPattern === 'rainbow'}
+                    >
+                      多色花火
+                    </button>
+                    <button
+                      type="button"
+                      className={cn('hanabi-pattern-button', specialPattern === 'shape' && 'is-active')}
+                      onClick={() => toggleSpecialPattern('shape')}
+                      aria-pressed={specialPattern === 'shape'}
+                    >
+                      形花火
+                    </button>
+                    <button
+                      type="button"
+                      className={cn('hanabi-pattern-button', specialPattern === 'rapid' && 'is-active')}
+                      onClick={() => toggleSpecialPattern('rapid')}
+                      aria-pressed={specialPattern === 'rapid'}
+                    >
+                      連発花火
+                    </button>
+                    <button
+                      type="button"
+                      className={cn('hanabi-pattern-button', specialPattern === 'finale' && 'is-active')}
+                      onClick={() => toggleSpecialPattern('finale')}
+                      aria-pressed={specialPattern === 'finale'}
+                    >
+                      終幕
+                    </button>
+                    <button
+                      type="button"
+                      className={cn('hanabi-pattern-button', specialPattern === 'program' && 'is-active')}
+                      onClick={() => toggleSpecialPattern('program')}
+                      aria-pressed={specialPattern === 'program'}
+                    >
+                      プログラム
+                    </button>
+                  </div>
+                </>
+              ) : null}
+              {hanabiEventMessage ? <div className="hanabi-event-message">{hanabiEventMessage}</div> : null}
             </>
           ) : null}
         </div>

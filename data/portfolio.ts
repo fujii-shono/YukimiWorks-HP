@@ -60,6 +60,7 @@ export const portfolioItems: PortfolioItem[] = [
       componentId: 'hanabi-scene',
       width: 681,
       height: 1000,
+      thumbnail: '/portfolio/hanabi/thumbnail.png'
     },
     ogImage: '/portfolio/hanabi/base.png',
     ogImageWidth: 681,

@@ -51,6 +51,22 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 
 export const portfolioItems: PortfolioItem[] = [
   {
+    id: 'to-eda',
+    title: '小日向えだ様キービジュアル',
+    href: '/portfolio/to-eda',
+    category: 'illustration',
+    content: {
+      kind: 'image',  
+      src: '/portfolio/skeb/to-eda.png',
+      alt: '小日向えだ様ご依頼'
+    },
+    description: '小日向えだ様からのご依頼でした！ありがとうございました。',
+    date: '2026-08-11',
+    year: 2026,
+    tags: ['イラスト'],
+    featured: true,
+  },
+  {
     id: 'hanabi',
     title: '花火大会',
     href: '/portfolio/hanabi',

@@ -1,8 +1,40 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { BokinSupportForm } from '@/components/ui/BokinSupportForm';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
+
+const title = 'YukimiWorks 募金ページ';
+const description =
+  'YukimiWorksの開発・運営を継続するための支援ページです。ご支援いただいた方には、ささやかなお礼としておみくじを提供しています。';
+const url = 'https://www.yukimi-works.co.jp/bokin';
+const image = {
+  url: 'https://www.yukimi-works.co.jp/bokin/header.png',
+  width: 4000,
+  height: 1000,
+  alt: 'YukimiWorks 募金ページ',
+};
+
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: {
+    canonical: url,
+  },
+  openGraph: {
+    title,
+    description,
+    url,
+    images: [image],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title,
+    description,
+    images: [image],
+  },
+};
 
 export default function BokinPage() {
   return (

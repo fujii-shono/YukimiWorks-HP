@@ -21,6 +21,18 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    image: {
+      src: '/message/20260818.jpg',
+      alt: 'wip',
+    },
+    publishedAt: '2026-08-18 15:27',
+    body: '次の作品は難しめ。',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     publishedAt: '2026-08-11 11:41',
     body: '新サイト作成が難航中です。便利にしたいので、色々機能を入れてます。',
   },

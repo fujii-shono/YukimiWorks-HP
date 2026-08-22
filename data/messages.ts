@@ -22,6 +22,18 @@ export const messagePosts: readonly MessagePost[] = [
       alt: 'YukimiWorks',
     },
     image: {
+      src: '/message/20260822.jpg',
+      alt: '震災募金',
+    },
+    publishedAt: '2026-08-22 10:14',
+    body: 'ちゃんと10%募金しました（天使の羽募金）',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
+    image: {
       src: '/message/20260818.jpg',
       alt: 'wip',
     },

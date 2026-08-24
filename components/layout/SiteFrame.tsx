@@ -8,8 +8,10 @@ import { TimeThemeProvider } from '@/components/theme/TimeThemeProvider';
 
 export function SiteFrame({
   children,
+  hideSidebar = false,
 }: {
   children: React.ReactNode;
+  hideSidebar?: boolean;
 }) {
   return (
     <TimeThemeProvider>
@@ -19,12 +21,18 @@ export function SiteFrame({
       </a>
       <div className="page-shell">
         <Header />
-        <div className="layout-grid">
-          <Sidebar />
-          <main id="main" className="main-column">
+        {hideSidebar ? (
+          <main id="main" className="main-column standalone-main">
             {children}
           </main>
-        </div>
+        ) : (
+          <div className="layout-grid">
+            <Sidebar />
+            <main id="main" className="main-column">
+              {children}
+            </main>
+          </div>
+        )}
         <Footer />
       </div>
       <DebugSpriteHost />

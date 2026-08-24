@@ -432,6 +432,11 @@ textarea {
   gap: 14px;
 }
 
+.standalone-main {
+  width: min(100%, 826px);
+  margin: 14px auto 0;
+}
+
 .window-panel {
   background: var(--site-surface);
   border: 1px solid var(--site-border);
@@ -2266,6 +2271,86 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   text-align: center;
 }
 
+.why-body {
+  display: grid;
+  gap: 28px;
+}
+
+.why-intro,
+.why-closing {
+  text-align: center;
+}
+
+.why-intro p,
+.why-closing p,
+.why-strength-body {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.95;
+}
+
+.why-kicker {
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.why-lead {
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  line-height: 1.75;
+}
+
+.why-strength-list {
+  display: grid;
+  gap: 18px;
+}
+
+.why-strength-block {
+  padding: 20px 22px 22px;
+  background: color-mix(in srgb, var(--site-surface-soft) 78%, white);
+  border: 1px solid color-mix(in srgb, var(--site-dotted) 65%, white);
+}
+
+.why-strength-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.why-strength-number {
+  margin: 0;
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.why-strength-heading h3 {
+  margin: 0;
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+  font-size: clamp(1.12rem, 2vw, 1.35rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+
+.why-strength-subheading {
+  margin: 6px 0 0;
+  font-family: var(--font-pixel);
+  font-size: 0.94rem;
+}
+
+.why-strength-body {
+  text-align: left;
+}
+
 .bokin-body {
   display: grid;
   gap: 18px;
@@ -4090,6 +4175,12 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
     display: contents;
   }
 
+  .standalone-main {
+    display: grid;
+    width: 100%;
+    margin-top: 14px;
+  }
+
   .main-column > * {
     order: 2;
   }
@@ -4176,6 +4267,11 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
     gap: 10px;
     padding-inline: 14px;
     font-size: 1.12rem;
+  }
+
+  .why-strength-heading {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .welcome-content {

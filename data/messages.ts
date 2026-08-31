@@ -21,6 +21,14 @@ export const messagePosts: readonly MessagePost[] = [
       src: '/logo/yukimi_works_favicon.png',
       alt: 'YukimiWorks',
     },
+    publishedAt: '2026-08-31 18:51',
+    body: 'ついにリクありリリース完了です！',
+  },
+  {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
     image: {
       src: '/message/20260822.jpg',
       alt: '震災募金',

@@ -6,6 +6,7 @@ export type WorkMedia = {
 
 export type WorkBodySegment =
   | { type: 'text'; value: string }
+  | { type: 'strikethrough'; value: string }
   | { type: 'link'; label: string; href: string };
 
 export type WorkCategory = 'contents' | 'tools' | 'apps';
@@ -32,8 +33,31 @@ export const workCategoryLabels: Record<WorkCategory, string> = {
 
 export const works: Work[] = [
   {
+    id: 'rikuari',
+    title: 'リクあり',
+    description: 'クリエイターのための業務効率化ツール',
+    body: [
+      {
+        type: 'text',
+        value:
+          'リクありはクリエイターのポートフォリオ・依頼募集から見積もり書の簡単作成にスケジュール管理まですべて入ったサービスです。\n\nクラウドソーシングと異なり、SNSでもメールでも企業様相手でも、あらゆる場面で依頼のやり取りを効率化します。',
+      },
+      {
+        type: 'link',
+        label: 'リクあり',
+        href: 'https://rikuari.com',
+      },
+    ],
+    category: 'apps',
+    tags: ['webサービス'],
+    thumbnail: '/works/rikuari/hero.png',
+    media: [{ type: 'image', src: '/works/rikuari/hero.png', alt: 'サービス紹介' }],
+    date: '2026-08-31',
+    featured: true,
+  },
+  {
     id: 'rss-matome-web',
-    title: '新サービス RSSまとめ',
+    title: 'RSSまとめ',
     description: '好きなwebサイトを集めてみんなに共有',
     body: [
       {
@@ -105,14 +129,14 @@ export const works: Work[] = [
     description: 'オンラインで料金表を作れるサービスです。',
     body: [
       {
-        type: 'text',
+        type: 'strikethrough',
         value:
           'Tarif(タリフ)はオンライン上で料金表を作りURLで共有できるサービスです。\n\n共有した料金表からそのまま見積書を作成できます。',
       },
       {
         type: 'link',
-        label: 'サービスリンク',
-        href: 'https://tarif.jp',
+        label: 'リクありとしてリニューアルしました',
+        href: '/works/rikuari',
       },
     ],
     category: 'apps',

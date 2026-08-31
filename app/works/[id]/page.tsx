@@ -86,17 +86,17 @@ export default function WorkDetailPage({ params }: { params: { id: string } }) {
           {typeof work.body === 'string' || !work.body ? (
             <p>{work.body ?? work.description}</p>
           ) : (
-            work.body.map((segment, index) =>
-              segment.type === 'text' ? (
-                <p key={index}>{segment.value}</p>
-              ) : (
+            work.body.map((segment, index) => {
+              if (segment.type === 'text') return <p key={index}>{segment.value}</p>;
+              if (segment.type === 'strikethrough') return <p key={index} className="detail-body-strikethrough">{segment.value}</p>;
+              return (
                 <p key={index}>
                   <Link href={segment.href} target="_blank" rel="noopener noreferrer">
                     {segment.label}
                   </Link>
                 </p>
-              ),
-            )
+              );
+            })
           )}
         </div>
         <div className="tag-list tag-list-center">

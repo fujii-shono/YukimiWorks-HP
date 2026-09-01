@@ -100,13 +100,21 @@ async function listIllustrations() {
 }
 
 async function postJson(pathname, body) {
-  const response = await fetch(`${baseUrl}${pathname}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let response;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    response = await fetch(`${baseUrl}${pathname}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-  if (!response.ok) {
+    if (response.ok || response.status !== 404 || attempt === 3) break;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 800);
+    });
+  }
+
+  if (!response || !response.ok) {
     const text = await response.text().catch(() => '');
     throw new Error(`${pathname} failed with ${response.status}${text ? `: ${text}` : ''}`);
   }
@@ -136,7 +144,7 @@ async function buildArtifacts(fileName) {
       relativePath: `${artifactDir}.preview.json`,
       content,
     });
-    for (const layerName of ['acrylicSrc', 'edgeSrc', 'artworkSrc', 'backSrc', 'highlightSrc']) {
+    for (const layerName of ['acrylicSrc', 'edgeSrc', 'sideSrc', 'artworkSrc', 'backSrc', 'highlightSrc']) {
       artifacts.push({
         relativePath: path.join(artifactDir, `${layerName.replace(/Src$/, '')}.png`),
         content: pngBufferFromDataUrl(preview[layerName]),

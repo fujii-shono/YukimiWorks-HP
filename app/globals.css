@@ -2998,6 +2998,13 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   transform: translateZ(6px);
 }
 
+.acrylic-preview-side-image {
+  z-index: 0;
+  --acrylic-side-opacity: 1;
+  opacity: var(--acrylic-side-opacity);
+  transform: translateZ(var(--acrylic-side-z));
+}
+
 .acrylic-preview-stand-base {
   position: absolute;
   left: var(--stand-base-left);

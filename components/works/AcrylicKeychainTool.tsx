@@ -7,6 +7,7 @@ import { cn } from '@/lib/format';
 type PreviewState = {
   acrylicSrc: string;
   edgeSrc: string;
+  sideSrc: string;
   artworkSrc: string;
   originalArtworkSrc: string;
   backSrc: string;
@@ -65,10 +66,16 @@ const MOBILE_PREVIEW_ARTWORK_MAX_WIDTH_RATIO = 0.98;
 const MOBILE_PREVIEW_ARTWORK_MAX_HEIGHT_RATIO = 0.98;
 const ROTATION_MIN_SPEED = 0.015;
 const HIGHLIGHT_VISIBLE_START = 0.78;
+const BACK_SIDE_SIDE_VISIBLE_START = 0.42;
 const SURFACE_GLOSS_OPACITY = 0.46;
 const EXPORT_DEBUG_SVG = false;
 const ACRYLIC_PREVIEW_FRONT_Z = 6;
 const ACRYLIC_PREVIEW_BACK_Z = -4;
+const ACRYLIC_SIDE_LAYER_COUNT = 6;
+const ACRYLIC_SIDE_LAYERS = Array.from({ length: ACRYLIC_SIDE_LAYER_COUNT }, (_, index) => {
+  const progress = (index + 1) / (ACRYLIC_SIDE_LAYER_COUNT + 1);
+  return ACRYLIC_PREVIEW_BACK_Z + (ACRYLIC_PREVIEW_FRONT_Z - ACRYLIC_PREVIEW_BACK_Z) * progress;
+});
 const STAND_CIRCLE_DEPTH_PX = ACRYLIC_PREVIEW_FRONT_Z - ACRYLIC_PREVIEW_BACK_Z;
 const STAND_CYLINDER_SIDE_SEGMENTS = 48;
 const STAND_CYLINDER_SIDE_PANELS = Array.from({ length: STAND_CYLINDER_SIDE_SEGMENTS }, (_, index) => ({
@@ -343,6 +350,7 @@ export function AcrylicKeychainTool() {
   const [standMode, setStandMode] = useState<StandMode>('simple');
   const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
   const [renderedEdgeSrc, setRenderedEdgeSrc] = useState('');
+  const [renderedSideSrc, setRenderedSideSrc] = useState('');
   const [renderedArtworkSrc, setRenderedArtworkSrc] = useState('');
   const [renderedBackArtworkSrc, setRenderedBackArtworkSrc] = useState('');
   const [renderedHighlightSrc, setRenderedHighlightSrc] = useState('');
@@ -365,6 +373,7 @@ export function AcrylicKeychainTool() {
     if (!preview) {
       setRenderedAcrylicSrc('');
       setRenderedEdgeSrc('');
+      setRenderedSideSrc('');
       setRenderedArtworkSrc('');
       setRenderedBackArtworkSrc('');
       setRenderedHighlightSrc('');
@@ -382,6 +391,10 @@ export function AcrylicKeychainTool() {
     edgeCanvas.width = stage.width;
     edgeCanvas.height = stage.height;
     const edgeContext = edgeCanvas.getContext('2d');
+    const sideCanvas = document.createElement('canvas');
+    sideCanvas.width = stage.width;
+    sideCanvas.height = stage.height;
+    const sideContext = sideCanvas.getContext('2d');
     const artworkCanvas = document.createElement('canvas');
     artworkCanvas.width = stage.width;
     artworkCanvas.height = stage.height;
@@ -394,7 +407,7 @@ export function AcrylicKeychainTool() {
     highlightCanvas.width = stage.width;
     highlightCanvas.height = stage.height;
     const highlightContext = highlightCanvas.getContext('2d');
-    if (!acrylicContext || !edgeContext || !artworkContext || !backContext || !highlightContext) return;
+    if (!acrylicContext || !edgeContext || !sideContext || !artworkContext || !backContext || !highlightContext) return;
 
     const setStandPreviewStyles = (contactYOverride?: number) => {
       const nextStyles = createStandPreviewStyles(preview, stage, contactYOverride);
@@ -421,12 +434,14 @@ export function AcrylicKeychainTool() {
 
       acrylicContext.clearRect(0, 0, stage.width, stage.height);
       edgeContext.clearRect(0, 0, stage.width, stage.height);
+      sideContext.clearRect(0, 0, stage.width, stage.height);
       artworkContext.clearRect(0, 0, stage.width, stage.height);
       backContext.clearRect(0, 0, stage.width, stage.height);
       highlightContext.clearRect(0, 0, stage.width, stage.height);
       setStandPreviewStyles();
       acrylicContext.save();
       edgeContext.save();
+      sideContext.save();
       artworkContext.save();
       backContext.save();
       highlightContext.save();
@@ -443,6 +458,11 @@ export function AcrylicKeychainTool() {
         edgeContext.translate(drawX, drawY);
         edgeContext.scale(scale, scale);
         await drawImageSource(edgeContext, preview.edgeSrc);
+        if (cancelled) return;
+
+        sideContext.translate(drawX, drawY);
+        sideContext.scale(scale, scale);
+        await drawImageSource(sideContext, preview.sideSrc);
         if (cancelled) return;
 
         artworkContext.translate(drawX, drawY);
@@ -462,6 +482,7 @@ export function AcrylicKeychainTool() {
 
         setRenderedAcrylicSrc(acrylicCanvas.toDataURL('image/png'));
         setRenderedEdgeSrc(edgeCanvas.toDataURL('image/png'));
+        setRenderedSideSrc(sideCanvas.toDataURL('image/png'));
         setRenderedArtworkSrc(artworkCanvas.toDataURL('image/png'));
         setRenderedBackArtworkSrc(backCanvas.toDataURL('image/png'));
         setRenderedHighlightSrc(highlightCanvas.toDataURL('image/png'));
@@ -475,6 +496,7 @@ export function AcrylicKeychainTool() {
       } finally {
         acrylicContext.restore();
         edgeContext.restore();
+        sideContext.restore();
         artworkContext.restore();
         backContext.restore();
         highlightContext.restore();
@@ -690,6 +712,11 @@ export function AcrylicKeychainTool() {
     isBackSide ? 0 : Math.max(0, (leftFacingAmount - HIGHLIGHT_VISIBLE_START) / (1 - HIGHLIGHT_VISIBLE_START))
   ).toFixed(3);
   const rightShadeOpacity = Math.max(0, visibleSideFacing).toFixed(3);
+  const sideLayerOpacity = (
+    isBackSide
+      ? Math.max(0, (Math.abs(sideFacing) - BACK_SIDE_SIDE_VISIBLE_START) / (1 - BACK_SIDE_SIDE_VISIBLE_START)) * 0.72
+      : 1
+  ).toFixed(3);
 
   return (
     <div className="acrylic-tool">
@@ -771,6 +798,7 @@ export function AcrylicKeychainTool() {
               if (
                 !renderedAcrylicSrc ||
                 !renderedEdgeSrc ||
+                !renderedSideSrc ||
                 !renderedArtworkSrc ||
                 !renderedBackArtworkSrc ||
                 !renderedHighlightSrc
@@ -844,7 +872,7 @@ export function AcrylicKeychainTool() {
                 </span>
               </div>
             ) : null}
-            {renderedAcrylicSrc && renderedEdgeSrc && renderedArtworkSrc && renderedBackArtworkSrc && renderedHighlightSrc ? (
+            {renderedAcrylicSrc && renderedEdgeSrc && renderedSideSrc && renderedArtworkSrc && renderedBackArtworkSrc && renderedHighlightSrc ? (
               <>
                 {SHOW_STAND_BASE_SVG && preview.productMode === 'stand' && visibleStandBaseStyle ? (
                   <div className="acrylic-preview-stand-base" style={visibleStandBaseStyle} aria-hidden="true">
@@ -881,6 +909,22 @@ export function AcrylicKeychainTool() {
                     transform: `rotateY(${rotation.y}deg)`,
                   } as CSSProperties}
                 >
+                  {ACRYLIC_SIDE_LAYERS.map((zPosition) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={zPosition}
+	                      className="acrylic-preview-image acrylic-preview-side-image"
+	                      src={renderedSideSrc}
+	                      alt=""
+	                      style={
+	                        {
+	                          '--acrylic-side-z': `${zPosition}px`,
+	                          '--acrylic-side-opacity': sideLayerOpacity,
+	                        } as CSSProperties
+	                      }
+	                      aria-hidden="true"
+	                    />
+                  ))}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="acrylic-preview-image acrylic-preview-edge-image" src={renderedEdgeSrc} alt="" aria-hidden="true" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}

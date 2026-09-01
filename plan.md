@@ -162,6 +162,49 @@
 
 ---
 
+## 追加対応: アクキー側面の3D厚みレイヤー
+
+### 対応する仕様
+
+- ユーザー依頼: アクキー本体の厚み表現を、アクスタ土台と同じレイヤー表現で追加する
+- ユーザー依頼: 側面レイヤーの色はアクスタ土台と同じ薄いグレーにする
+
+### 実装方針
+
+- 既存の `edge` / `back` / `highlight` レイヤーは維持する
+- `/api/acrylic/preview` で透明アクリル本体のシルエットを薄いグレーにした `sideSrc` を追加生成する
+- フロントでは `sideSrc` をステージサイズへ整形し、前面と背面のZ位置の間に複数枚並べて厚みとして表示する
+- 背面が正対しているときは側面帯のopacityを落とし、背面ハイライトに暗い帯がかぶらないようにする
+- SVG/export は今回の表示改善対象外のため変更しない
+
+### 変更予定のファイルと理由
+
+- `app/api/acrylic/preview/route.ts`: アクキー/アクスタ共通のプレビュー側面レイヤーを返すため
+- `components/works/AcrylicKeychainTool.tsx`: 側面レイヤーをcanvas整形し、3D空間へ複数枚配置するため
+- `app/globals.css`: 側面レイヤーのZ位置・見た目を定義するため
+- `scripts/acrylic-regression.mjs`: 新しい `sideSrc` レイヤーも比較成果物に含めるため
+
+### 影響範囲
+
+- `/works/acrylic-keychain-tool` のプレビュー表示
+- `/api/acrylic/preview` のレスポンス形状
+- 回帰比較で保存されるプレビューレイヤー成果物
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --pretty false`
+- `npm run build`
+- `npm run acrylic:compare`
+- 通常ブラウザで回転時に薄いグレーの側面厚みが見えることを確認する
+
+### 懸念点・制約・未確定事項
+
+- baseline には `sideSrc` が存在しないため、今回の比較では新規レイヤーが missing として表示される想定
+- VS Code のブラウザプレビューではCSS 3Dが正しく見えない可能性があるため、表示確認は通常ブラウザを基準にする
+
+---
+
 ## 追加対応: メッセージパネル
 
 ### 対応する仕様

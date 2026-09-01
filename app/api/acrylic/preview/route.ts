@@ -63,6 +63,7 @@ const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
 const HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER = 1.18;
 const ARTWORK_MULTIPLY = 242 / 255;
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
+const ACRYLIC_SIDE_FACE_COLOR: [number, number, number, number] = [116, 122, 138, 33];
 const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124, 58];
 const ACRYLIC_EDGE_SHADOW_COLOR: [number, number, number, number] = [88, 96, 112, 34];
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
@@ -650,6 +651,14 @@ function layerFromMask(width: number, height: number, mask: Uint8Array, color: [
   return { width, height, rgba };
 }
 
+function subtractMask(outerMask: Uint8Array, innerMask: Uint8Array, width: number, height: number) {
+  const output = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (outerMask[index] && !innerMask[index]) output[index] = 1;
+  }
+  return output;
+}
+
 function conditionalLayer(width: number, height: number, paint: (index: number) => [number, number, number, number] | null) {
   const rgba = new Uint8Array(width * height * 4);
   for (let index = 0; index < width * height; index += 1) {
@@ -951,6 +960,7 @@ function buildPreviewLayers(
   compositeStandContactLine(acrylic, standShape?.contactLine ?? null, bounds.width, bounds.height, metrics.clearRadius);
   const edge = buildEdgeLayer(width, height, clearMask, edgeMask);
   compositeStandClawFill(edge, standClawFillMask);
+  const side = layerFromMask(width, height, subtractMask(clearMask, innerShineMask, width, height), ACRYLIC_SIDE_FACE_COLOR);
   const back = layerFromMask(width, height, gapClosedBaseMask, BACK_FACE_MULTIPLY_COLOR);
   const originalArtwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
   const artwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
@@ -978,6 +988,7 @@ function buildPreviewLayers(
   return {
     acrylicSrc: toDataUrl(acrylic),
     edgeSrc: toDataUrl(edge),
+    sideSrc: toDataUrl(side),
     artworkSrc: toDataUrl(artwork),
     originalArtworkSrc: toDataUrl(originalArtwork),
     backSrc: toDataUrl(back),

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "acrylic:baseline": "node scripts/acrylic-regression.mjs baseline",
+    "acrylic:compare": "node scripts/acrylic-regression.mjs compare"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

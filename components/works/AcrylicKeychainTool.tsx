@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from 'react';
+import { DEFAULT_ACRYLIC_GENERATION_OPTIONS } from '@/lib/acrylicGenerationOptions';
 import { cn } from '@/lib/format';
 
 type PreviewState = {
@@ -314,6 +315,7 @@ async function buildPreview(file: File, productMode: ProductMode, shapeMode: Sha
       imageDataUrl: await fileToDataUrl(file),
       productMode,
       shapeMode,
+      generationOptions: DEFAULT_ACRYLIC_GENERATION_OPTIONS,
     }),
   });
 
@@ -627,6 +629,7 @@ export function AcrylicKeychainTool() {
           artworkDataUrl: preview.originalArtworkSrc,
           holeMode,
           debug: EXPORT_DEBUG_SVG,
+          generationOptions: DEFAULT_ACRYLIC_GENERATION_OPTIONS,
         }),
       });
 

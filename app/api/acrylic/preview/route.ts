@@ -1,6 +1,7 @@
 import { deflateSync } from 'node:zlib';
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { resolveAcrylicGenerationOptions, type AcrylicGenerationOptions } from '@/lib/acrylicGenerationOptions';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +15,7 @@ type AcrylicPreviewRequest = {
   imageDataUrl?: unknown;
   productMode?: unknown;
   shapeMode?: unknown;
+  generationOptions?: unknown;
 };
 
 type StandBaseFrame = {
@@ -37,6 +39,8 @@ type StandContactLine = {
   y: number;
 } | null;
 
+type StandShapeOptions = AcrylicGenerationOptions['stand'];
+
 type AcrylicMetrics = {
   clearRadius: number;
   highlightRadius: number;
@@ -57,10 +61,6 @@ const BASE_CLEAR_RADIUS = 10;
 const BASE_HIGHLIGHT_RADIUS = 1;
 const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
 const HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER = 1.18;
-const BASE_KEYCHAIN_HOLE_OUTER_RADIUS = 24;
-const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
-const BASE_KEYCHAIN_HOLE_GAP = 2;
-const BASE_PADDING_SPACE = 20;
 const ARTWORK_MULTIPLY = 242 / 255;
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
 const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124, 58];
@@ -76,10 +76,6 @@ const BASE_STAND_STABLE_START_WIDTH_RATIO = 0.6;
 const BASE_STAND_STABLE_DIAGONAL_DISTANCE = 28;
 const BASE_STAND_CLAW_EDGE_GAP = 16;
 const BASE_STAND_CLAW_CONTACT_LINE_WIDTH = 3;
-const BASE_STAND_BASE_WIDTH_RATIO_PERCENT = 100;
-const BASE_STAND_BASE_HEIGHT_RATIO_PERCENT = 22;
-const BASE_STAND_BASE_MIN_HEIGHT = 18;
-const BASE_STAND_BASE_DEPTH_OFFSET_RATIO = 0.18;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 function jsonError(message: string, status = 400) {
@@ -90,15 +86,19 @@ function scaleArtworkMetric(value: number, artworkWidth: number, artworkHeight: 
   return value * (Math.max(artworkWidth, artworkHeight) / REFERENCE_ARTWORK_SIZE);
 }
 
-function getAcrylicMetrics(artworkWidth: number, artworkHeight: number): AcrylicMetrics {
+function getAcrylicMetrics(
+  artworkWidth: number,
+  artworkHeight: number,
+  keychainOptions: AcrylicGenerationOptions['keychain'],
+): AcrylicMetrics {
   return {
     clearRadius: scaleArtworkMetric(BASE_CLEAR_RADIUS, artworkWidth, artworkHeight),
     highlightRadius: scaleArtworkMetric(BASE_HIGHLIGHT_RADIUS, artworkWidth, artworkHeight),
     internalGapCloseRadius: scaleArtworkMetric(BASE_INTERNAL_GAP_CLOSE_RADIUS, artworkWidth, artworkHeight),
-    holeOuterRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_OUTER_RADIUS, artworkWidth, artworkHeight),
-    holeInnerRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_INNER_RADIUS, artworkWidth, artworkHeight),
-    holeGap: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_GAP, artworkWidth, artworkHeight),
-    paddingSpace: scaleArtworkMetric(BASE_PADDING_SPACE, artworkWidth, artworkHeight),
+    holeOuterRadius: scaleArtworkMetric(keychainOptions.holeOuterRadius, artworkWidth, artworkHeight),
+    holeInnerRadius: scaleArtworkMetric(keychainOptions.holeInnerRadius, artworkWidth, artworkHeight),
+    holeGap: scaleArtworkMetric(keychainOptions.holeGap, artworkWidth, artworkHeight),
+    paddingSpace: scaleArtworkMetric(keychainOptions.paddingSpace, artworkWidth, artworkHeight),
     edgeShadowWidth: scaleArtworkMetric(BASE_EDGE_SHADOW_WIDTH, artworkWidth, artworkHeight),
     innerShineWidth: scaleArtworkMetric(BASE_INNER_SHINE_WIDTH, artworkWidth, artworkHeight),
   };
@@ -406,7 +406,16 @@ function findConnectorEdgeContactY(mask: Uint8Array, width: number, height: numb
   return null;
 }
 
-function addKeychainHoleToMask(mask: Uint8Array, width: number, height: number, artworkCenterX: number, artworkWidth: number, metrics: AcrylicMetrics) {
+function addKeychainHoleToMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  artworkHeight: number,
+  metrics: AcrylicMetrics,
+  keychainOptions: AcrylicGenerationOptions['keychain'],
+) {
   const loopMask = mask.slice();
   const centerX = Math.round(artworkCenterX);
   const centerBandHalfWidth = Math.max(3, Math.round(artworkWidth * 0.16));
@@ -416,7 +425,10 @@ function addKeychainHoleToMask(mask: Uint8Array, width: number, height: number, 
   const clearRadius = Math.max(1, Math.round(metrics.clearRadius));
   const gap = Math.round(metrics.holeGap);
   const clearTopY = Math.max(0, artworkTopY - clearRadius);
-  const centerY = Math.max(outerRadius + 1, clearTopY - innerRadius - gap);
+  const centerY =
+    keychainOptions.holeCenterYRatio === null
+      ? Math.max(outerRadius + 1, clearTopY - innerRadius - gap)
+      : Math.max(outerRadius + 1, Math.round(artworkTopY + artworkHeight * keychainOptions.holeCenterYRatio));
   const connectorLeft = centerX - outerRadius;
   const connectorRight = centerX + outerRadius;
   const edgeProbeRadius = Math.max(1, Math.round(clearRadius * 0.35));
@@ -470,14 +482,17 @@ function addStandClawsToMask(
   artworkWidth: number,
   artworkHeight: number,
   standBaseDepthOffset: number,
+  standOptions: StandShapeOptions,
 ) {
   const edgeGap = Math.max(0, Math.round(scaleArtworkMetric(BASE_STAND_CLAW_EDGE_GAP, artworkWidth, artworkHeight)));
   const safeLeftX = Math.min(contactRightX, contactLeftX + edgeGap);
   const safeRightX = Math.max(contactLeftX, contactRightX - edgeGap);
-  const centerX = Math.round(artworkCenterX);
+  const centerX = Math.round(artworkCenterX + (standOptions.clawCenterXRatio - 0.5) * artworkWidth);
   const leftSpan = Math.max(0, centerX - safeLeftX);
   const rightSpan = Math.max(0, safeRightX - centerX);
-  const halfSpan = Math.floor(Math.min(leftSpan, rightSpan));
+  const autoHalfSpan = Math.floor(Math.min(leftSpan, rightSpan));
+  const requestedHalfSpan = standOptions.clawWidthRatio === null ? autoHalfSpan : Math.round((artworkWidth * standOptions.clawWidthRatio) / 2);
+  const halfSpan = Math.min(autoHalfSpan, Math.max(0, requestedHalfSpan));
   if (halfSpan <= 0) return;
 
   const clawLeftX = Math.max(contactLeftX, centerX - halfSpan);
@@ -555,6 +570,7 @@ function addStandBottomOutlineToMask(
   artworkHeight: number,
   standBaseDepthOffset: number,
   standMode: StandMode,
+  standOptions: StandShapeOptions,
 ) {
   const standMask = mask.slice();
   const bottomPoint = findBottomMaskPoint(mask, width, height);
@@ -596,6 +612,7 @@ function addStandBottomOutlineToMask(
       artworkWidth,
       artworkHeight,
       standBaseDepthOffset,
+      standOptions,
     );
     contactLine = { leftX: contactLeftX, rightX: contactRightX, y: clawContactY };
   }
@@ -815,7 +832,13 @@ function placeImage(target: RgbaImage, source: RgbaImage, offsetX: number, offse
   }
 }
 
-function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMode: ProductMode, shapeMode: ShapeMode) {
+function buildPreviewLayers(
+  sourceImage: RgbaImage,
+  fileName: string,
+  productMode: ProductMode,
+  shapeMode: ShapeMode,
+  generationOptions: AcrylicGenerationOptions,
+) {
   const scale = Math.min(1, MAX_IMAGE_SIZE / Math.max(sourceImage.width, sourceImage.height));
   const image = resizeNearest(sourceImage, Math.max(1, Math.round(sourceImage.width * scale)), Math.max(1, Math.round(sourceImage.height * scale)));
   const alphaMask = new Uint8Array(image.width * image.height);
@@ -823,18 +846,18 @@ function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMod
     if (image.rgba[index * 4 + 3] > 8) alphaMask[index] = 1;
   }
   const bounds = maskBounds(alphaMask, image.width, image.height);
-  const metrics = getAcrylicMetrics(bounds.width, bounds.height);
+  const metrics = getAcrylicMetrics(bounds.width, bounds.height, generationOptions.keychain);
   const padding = Math.ceil(metrics.clearRadius + metrics.highlightRadius + metrics.paddingSpace);
   const topLoopSpace = productMode === 'keychain' && shapeMode === 'with-hole' ? Math.ceil(metrics.holeOuterRadius * 2 + metrics.holeGap * 2) : 0;
   const standBaseWidth =
     productMode === 'stand'
-      ? Math.max(1, Math.round(bounds.width * (BASE_STAND_BASE_WIDTH_RATIO_PERCENT / 100)))
+      ? Math.max(1, Math.round(bounds.width * (generationOptions.stand.baseWidthRatioPercent / 100)))
       : 0;
   const standBaseHeight =
     productMode === 'stand'
-      ? Math.max(BASE_STAND_BASE_MIN_HEIGHT, Math.round(standBaseWidth * (BASE_STAND_BASE_HEIGHT_RATIO_PERCENT / 100)))
+      ? Math.max(generationOptions.stand.baseMinHeight, Math.round(standBaseWidth * (generationOptions.stand.baseHeightRatioPercent / 100)))
       : 0;
-  const standBaseDepthOffset = productMode === 'stand' ? Math.max(1, Math.round(standBaseHeight * BASE_STAND_BASE_DEPTH_OFFSET_RATIO)) : 0;
+  const standBaseDepthOffset = productMode === 'stand' ? Math.max(1, Math.round(standBaseHeight * generationOptions.stand.baseDepthOffsetRatio)) : 0;
   const contentWidth = Math.max(bounds.width, standBaseWidth);
   const width = contentWidth + padding * 2;
   const imageX = padding + Math.round((contentWidth - bounds.width) / 2) - bounds.minX;
@@ -877,7 +900,16 @@ function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMod
   );
   const keychainShape =
     productMode === 'keychain' && shapeMode === 'with-hole'
-      ? addKeychainHoleToMask(gapClosedBaseMask, width, height, padding + bounds.width / 2, bounds.width, metrics)
+      ? addKeychainHoleToMask(
+          gapClosedBaseMask,
+          width,
+          height,
+          padding + bounds.width * generationOptions.keychain.holeCenterXRatio,
+          bounds.width,
+          bounds.height,
+          metrics,
+          generationOptions.keychain,
+        )
       : null;
   const standShape =
     productMode === 'stand'
@@ -890,6 +922,7 @@ function buildPreviewLayers(sourceImage: RgbaImage, fileName: string, productMod
           bounds.height,
           standBaseDepthOffset,
           shapeMode as StandMode,
+          generationOptions.stand,
         )
       : null;
   const standShapeMask = standShape ? fillEnclosedMaskHoles(standShape.mask, width, height) : null;
@@ -979,7 +1012,13 @@ export async function POST(request: Request) {
   try {
     const png = parsePngDataUrl(body.imageDataUrl);
     const image = await decodePng(png);
-    const preview = buildPreviewLayers(image, body.fileName, body.productMode, body.shapeMode as ShapeMode);
+    const preview = buildPreviewLayers(
+      image,
+      body.fileName,
+      body.productMode,
+      body.shapeMode as ShapeMode,
+      resolveAcrylicGenerationOptions(body.generationOptions),
+    );
     return NextResponse.json(preview, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : 'プレビューを作成できませんでした');

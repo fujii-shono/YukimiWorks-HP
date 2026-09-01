@@ -114,6 +114,54 @@
 
 ---
 
+## 追加対応: アクキーシミュレーター可変生成パラメータと回帰比較
+
+### 対応する仕様
+
+- ユーザー依頼: 本来のアクキーシミュレーターへの影響をなくしつつ、デモページ用に API へ固定値ではなく指定値を渡せるようにする
+- ユーザー依頼: 変更前後の 3D 情報・SVG 情報を保存し、差異があるファイルを自動で表示する
+- ユーザー依頼: 差異があっても NG とはせず、最終判断は人間に任せる
+- ユーザー依頼: テスト用イラストを後から追加できるフォルダを用意する
+
+### 実装方針
+
+- 現在 API 内にある固定値を共有デフォルト設定として定義する
+- 既存シミュレーターは共有デフォルト設定を明示的に API へ送る
+- API は設定未指定時も同じデフォルトを使い、既存呼び出しとの後方互換性を保つ
+- 回帰確認スクリプトは `tests/acrylic/illustrations/` 配下の PNG を自動で対象にする
+- baseline は変更前保存用、compare は変更後の再生成・差分表示用に分ける
+
+### 変更予定のファイルと理由
+
+- `lib/acrylicGenerationOptions.ts`: 共有デフォルト設定と API 入力の正規化を定義するため
+- `components/works/AcrylicKeychainTool.tsx`: 既存ツールから固定デフォルト値を明示的に送るため
+- `app/api/acrylic/preview/route.ts`: 可変設定を受け取り、未指定時はデフォルトで生成するため
+- `app/api/acrylic/export/route.ts`: SVG生成にも可変設定を受け取り、未指定時はデフォルトで生成するため
+- `tests/acrylic/illustrations/.gitkeep`: 回帰確認用 PNG の格納場所を用意するため
+- `scripts/acrylic-regression.mjs`: 変更前後のプレビュー JSON と SVG を保存・比較するため
+- `package.json`: 回帰確認スクリプトの npm script を追加するため
+
+### 影響範囲
+
+- 既存ページ `/works/acrylic-keychain-tool` の API 呼び出し
+- `/api/acrylic/preview` と `/api/acrylic/export` の request body
+- サーバー側のマスク生成、穴生成、アクスタ台座・ツメ生成
+- 生成結果の自動比較フロー
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- テスト用 PNG 追加後に `npm run acrylic:baseline` と `npm run acrylic:compare`
+
+### 懸念点・制約・未確定事項
+
+- 現時点では回帰確認用 PNG が未投入のため、比較スクリプトはフォルダだけ確認し、実比較は画像追加後に行う
+- 差分検出は失敗扱いにせず、差分があるファイル名を表示して人間が判断する
+
+---
+
 ## 追加対応: メッセージパネル
 
 ### 対応する仕様

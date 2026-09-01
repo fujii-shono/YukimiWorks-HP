@@ -1,5 +1,6 @@
 import { inflateSync } from 'node:zlib';
 import { NextResponse } from 'next/server';
+import { resolveAcrylicGenerationOptions, type AcrylicGenerationOptions } from '@/lib/acrylicGenerationOptions';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,7 @@ type AcrylicExportRequest = {
   artworkDataUrl?: unknown;
   holeMode?: unknown;
   debug?: unknown;
+  generationOptions?: unknown;
 };
 
 type Point = {
@@ -123,9 +125,6 @@ const MAX_MASK_PIXELS = 2_400_000;
 const REFERENCE_ARTWORK_SIZE = 500;
 const BASE_CLEAR_RADIUS = 10;
 const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
-const BASE_KEYCHAIN_HOLE_OUTER_RADIUS = 24;
-const BASE_KEYCHAIN_HOLE_INNER_RADIUS = 11;
-const BASE_KEYCHAIN_HOLE_GAP = 2;
 const CONTROL_POINT_RADIUS = 0.9;
 const CONTROL_POINT_STROKE_WIDTH = 0.2;
 const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 7;
@@ -692,13 +691,17 @@ function scaleArtworkMetric(value: number, artworkWidth: number, artworkHeight: 
   return value * (Math.max(artworkWidth, artworkHeight) / REFERENCE_ARTWORK_SIZE);
 }
 
-function getAcrylicMetrics(artworkWidth: number, artworkHeight: number): AcrylicMetrics {
+function getAcrylicMetrics(
+  artworkWidth: number,
+  artworkHeight: number,
+  keychainOptions: AcrylicGenerationOptions['keychain'],
+): AcrylicMetrics {
   return {
     clearRadius: scaleArtworkMetric(BASE_CLEAR_RADIUS, artworkWidth, artworkHeight),
     internalGapCloseRadius: scaleArtworkMetric(BASE_INTERNAL_GAP_CLOSE_RADIUS, artworkWidth, artworkHeight),
-    holeOuterRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_OUTER_RADIUS, artworkWidth, artworkHeight),
-    holeInnerRadius: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_INNER_RADIUS, artworkWidth, artworkHeight),
-    holeGap: scaleArtworkMetric(BASE_KEYCHAIN_HOLE_GAP, artworkWidth, artworkHeight),
+    holeOuterRadius: scaleArtworkMetric(keychainOptions.holeOuterRadius, artworkWidth, artworkHeight),
+    holeInnerRadius: scaleArtworkMetric(keychainOptions.holeInnerRadius, artworkWidth, artworkHeight),
+    holeGap: scaleArtworkMetric(keychainOptions.holeGap, artworkWidth, artworkHeight),
   };
 }
 
@@ -922,7 +925,16 @@ function findConnectorEdgeContactY(mask: Uint8Array, width: number, height: numb
   return null;
 }
 
-function addKeychainHoleToMask(mask: Uint8Array, width: number, height: number, artworkCenterX: number, artworkWidth: number, metrics: AcrylicMetrics) {
+function addKeychainHoleToMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  artworkHeight: number,
+  metrics: AcrylicMetrics,
+  keychainOptions: AcrylicGenerationOptions['keychain'],
+) {
   const loopMask = mask.slice();
   const centerX = Math.round(artworkCenterX);
   const centerBandHalfWidth = Math.max(3, Math.round(artworkWidth * 0.16));
@@ -932,7 +944,10 @@ function addKeychainHoleToMask(mask: Uint8Array, width: number, height: number, 
   const clearRadius = Math.max(1, Math.round(metrics.clearRadius));
   const gap = Math.round(metrics.holeGap);
   const clearTopY = Math.max(0, artworkTopY - clearRadius);
-  const centerY = Math.max(outerRadius + 1, clearTopY - innerRadius - gap);
+  const centerY =
+    keychainOptions.holeCenterYRatio === null
+      ? Math.max(outerRadius + 1, clearTopY - innerRadius - gap)
+      : Math.max(outerRadius + 1, Math.round(artworkTopY + artworkHeight * keychainOptions.holeCenterYRatio));
   const connectorLeft = centerX - outerRadius;
   const connectorRight = centerX + outerRadius;
   const edgeProbeRadius = Math.max(1, Math.round(clearRadius * 0.35));
@@ -2072,13 +2087,17 @@ function boundaryLoopsToPathData(loops: Point[][]) {
   return commands.join(' ');
 }
 
-function buildServerCutPath(artwork: PngImage, holeMode: 'with-hole' | 'without-hole'): SvgPathResult {
+function buildServerCutPath(
+  artwork: PngImage,
+  holeMode: 'with-hole' | 'without-hole',
+  generationOptions: AcrylicGenerationOptions,
+): SvgPathResult {
   const baseMask = new Uint8Array(artwork.width * artwork.height);
   for (let index = 0; index < artwork.width * artwork.height; index += 1) {
     if (artwork.alpha[index] > 8) baseMask[index] = 1;
   }
   const bounds = findMaskBounds(baseMask, artwork.width, artwork.height);
-  const metrics = getAcrylicMetrics(bounds.width, bounds.height);
+  const metrics = getAcrylicMetrics(bounds.width, bounds.height, generationOptions.keychain);
   const filledBaseMask = fillEnclosedMaskHoles(baseMask, artwork.width, artwork.height);
   const internalGapCloseRadius = Math.max(1, Math.round(metrics.internalGapCloseRadius));
   const shouldDetectNarrowExitAreas = DEBUG_OUTPUT_NARROW_EXIT_AREA_MASK_PATH || DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH || ENABLE_NARROW_EXIT_AREA_FILL;
@@ -2114,7 +2133,19 @@ function buildServerCutPath(artwork: PngImage, holeMode: 'with-hole' | 'without-
   const gapClosedBaseMask = ENABLE_NARROW_EXIT_AREA_FILL
     ? fillNarrowExitTransparentAreas(filledBaseMask, narrowExitFillPatchMask, artwork.width, artwork.height)
     : filledBaseMask;
-  const keychainShape = holeMode === 'with-hole' ? addKeychainHoleToMask(gapClosedBaseMask, artwork.width, artwork.height, bounds.minX + bounds.width / 2, bounds.width, metrics) : null;
+  const keychainShape =
+    holeMode === 'with-hole'
+      ? addKeychainHoleToMask(
+          gapClosedBaseMask,
+          artwork.width,
+          artwork.height,
+          bounds.minX + bounds.width * generationOptions.keychain.holeCenterXRatio,
+          bounds.width,
+          bounds.height,
+          metrics,
+          generationOptions.keychain,
+        )
+      : null;
   const keychainMask = keychainShape?.mask ?? gapClosedBaseMask;
   if (DEBUG_OUTPUT_RAW_BASE_MASK_PATH && !DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH) {
     return rawBoundaryLoopsToPath(maskToBoundaryLoops(keychainMask, artwork.width, artwork.height));
@@ -2235,7 +2266,7 @@ export async function POST(request: Request) {
     const artworkPng = parsePngDataUrl(body.artworkDataUrl);
     const artwork = decodePngAlpha(artworkPng);
     if (artwork.width !== body.width || artwork.height !== body.height) throw new Error('イラストPNGのサイズが不正です');
-    const cutPath = buildServerCutPath(artwork, body.holeMode);
+    const cutPath = buildServerCutPath(artwork, body.holeMode, resolveAcrylicGenerationOptions(body.generationOptions));
     const debug = body.debug === true;
 
     if (debug) {

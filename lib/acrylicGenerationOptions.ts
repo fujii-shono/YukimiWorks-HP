@@ -4,6 +4,7 @@ export type AcrylicKeychainGenerationOptions = {
   holeOuterRadius: number;
   holeInnerRadius: number;
   holeGap: number;
+  clearRadius: number;
   paddingSpace: number;
 };
 
@@ -28,6 +29,7 @@ export const DEFAULT_ACRYLIC_GENERATION_OPTIONS: AcrylicGenerationOptions = {
     holeOuterRadius: 24,
     holeInnerRadius: 11,
     holeGap: 2,
+    clearRadius: 10,
     paddingSpace: 20,
   },
   stand: {
@@ -72,6 +74,7 @@ export function resolveAcrylicGenerationOptions(value: unknown): AcrylicGenerati
       holeOuterRadius: clamp(finiteNumberOrDefault(keychain.holeOuterRadius, defaults.keychain.holeOuterRadius), 1, 240),
       holeInnerRadius: clamp(finiteNumberOrDefault(keychain.holeInnerRadius, defaults.keychain.holeInnerRadius), 1, 240),
       holeGap: clamp(finiteNumberOrDefault(keychain.holeGap, defaults.keychain.holeGap), 0, 240),
+      clearRadius: clamp(finiteNumberOrDefault(keychain.clearRadius, defaults.keychain.clearRadius), 0, 240),
       paddingSpace: clamp(finiteNumberOrDefault(keychain.paddingSpace, defaults.keychain.paddingSpace), 0, 480),
     },
     stand: {

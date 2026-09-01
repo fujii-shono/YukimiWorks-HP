@@ -1,7 +1,10 @@
 'use client';
 
 import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from 'react';
-import { DEFAULT_ACRYLIC_GENERATION_OPTIONS } from '@/lib/acrylicGenerationOptions';
+import {
+  DEFAULT_ACRYLIC_GENERATION_OPTIONS,
+  type AcrylicGenerationOptions,
+} from '@/lib/acrylicGenerationOptions';
 import { cn } from '@/lib/format';
 
 type PreviewState = {
@@ -41,7 +44,7 @@ type StandMode = 'simple' | 'stable';
 
 type ShapeMode = HoleMode | StandMode;
 
-type PreviewCacheKey = `${ProductMode}:${ShapeMode}`;
+type PreviewCacheKey = string;
 
 type PreviewCache = Partial<Record<PreviewCacheKey, PreviewState>>;
 
@@ -50,9 +53,29 @@ type PreviewStageSize = {
   height: number;
 };
 
+type AlphaBounds = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  width: number;
+  height: number;
+};
+
 type StandPreviewStyles = {
   base: CSSProperties;
   circle: CSSProperties;
+};
+
+export type AcrylicDemoSample = {
+  label: string;
+  src: string;
+  fileName: string;
+};
+
+type AcrylicKeychainToolProps = {
+  mode?: 'default' | 'demo';
+  samples?: AcrylicDemoSample[];
 };
 
 const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
@@ -68,6 +91,7 @@ const ROTATION_MIN_SPEED = 0.015;
 const HIGHLIGHT_VISIBLE_START = 0.78;
 const BACK_SIDE_SIDE_VISIBLE_START = 0.42;
 const SURFACE_GLOSS_OPACITY = 0.46;
+const REFERENCE_ARTWORK_SIZE = 500;
 const EXPORT_DEBUG_SVG = false;
 const ACRYLIC_PREVIEW_FRONT_Z = 6;
 const ACRYLIC_PREVIEW_BACK_Z = -4;
@@ -183,7 +207,7 @@ function drawImageSource(context: CanvasRenderingContext2D, src: string) {
   });
 }
 
-function findCanvasAlphaBounds(context: CanvasRenderingContext2D, width: number, height: number) {
+function findCanvasAlphaBounds(context: CanvasRenderingContext2D, width: number, height: number): AlphaBounds | null {
   const pixels = context.getImageData(0, 0, width, height).data;
   let minX = width;
   let maxX = -1;
@@ -200,13 +224,70 @@ function findCanvasAlphaBounds(context: CanvasRenderingContext2D, width: number,
     maxY = Math.max(maxY, y);
   }
 
-  return maxX >= 0 ? { minX, maxX, minY, maxY } : null;
+  return maxX >= 0 ? { minX, maxX, minY, maxY, width: maxX - minX + 1, height: maxY - minY + 1 } : null;
+}
+
+async function findImageAlphaBounds(src: string, width: number, height: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  await drawImageSource(context, src);
+  return findCanvasAlphaBounds(context, width, height);
 }
 
 function waitForNextFrame() {
   return new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
   });
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function createRadialOffsets(radius: number) {
+  const roundedRadius = Math.max(0, Math.round(radius));
+  if (roundedRadius <= 0) return [];
+  const offsets: Array<[number, number]> = [];
+  const rings = [roundedRadius * 0.5, roundedRadius];
+  for (const ringRadius of rings) {
+    const steps = Math.max(24, Math.ceil(ringRadius * 1.8));
+    for (let index = 0; index < steps; index += 1) {
+      const angle = (index / steps) * Math.PI * 2;
+      offsets.push([Math.round(Math.cos(angle) * ringRadius), Math.round(Math.sin(angle) * ringRadius)]);
+    }
+  }
+  return offsets;
+}
+
+async function createAlphaMarginGuide(src: string, width: number, height: number, radius: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return '';
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const nextImage = new Image();
+    nextImage.decoding = 'async';
+    nextImage.onload = () => resolve(nextImage);
+    nextImage.onerror = () => reject(new Error('余白ガイドを描画できませんでした'));
+    nextImage.src = src;
+  });
+
+  context.clearRect(0, 0, width, height);
+  context.globalAlpha = 1;
+  for (const [offsetX, offsetY] of createRadialOffsets(radius)) {
+    context.drawImage(image, offsetX, offsetY);
+  }
+  context.globalCompositeOperation = 'source-in';
+  context.fillStyle = 'rgba(70, 92, 124, 0.9)';
+  context.fillRect(0, 0, width, height);
+  context.globalCompositeOperation = 'destination-out';
+  context.drawImage(image, 0, 0);
+  context.globalCompositeOperation = 'source-over';
+  return canvas.toDataURL('image/png');
 }
 
 function downloadBlob(blob: Blob, fileName: string) {
@@ -224,8 +305,26 @@ function getExportFileBaseName(fileName: string) {
   return fileName.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'acrylic-keychain';
 }
 
-function getPreviewCacheKey(productMode: ProductMode, shapeMode: ShapeMode): PreviewCacheKey {
-  return `${productMode}:${shapeMode}`;
+function cloneGenerationOptions(options: AcrylicGenerationOptions): AcrylicGenerationOptions {
+  return {
+    keychain: { ...options.keychain },
+    stand: { ...options.stand },
+  };
+}
+
+function withFixedKeychainHoleSize(options: AcrylicGenerationOptions): AcrylicGenerationOptions {
+  return {
+    ...options,
+    keychain: {
+      ...options.keychain,
+      holeOuterRadius: DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeOuterRadius,
+      holeInnerRadius: DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeInnerRadius,
+    },
+  };
+}
+
+function getPreviewCacheKey(productMode: ProductMode, shapeMode: ShapeMode, generationOptions: AcrylicGenerationOptions): PreviewCacheKey {
+  return `${productMode}:${shapeMode}:${JSON.stringify(generationOptions)}`;
 }
 
 function getPreviewArtworkRatios() {
@@ -304,7 +403,12 @@ async function fileToDataUrl(file: File) {
   });
 }
 
-async function buildPreview(file: File, productMode: ProductMode, shapeMode: ShapeMode): Promise<PreviewState> {
+async function buildPreview(
+  file: File,
+  productMode: ProductMode,
+  shapeMode: ShapeMode,
+  generationOptions: AcrylicGenerationOptions,
+): Promise<PreviewState> {
   if (file.type !== 'image/png') {
     throw new Error('PNGファイルを選択してください');
   }
@@ -322,7 +426,7 @@ async function buildPreview(file: File, productMode: ProductMode, shapeMode: Sha
       imageDataUrl: await fileToDataUrl(file),
       productMode,
       shapeMode,
-      generationOptions: DEFAULT_ACRYLIC_GENERATION_OPTIONS,
+      generationOptions,
     }),
   });
 
@@ -334,8 +438,18 @@ async function buildPreview(file: File, productMode: ProductMode, shapeMode: Sha
   return data;
 }
 
-export function AcrylicKeychainTool() {
+async function sampleToFile(sample: AcrylicDemoSample) {
+  const response = await fetch(sample.src, { cache: 'no-store' });
+  if (!response.ok) throw new Error('サンプル画像を読み込めませんでした');
+  const blob = await response.blob();
+  return new File([blob], sample.fileName, { type: blob.type || 'image/png' });
+}
+
+export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicKeychainToolProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const holePreviewRef = useRef<HTMLDivElement>(null);
+  const isDraggingHolePreviewRef = useRef(false);
+  const isDemo = mode === 'demo';
   const isRotatingRef = useRef(false);
   const inertiaFrameRef = useRef<number | null>(null);
   const lastPointerRef = useRef({ x: 0, y: 0, time: 0 });
@@ -345,15 +459,22 @@ export function AcrylicKeychainTool() {
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewCache, setPreviewCache] = useState<PreviewCache>({});
+  const [generationOptions, setGenerationOptions] = useState<AcrylicGenerationOptions>(() =>
+    cloneGenerationOptions(DEFAULT_ACRYLIC_GENERATION_OPTIONS),
+  );
   const [productMode, setProductMode] = useState<ProductMode>('keychain');
   const [holeMode, setHoleMode] = useState<HoleMode>('with-hole');
   const [standMode, setStandMode] = useState<StandMode>('simple');
+  const [activeSampleSrc, setActiveSampleSrc] = useState('');
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
   const [renderedEdgeSrc, setRenderedEdgeSrc] = useState('');
   const [renderedSideSrc, setRenderedSideSrc] = useState('');
   const [renderedArtworkSrc, setRenderedArtworkSrc] = useState('');
   const [renderedBackArtworkSrc, setRenderedBackArtworkSrc] = useState('');
   const [renderedHighlightSrc, setRenderedHighlightSrc] = useState('');
+  const [sourceArtworkBounds, setSourceArtworkBounds] = useState<AlphaBounds | null>(null);
+  const [keychainMarginGuideSrc, setKeychainMarginGuideSrc] = useState('');
   const [standBaseStyle, setStandBaseStyle] = useState<CSSProperties | null>(null);
   const [standCircleStyle, setStandCircleStyle] = useState<CSSProperties | null>(null);
   const [rotation, setRotation] = useState<PreviewRotation>({ y: 0 });
@@ -361,13 +482,17 @@ export function AcrylicKeychainTool() {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [processingDotCount, setProcessingDotCount] = useState(1);
   const [previewLayoutKey, setPreviewLayoutKey] = useState(0);
-  const [status, setStatus] = useState('PNGを選択してください');
+  const [status, setStatus] = useState(isDemo ? 'サンプルを選択してください' : 'PNGを選択してください');
   const immediateStandPreviewStyles =
     preview && preview.productMode === 'stand' && preview.standBaseFrame ? createStandPreviewStyles(preview, getPreviewStageSize()) : null;
   const visibleStandBaseStyle = preview?.productMode === 'stand' ? (immediateStandPreviewStyles?.base ?? standBaseStyle ?? null) : null;
   const visibleStandCircleStyle = preview?.productMode === 'stand' ? (immediateStandPreviewStyles?.circle ?? standCircleStyle ?? null) : null;
+  const sourceArtworkMetricScale = sourceArtworkBounds
+    ? Math.max(sourceArtworkBounds.width, sourceArtworkBounds.height) / REFERENCE_ARTWORK_SIZE
+    : 1;
 
   useEffect(() => {
     if (!preview) {
@@ -377,6 +502,8 @@ export function AcrylicKeychainTool() {
       setRenderedArtworkSrc('');
       setRenderedBackArtworkSrc('');
       setRenderedHighlightSrc('');
+      setSourceArtworkBounds(null);
+      setKeychainMarginGuideSrc('');
       setStandBaseStyle(null);
       setStandCircleStyle(null);
       return;
@@ -486,6 +613,9 @@ export function AcrylicKeychainTool() {
         setRenderedArtworkSrc(artworkCanvas.toDataURL('image/png'));
         setRenderedBackArtworkSrc(backCanvas.toDataURL('image/png'));
         setRenderedHighlightSrc(highlightCanvas.toDataURL('image/png'));
+        const nextSourceArtworkBounds = await findImageAlphaBounds(preview.originalArtworkSrc, preview.width, preview.height);
+        if (cancelled) return;
+        setSourceArtworkBounds(nextSourceArtworkBounds);
         if (preview.productMode === 'stand' && preview.standBaseFrame) {
           const acrylicBounds = findCanvasAlphaBounds(acrylicContext, stage.width, stage.height);
           setStandPreviewStyles(acrylicBounds?.maxY);
@@ -511,6 +641,29 @@ export function AcrylicKeychainTool() {
       cancelled = true;
     };
   }, [preview, previewLayoutKey]);
+
+  useEffect(() => {
+    if (!isDemo || !preview || preview.productMode !== 'keychain' || !sourceArtworkBounds) {
+      setKeychainMarginGuideSrc('');
+      return;
+    }
+    let cancelled = false;
+    void createAlphaMarginGuide(
+      preview.originalArtworkSrc,
+      preview.width,
+      preview.height,
+      generationOptions.keychain.clearRadius * sourceArtworkMetricScale,
+    )
+      .then((src) => {
+        if (!cancelled) setKeychainMarginGuideSrc(src);
+      })
+      .catch(() => {
+        if (!cancelled) setKeychainMarginGuideSrc('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [generationOptions.keychain.clearRadius, isDemo, preview, sourceArtworkBounds, sourceArtworkMetricScale]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -556,12 +709,13 @@ export function AcrylicKeychainTool() {
     };
   }, []);
 
-  const loadFile = async (file: File | undefined) => {
+  const loadFile = async (file: File | undefined, options: AcrylicGenerationOptions = generationOptions) => {
     if (!file) return;
+    const resolvedOptions = withFixedKeychainHoleSize(options);
     const startedAt = Date.now();
     const nextProductMode = productMode;
     const nextShapeMode = nextProductMode === 'keychain' ? holeMode : standMode;
-    const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode);
+    const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode, resolvedOptions);
     setIsProcessing(true);
     setStatus('プレビューを作成中です');
     setSelectedFile(file);
@@ -569,7 +723,7 @@ export function AcrylicKeychainTool() {
     try {
       await waitForNextFrame();
       await waitForNextFrame();
-      const nextPreview = await buildPreview(file, nextProductMode, nextShapeMode);
+      const nextPreview = await buildPreview(file, nextProductMode, nextShapeMode, resolvedOptions);
       const elapsed = Date.now() - startedAt;
       if (elapsed < 900) await wait(900 - elapsed);
       setPreviewCache({ [nextCacheKey]: nextPreview });
@@ -597,7 +751,8 @@ export function AcrylicKeychainTool() {
       setStandMode(nextShapeMode as StandMode);
     }
 
-    const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode);
+    const resolvedOptions = withFixedKeychainHoleSize(generationOptions);
+    const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode, resolvedOptions);
     const cachedPreview = previewCache[nextCacheKey];
     if (cachedPreview) {
       setPreview(cachedPreview);
@@ -616,7 +771,7 @@ export function AcrylicKeychainTool() {
     try {
       await waitForNextFrame();
       await waitForNextFrame();
-      const nextPreview = await buildPreview(selectedFile, nextProductMode, nextShapeMode);
+      const nextPreview = await buildPreview(selectedFile, nextProductMode, nextShapeMode, resolvedOptions);
       const elapsed = Date.now() - startedAt;
       if (elapsed < 900) await wait(900 - elapsed);
       setPreviewCache((current) => ({ ...current, [nextCacheKey]: nextPreview }));
@@ -631,6 +786,79 @@ export function AcrylicKeychainTool() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const loadSample = async (sample: AcrylicDemoSample) => {
+    setActiveSampleSrc(sample.src);
+    try {
+      const file = await sampleToFile(sample);
+      await loadFile(file);
+    } catch (error) {
+      setPreview(null);
+      setSelectedFile(null);
+      setPreviewCache({});
+      setStatus(error instanceof Error ? error.message : 'サンプル画像を読み込めませんでした');
+    }
+  };
+
+  const regeneratePreview = async (options: AcrylicGenerationOptions = generationOptions) => {
+    if (!selectedFile) return;
+    const resolvedOptions = withFixedKeychainHoleSize(options);
+    const nextProductMode = productMode;
+    const nextShapeMode = nextProductMode === 'keychain' ? holeMode : standMode;
+    const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode, resolvedOptions);
+    const startedAt = Date.now();
+    setIsProcessing(true);
+    setStatus('プレビューを作成中です');
+    setPreviewCache((current) => {
+      const next = { ...current };
+      delete next[nextCacheKey];
+      return next;
+    });
+    try {
+      await waitForNextFrame();
+      await waitForNextFrame();
+      const nextPreview = await buildPreview(selectedFile, nextProductMode, nextShapeMode, resolvedOptions);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 900) await wait(900 - elapsed);
+      setPreviewCache((current) => ({ ...current, [nextCacheKey]: nextPreview }));
+      setPreview(nextPreview);
+      setRotation({ y: 0 });
+      rotationVelocityRef.current = { y: 0 };
+      if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
+      inertiaFrameRef.current = null;
+      setStatus(`${selectedFile.name} を再生成しました`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'プレビューを作成できませんでした');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const updateKeychainOption = <Key extends keyof AcrylicGenerationOptions['keychain']>(
+    key: Key,
+    value: AcrylicGenerationOptions['keychain'][Key],
+  ) => {
+    setGenerationOptions((current) => ({
+      ...current,
+      keychain: {
+        ...current.keychain,
+        [key]: value,
+      },
+    }));
+  };
+
+  const updateStandOption = <Key extends keyof AcrylicGenerationOptions['stand']>(
+    key: Key,
+    value: AcrylicGenerationOptions['stand'][Key],
+  ) => {
+    setGenerationOptions((current) => ({
+      ...current,
+      stand: {
+        ...current.stand,
+        [key]: value,
+      },
+    }));
   };
 
   const exportOrderFiles = async () => {
@@ -650,8 +878,8 @@ export function AcrylicKeychainTool() {
           height: preview.height,
           artworkDataUrl: preview.originalArtworkSrc,
           holeMode,
-          debug: EXPORT_DEBUG_SVG,
-          generationOptions: DEFAULT_ACRYLIC_GENERATION_OPTIONS,
+          debug: isDemo ? true : EXPORT_DEBUG_SVG,
+          generationOptions: isDemo ? withFixedKeychainHoleSize(generationOptions) : DEFAULT_ACRYLIC_GENERATION_OPTIONS,
         }),
       });
 
@@ -661,12 +889,44 @@ export function AcrylicKeychainTool() {
       }
 
       const blob = await response.blob();
-      downloadBlob(blob, `${fileBaseName}${EXPORT_DEBUG_SVG ? '.svg' : '.zip'}`);
-      setStatus(EXPORT_DEBUG_SVG ? 'デバッグ用SVGを書き出しました' : '発注用SVGと元画像をZIPで書き出しました');
+      downloadBlob(blob, `${fileBaseName}${isDemo || EXPORT_DEBUG_SVG ? '.svg' : '.zip'}`);
+      setStatus(isDemo || EXPORT_DEBUG_SVG ? 'デバッグ用SVGを書き出しました' : '発注用SVGと元画像をZIPで書き出しました');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'SVGを作成できませんでした');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const requestAiGeneration = async () => {
+    if (!preview || isAiGenerating) return;
+    setIsAiGenerating(true);
+    setStatus('AI生成APIへ送信中です');
+    try {
+      const response = await fetch('/api/acrylic/ai-generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: preview.fileName,
+          productMode,
+          shapeMode: productMode === 'keychain' ? holeMode : standMode,
+          artworkDataUrl: preview.originalArtworkSrc,
+          generationOptions: withFixedKeychainHoleSize(generationOptions),
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (response.status === 501) {
+        setStatus(data?.message ?? 'AI生成は未実装です');
+        return;
+      }
+      if (!response.ok) throw new Error(data?.error ?? 'AI生成APIへ送信できませんでした');
+      setStatus(data?.message ?? 'AI生成APIへ送信しました');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'AI生成APIへ送信できませんでした');
+    } finally {
+      setIsAiGenerating(false);
     }
   };
 
@@ -717,19 +977,120 @@ export function AcrylicKeychainTool() {
       ? Math.max(0, (Math.abs(sideFacing) - BACK_SIDE_SIDE_VISIBLE_START) / (1 - BACK_SIDE_SIDE_VISIBLE_START)) * 0.72
       : 1
   ).toFixed(3);
+  const keychainArtworkBounds =
+    preview && sourceArtworkBounds
+      ? sourceArtworkBounds
+      : preview
+        ? {
+            minX: 0,
+            maxX: preview.width - 1,
+            minY: 0,
+            maxY: preview.height - 1,
+            width: preview.width,
+            height: preview.height,
+          }
+        : null;
+  const keychainMetricScale = keychainArtworkBounds
+    ? Math.max(keychainArtworkBounds.width, keychainArtworkBounds.height) / REFERENCE_ARTWORK_SIZE
+    : 1;
+  const keychainHoleOuterRadius = DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeOuterRadius * keychainMetricScale;
+  const keychainHoleInnerRadius = DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeInnerRadius * keychainMetricScale;
+  const keychainHoleCenterX = keychainArtworkBounds
+    ? keychainArtworkBounds.minX + keychainArtworkBounds.width * generationOptions.keychain.holeCenterXRatio
+    : 0;
+  const keychainHoleCenterY = keychainArtworkBounds
+    ? generationOptions.keychain.holeCenterYRatio === null
+      ? Math.max(keychainHoleOuterRadius + 1, keychainArtworkBounds.minY - keychainHoleOuterRadius - generationOptions.keychain.holeGap * keychainMetricScale)
+      : keychainArtworkBounds.minY + keychainArtworkBounds.height * generationOptions.keychain.holeCenterYRatio
+    : 0;
+  const keychainFlatPreviewStyle =
+    preview && keychainArtworkBounds
+      ? ({
+          '--acrylic-flat-image-aspect': `${preview.width} / ${preview.height}`,
+          '--acrylic-flat-art-left': `${(keychainArtworkBounds.minX / preview.width) * 100}%`,
+          '--acrylic-flat-art-top': `${(keychainArtworkBounds.minY / preview.height) * 100}%`,
+          '--acrylic-flat-art-width': `${(keychainArtworkBounds.width / preview.width) * 100}%`,
+          '--acrylic-flat-art-height': `${(keychainArtworkBounds.height / preview.height) * 100}%`,
+          '--acrylic-flat-hole-x': `${(keychainHoleCenterX / preview.width) * 100}%`,
+          '--acrylic-flat-hole-y': `${(keychainHoleCenterY / preview.height) * 100}%`,
+          '--acrylic-flat-hole-loop-width': `${((keychainHoleOuterRadius * 2) / preview.width) * 100}%`,
+          '--acrylic-flat-hole-loop-height': `${((keychainHoleOuterRadius * 2) / preview.height) * 100}%`,
+          '--acrylic-flat-hole-outer-width': `${((keychainHoleOuterRadius * 2) / preview.width) * 100}%`,
+          '--acrylic-flat-hole-outer-height': `${((keychainHoleOuterRadius * 2) / preview.height) * 100}%`,
+          '--acrylic-flat-hole-inner-size': `${(keychainHoleInnerRadius / Math.max(1, keychainHoleOuterRadius)) * 100}%`,
+        } as CSSProperties)
+      : undefined;
+
+  const updateKeychainHoleFromPointer = (event: PointerEvent<HTMLElement>) => {
+    if (!preview || !keychainArtworkBounds || !holePreviewRef.current) return;
+    const rect = holePreviewRef.current.getBoundingClientRect();
+    const pointX = clampNumber(((event.clientX - rect.left) / rect.width) * preview.width, 0, preview.width);
+    const pointY = clampNumber(((event.clientY - rect.top) / rect.height) * preview.height, 0, preview.height);
+
+    updateKeychainOption(
+      'holeCenterXRatio',
+      clampNumber((pointX - keychainArtworkBounds.minX) / keychainArtworkBounds.width, 0, 1),
+    );
+    updateKeychainOption(
+      'holeCenterYRatio',
+      clampNumber((pointY - keychainArtworkBounds.minY) / keychainArtworkBounds.height, -0.5, 0.6),
+    );
+  };
+
+  const startKeychainHolePreviewDrag = (event: PointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    isDraggingHolePreviewRef.current = true;
+    updateKeychainHoleFromPointer(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveKeychainHolePreviewDrag = (event: PointerEvent<HTMLElement>) => {
+    if (!isDraggingHolePreviewRef.current) return;
+    event.preventDefault();
+    updateKeychainHoleFromPointer(event);
+  };
+
+  const stopKeychainHolePreviewDrag = (event: PointerEvent<HTMLElement>) => {
+    isDraggingHolePreviewRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   return (
     <div className="acrylic-tool">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png"
-        className="visually-hidden"
-        onChange={(event) => {
-          void loadFile(event.target.files?.[0]);
-          event.currentTarget.value = '';
-        }}
-      />
+      {!isDemo ? (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png"
+          className="visually-hidden"
+          onChange={(event) => {
+            void loadFile(event.target.files?.[0]);
+            event.currentTarget.value = '';
+          }}
+        />
+      ) : null}
+      {isDemo ? (
+        <div className="acrylic-demo-samples" aria-label="サンプル画像">
+          {samples.map((sample) => (
+            <button
+              key={sample.src}
+              type="button"
+              className={cn('acrylic-demo-sample-button', activeSampleSrc === sample.src && 'is-active')}
+              disabled={isProcessing}
+              aria-label={`${sample.label}を選択`}
+              onClick={() => {
+                void loadSample(sample);
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={sample.src} alt="" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="acrylic-product-toggle" role="group" aria-label="作成タイプ">
         <button
           type="button"
@@ -759,12 +1120,12 @@ export function AcrylicKeychainTool() {
       </div>
       <div
         className={cn('acrylic-preview-wrap', preview && 'has-preview', isDragging && 'is-dragging')}
-        role={preview ? undefined : 'button'}
-        tabIndex={preview ? undefined : 0}
+        role={!isDemo && !preview ? 'button' : undefined}
+        tabIndex={!isDemo && !preview ? 0 : undefined}
         aria-live="polite"
-        onClick={preview ? undefined : () => inputRef.current?.click()}
+        onClick={!isDemo && !preview ? () => inputRef.current?.click() : undefined}
         onKeyDown={
-          preview
+          isDemo || preview
             ? undefined
             : (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -773,23 +1134,39 @@ export function AcrylicKeychainTool() {
                 }
               }
         }
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={(event) => {
-          if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-          setIsDragging(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setIsDragging(false);
-          void loadFile(event.dataTransfer.files[0]);
-        }}
+        onDragEnter={
+          isDemo
+            ? undefined
+            : (event) => {
+                event.preventDefault();
+                setIsDragging(true);
+              }
+        }
+        onDragOver={
+          isDemo
+            ? undefined
+            : (event) => {
+                event.preventDefault();
+                setIsDragging(true);
+              }
+        }
+        onDragLeave={
+          isDemo
+            ? undefined
+            : (event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                setIsDragging(false);
+              }
+        }
+        onDrop={
+          isDemo
+            ? undefined
+            : (event) => {
+                event.preventDefault();
+                setIsDragging(false);
+                void loadFile(event.dataTransfer.files[0]);
+              }
+        }
       >
         {preview ? (
           <div
@@ -909,22 +1286,22 @@ export function AcrylicKeychainTool() {
                     transform: `rotateY(${rotation.y}deg)`,
                   } as CSSProperties}
                 >
-                  {ACRYLIC_SIDE_LAYERS.map((zPosition) => (
+                  {preview.productMode === 'keychain' ? ACRYLIC_SIDE_LAYERS.map((zPosition) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={zPosition}
-	                      className="acrylic-preview-image acrylic-preview-side-image"
-	                      src={renderedSideSrc}
-	                      alt=""
-	                      style={
-	                        {
-	                          '--acrylic-side-z': `${zPosition}px`,
-	                          '--acrylic-side-opacity': sideLayerOpacity,
-	                        } as CSSProperties
-	                      }
-	                      aria-hidden="true"
-	                    />
-                  ))}
+                      className="acrylic-preview-image acrylic-preview-side-image"
+                      src={renderedSideSrc}
+                      alt=""
+                      style={
+                        {
+                          '--acrylic-side-z': `${zPosition}px`,
+                          '--acrylic-side-opacity': sideLayerOpacity,
+                        } as CSSProperties
+                      }
+                      aria-hidden="true"
+                    />
+                  )) : null}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="acrylic-preview-image acrylic-preview-edge-image" src={renderedEdgeSrc} alt="" aria-hidden="true" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -976,7 +1353,7 @@ export function AcrylicKeychainTool() {
           </div>
         ) : (
           <div className="acrylic-preview-empty">
-            <span>PNGを選択してください</span>
+            <span>{isDemo ? 'サンプルを選択してください' : 'PNGを選択してください'}</span>
           </div>
         )}
       </div>
@@ -1040,12 +1417,23 @@ export function AcrylicKeychainTool() {
         )}
       </div>
       <div className="acrylic-tool-actions">
-        <button type="button" className="acrylic-file-button" onClick={() => inputRef.current?.click()}>
-          {preview ? '新しいPNGを選択' : 'PNGを選択'}
-        </button>
+        {!isDemo ? (
+          <button type="button" className="acrylic-file-button" onClick={() => inputRef.current?.click()}>
+            {preview ? '新しいPNGを選択' : 'PNGを選択'}
+          </button>
+        ) : (
+          <button type="button" className="acrylic-file-button" disabled={!preview || isProcessing} onClick={() => setIsOptionsOpen(true)}>
+            {productMode === 'stand' ? '台座・ツメ変更' : '穴の位置・余白変更'}
+          </button>
+        )}
         {preview && productMode === 'keychain' ? (
           <button type="button" className="acrylic-file-button" disabled={isProcessing || isExporting} onClick={() => void exportOrderFiles()}>
-            {isExporting ? '作成中' : 'SVGを書き出す'}
+            {isExporting ? '作成中' : isDemo ? 'SVG生成' : 'SVGを書き出す'}
+          </button>
+        ) : null}
+        {isDemo && preview ? (
+          <button type="button" className="acrylic-file-button" disabled={isProcessing || isAiGenerating} onClick={() => void requestAiGeneration()}>
+            {isAiGenerating ? '送信中' : 'AI生成'}
           </button>
         ) : null}
       </div>
@@ -1059,6 +1447,130 @@ export function AcrylicKeychainTool() {
             <span className="acrylic-processing-dots" aria-hidden="true">
               {'.'.repeat(processingDotCount)}
             </span>
+          </div>
+        </div>
+      ) : null}
+      {isDemo && isOptionsOpen ? (
+        <div className="acrylic-options-modal" role="dialog" aria-modal="true" aria-label={productMode === 'stand' ? '台座・ツメ変更' : '穴の位置・余白変更'}>
+          <div className="acrylic-options-panel">
+            <div className="acrylic-options-fields">
+              {productMode === 'keychain' ? (
+                <>
+                  {preview && keychainFlatPreviewStyle ? (
+                    <div
+                      ref={holePreviewRef}
+                      className="acrylic-hole-flat-preview"
+                      style={keychainFlatPreviewStyle}
+                      onPointerDown={startKeychainHolePreviewDrag}
+                      onPointerMove={moveKeychainHolePreviewDrag}
+                      onPointerUp={stopKeychainHolePreviewDrag}
+                      onPointerCancel={stopKeychainHolePreviewDrag}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={preview.originalArtworkSrc} alt="" aria-hidden="true" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img className="acrylic-hole-flat-acrylic" src={preview.acrylicSrc} alt="" aria-hidden="true" />
+                      {keychainMarginGuideSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="acrylic-hole-flat-margin-guide" src={keychainMarginGuideSrc} alt="" aria-hidden="true" />
+                      ) : null}
+                      <span className="acrylic-hole-flat-art-bounds" aria-hidden="true" />
+                      <span className="acrylic-hole-flat-loop" aria-hidden="true" />
+                      <span className="acrylic-hole-flat-outer" aria-hidden="true">
+                        <span className="acrylic-hole-flat-inner" />
+                      </span>
+                    </div>
+                  ) : null}
+                  <label className="acrylic-options-field acrylic-options-field-combo">
+                    <span>キャラ余白</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="80"
+                      value={generationOptions.keychain.clearRadius}
+                      onChange={(event) => updateKeychainOption('clearRadius', Number(event.currentTarget.value))}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="240"
+                      value={generationOptions.keychain.clearRadius}
+                      onChange={(event) => updateKeychainOption('clearRadius', Number(event.currentTarget.value))}
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="acrylic-options-field">
+                    <span>台座の横幅</span>
+                    <input
+                      type="range"
+                      min="20"
+                      max="180"
+                      step="1"
+                      value={generationOptions.stand.baseWidthRatioPercent}
+                      onChange={(event) => updateStandOption('baseWidthRatioPercent', Number(event.currentTarget.value))}
+                    />
+                    <output>{generationOptions.stand.baseWidthRatioPercent}%</output>
+                  </label>
+                  <label className="acrylic-options-field">
+                    <span>台座の高さ</span>
+                    <input
+                      type="range"
+                      min="5"
+                      max="80"
+                      step="1"
+                      value={generationOptions.stand.baseHeightRatioPercent}
+                      onChange={(event) => updateStandOption('baseHeightRatioPercent', Number(event.currentTarget.value))}
+                    />
+                    <output>{generationOptions.stand.baseHeightRatioPercent}%</output>
+                  </label>
+                  <label className="acrylic-options-field">
+                    <span>ツメの横幅</span>
+                    <input
+                      type="range"
+                      min="5"
+                      max="80"
+                      step="1"
+                      value={Math.round((generationOptions.stand.clawWidthRatio ?? 0.24) * 100)}
+                      onChange={(event) => updateStandOption('clawWidthRatio', Number(event.currentTarget.value) / 100)}
+                    />
+                    <output>{Math.round((generationOptions.stand.clawWidthRatio ?? 0.24) * 100)}%</output>
+                  </label>
+                  <label className="acrylic-options-field">
+                    <span>ツメの位置</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={Math.round(generationOptions.stand.clawCenterXRatio * 100)}
+                      onChange={(event) => updateStandOption('clawCenterXRatio', Number(event.currentTarget.value) / 100)}
+                    />
+                    <output>{Math.round(generationOptions.stand.clawCenterXRatio * 100)}%</output>
+                  </label>
+                </>
+              )}
+            </div>
+            <div className="acrylic-options-actions">
+              <button type="button" className="acrylic-file-button" onClick={() => setGenerationOptions(cloneGenerationOptions(DEFAULT_ACRYLIC_GENERATION_OPTIONS))}>
+                初期値
+              </button>
+              <button type="button" className="acrylic-file-button" onClick={() => setIsOptionsOpen(false)}>
+                閉じる
+              </button>
+              <button
+                type="button"
+                className="acrylic-file-button"
+                disabled={isProcessing}
+                onClick={() => {
+                  setIsOptionsOpen(false);
+                  void regeneratePreview();
+                }}
+              >
+                再生成
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

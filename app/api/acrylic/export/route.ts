@@ -123,7 +123,6 @@ const MAX_EXPORT_SIZE = 2400;
 const MAX_PNG_BYTES = 12 * 1024 * 1024;
 const MAX_MASK_PIXELS = 2_400_000;
 const REFERENCE_ARTWORK_SIZE = 500;
-const BASE_CLEAR_RADIUS = 10;
 const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
 const CONTROL_POINT_RADIUS = 0.9;
 const CONTROL_POINT_STROKE_WIDTH = 0.2;
@@ -697,7 +696,7 @@ function getAcrylicMetrics(
   keychainOptions: AcrylicGenerationOptions['keychain'],
 ): AcrylicMetrics {
   return {
-    clearRadius: scaleArtworkMetric(BASE_CLEAR_RADIUS, artworkWidth, artworkHeight),
+    clearRadius: scaleArtworkMetric(keychainOptions.clearRadius, artworkWidth, artworkHeight),
     internalGapCloseRadius: scaleArtworkMetric(BASE_INTERNAL_GAP_CLOSE_RADIUS, artworkWidth, artworkHeight),
     holeOuterRadius: scaleArtworkMetric(keychainOptions.holeOuterRadius, artworkWidth, artworkHeight),
     holeInnerRadius: scaleArtworkMetric(keychainOptions.holeInnerRadius, artworkWidth, artworkHeight),

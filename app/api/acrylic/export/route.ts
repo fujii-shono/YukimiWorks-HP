@@ -107,6 +107,14 @@ type PathOp =
       end: Point;
     };
 
+type SvgSegment = PathOp;
+
+type SplitPathLocation = {
+  segmentIndex: number;
+  t: number;
+  point: Point;
+};
+
 type StraightLineCandidate = {
   start: Point;
   end: Point;
@@ -2365,6 +2373,224 @@ function circleToPath(circle: Circle): SvgPathResult {
   );
 }
 
+function parseSvgPathSegments(path: string): SvgSegment[] {
+  const tokens = path.match(/[MLCQZ]|[-+]?(?:\d*\.\d+|\d+)/g) ?? [];
+  const segments: SvgSegment[] = [];
+  let cursor: Point | null = null;
+  let start: Point | null = null;
+  let index = 0;
+
+  while (index < tokens.length) {
+    const token = tokens[index];
+    if (token === 'M') {
+      cursor = { x: Number(tokens[index + 1]), y: Number(tokens[index + 2]) };
+      start = cursor;
+      index += 3;
+      continue;
+    }
+    if (token === 'L' && cursor) {
+      const end = { x: Number(tokens[index + 1]), y: Number(tokens[index + 2]) };
+      segments.push({ kind: 'line', start: cursor, end });
+      cursor = end;
+      index += 3;
+      continue;
+    }
+    if (token === 'Q' && cursor) {
+      const control = { x: Number(tokens[index + 1]), y: Number(tokens[index + 2]) };
+      const end = { x: Number(tokens[index + 3]), y: Number(tokens[index + 4]) };
+      segments.push({ kind: 'quad', start: cursor, control, end, controlKind: 'normal' });
+      cursor = end;
+      index += 5;
+      continue;
+    }
+    if (token === 'C' && cursor) {
+      const control1 = { x: Number(tokens[index + 1]), y: Number(tokens[index + 2]) };
+      const control2 = { x: Number(tokens[index + 3]), y: Number(tokens[index + 4]) };
+      const end = { x: Number(tokens[index + 5]), y: Number(tokens[index + 6]) };
+      segments.push({ kind: 'cubic', start: cursor, control1, control2, end });
+      cursor = end;
+      index += 7;
+      continue;
+    }
+    if (token === 'Z') {
+      if (cursor && start && distance(cursor, start) > 0.001) {
+        segments.push({ kind: 'line', start: cursor, end: start });
+      }
+      cursor = start;
+      index += 1;
+      continue;
+    }
+    index += 1;
+  }
+
+  return segments;
+}
+
+function pointOnSegment(segment: SvgSegment, t: number): Point {
+  if (segment.kind === 'line') return lerpPoint(segment.start, segment.end, t);
+  if (segment.kind === 'quad') {
+    const left = lerpPoint(segment.start, segment.control, t);
+    const right = lerpPoint(segment.control, segment.end, t);
+    return lerpPoint(left, right, t);
+  }
+  const left = lerpPoint(segment.start, segment.control1, t);
+  const center = lerpPoint(segment.control1, segment.control2, t);
+  const right = lerpPoint(segment.control2, segment.end, t);
+  return lerpPoint(lerpPoint(left, center, t), lerpPoint(center, right, t), t);
+}
+
+function splitSegment(segment: SvgSegment, t: number): [SvgSegment | null, SvgSegment | null] {
+  if (t <= 0.001) return [null, segment];
+  if (t >= 0.999) return [segment, null];
+  if (segment.kind === 'line') {
+    const middle = lerpPoint(segment.start, segment.end, t);
+    return [
+      { kind: 'line', start: segment.start, end: middle },
+      { kind: 'line', start: middle, end: segment.end },
+    ];
+  }
+  if (segment.kind === 'quad') {
+    const startControl = lerpPoint(segment.start, segment.control, t);
+    const controlEnd = lerpPoint(segment.control, segment.end, t);
+    const middle = lerpPoint(startControl, controlEnd, t);
+    return [
+      { kind: 'quad', start: segment.start, control: startControl, end: middle, controlKind: segment.controlKind },
+      { kind: 'quad', start: middle, control: controlEnd, end: segment.end, controlKind: segment.controlKind },
+    ];
+  }
+  const startControl = lerpPoint(segment.start, segment.control1, t);
+  const controlCenter = lerpPoint(segment.control1, segment.control2, t);
+  const controlEnd = lerpPoint(segment.control2, segment.end, t);
+  const leftControl = lerpPoint(startControl, controlCenter, t);
+  const rightControl = lerpPoint(controlCenter, controlEnd, t);
+  const middle = lerpPoint(leftControl, rightControl, t);
+  return [
+    { kind: 'cubic', start: segment.start, control1: startControl, control2: leftControl, end: middle },
+    { kind: 'cubic', start: middle, control1: rightControl, control2: controlEnd, end: segment.end },
+  ];
+}
+
+function segmentToCommand(segment: SvgSegment) {
+  if (segment.kind === 'line') return lineToCommand(segment.end);
+  if (segment.kind === 'quad') {
+    return `Q ${formatSvgNumber(segment.control.x)} ${formatSvgNumber(segment.control.y)} ${formatSvgNumber(segment.end.x)} ${formatSvgNumber(segment.end.y)}`;
+  }
+  return `C ${formatSvgNumber(segment.control1.x)} ${formatSvgNumber(segment.control1.y)} ${formatSvgNumber(segment.control2.x)} ${formatSvgNumber(segment.control2.y)} ${formatSvgNumber(segment.end.x)} ${formatSvgNumber(segment.end.y)}`;
+}
+
+function findTopVerticalPathIntersection(segments: SvgSegment[], x: number, maxY: number): SplitPathLocation | null {
+  const candidates: SplitPathLocation[] = [];
+  const steps = 80;
+  segments.forEach((segment, segmentIndex) => {
+    let previous = pointOnSegment(segment, 0);
+    for (let step = 1; step <= steps; step += 1) {
+      const t = step / steps;
+      const current = pointOnSegment(segment, t);
+      const previousDelta = previous.x - x;
+      const currentDelta = current.x - x;
+      if (Math.abs(currentDelta) <= 0.001 || previousDelta * currentDelta <= 0) {
+        const denominator = Math.abs(previousDelta) + Math.abs(currentDelta);
+        const localProgress = denominator <= 0.001 ? 1 : Math.abs(previousDelta) / denominator;
+        const intersectionT = (step - 1 + localProgress) / steps;
+        const point = pointOnSegment(segment, intersectionT);
+        if (point.y <= maxY + 1) candidates.push({ segmentIndex, t: intersectionT, point });
+      }
+      previous = current;
+    }
+  });
+
+  return candidates.sort((left, right) => left.point.y - right.point.y)[0] ?? null;
+}
+
+function pathSectionAverageY(segments: SvgSegment[], from: SplitPathLocation, to: SplitPathLocation) {
+  const samples: number[] = [];
+  let segmentIndex = from.segmentIndex;
+  let guard = segments.length + 1;
+  while (guard > 0) {
+    guard -= 1;
+    const segment = segments[segmentIndex];
+    const startT = segmentIndex === from.segmentIndex ? from.t : 0;
+    const endT = segmentIndex === to.segmentIndex ? to.t : 1;
+    const sampleCount = Math.max(1, Math.ceil(Math.abs(endT - startT) * 8));
+    for (let step = 0; step <= sampleCount; step += 1) {
+      const t = startT + (endT - startT) * (step / sampleCount);
+      samples.push(pointOnSegment(segment, t).y);
+    }
+    if (segmentIndex === to.segmentIndex) break;
+    segmentIndex = (segmentIndex + 1) % segments.length;
+  }
+  return samples.reduce((sum, y) => sum + y, 0) / Math.max(1, samples.length);
+}
+
+function buildBodyRemainderSegments(segments: SvgSegment[], removeStart: SplitPathLocation, removeEnd: SplitPathLocation) {
+  const output: SvgSegment[] = [];
+  const [, afterRemoveEnd] = splitSegment(segments[removeEnd.segmentIndex], removeEnd.t);
+  if (afterRemoveEnd) output.push(afterRemoveEnd);
+
+  let index = (removeEnd.segmentIndex + 1) % segments.length;
+  let guard = segments.length;
+  while (index !== removeStart.segmentIndex && guard > 0) {
+    guard -= 1;
+    output.push(segments[index]);
+    index = (index + 1) % segments.length;
+  }
+
+  const [beforeRemoveStart] = splitSegment(segments[removeStart.segmentIndex], removeStart.t);
+  if (beforeRemoveStart) output.push(beforeRemoveStart);
+  return output;
+}
+
+function keychainOuterOpenCommands(keychainShape: ReturnType<typeof addKeychainHoleToMask>, end: Point) {
+  const circle = keychainShape.outerCircle;
+  const left = { x: circle.centerX - circle.radius, y: circle.centerY };
+  const top = { x: circle.centerX, y: circle.centerY - circle.radius };
+  const right = { x: circle.centerX + circle.radius, y: circle.centerY };
+  return [
+    lineToCommand(left),
+    `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 1 ${formatSvgNumber(top.x)} ${formatSvgNumber(top.y)}`,
+    `A ${formatSvgNumber(circle.radius)} ${formatSvgNumber(circle.radius)} 0 0 1 ${formatSvgNumber(right.x)} ${formatSvgNumber(right.y)}`,
+    lineToCommand(end),
+  ];
+}
+
+function mergeKeychainOuterWithBodyPath(bodyPath: SvgPathResult, keychainShape: ReturnType<typeof addKeychainHoleToMask>): SvgPathResult | null {
+  const segments = parseSvgPathSegments(bodyPath.path);
+  if (segments.length === 0) return null;
+  const circle = keychainShape.outerCircle;
+  const leftX = circle.centerX - circle.radius;
+  const rightX = circle.centerX + circle.radius;
+  const maxIntersectionY = Math.max(keychainShape.leftConnectorBottomY, keychainShape.rightConnectorBottomY);
+  const leftIntersection = findTopVerticalPathIntersection(segments, leftX, maxIntersectionY);
+  const rightIntersection = findTopVerticalPathIntersection(segments, rightX, maxIntersectionY);
+  if (!leftIntersection || !rightIntersection) return null;
+
+  const leftToRightAverageY = pathSectionAverageY(segments, leftIntersection, rightIntersection);
+  const rightToLeftAverageY = pathSectionAverageY(segments, rightIntersection, leftIntersection);
+  const [removeStart, removeEnd] = leftToRightAverageY <= rightToLeftAverageY
+    ? [leftIntersection, rightIntersection]
+    : [rightIntersection, leftIntersection];
+  const keychainStart = removeStart === leftIntersection ? leftIntersection.point : rightIntersection.point;
+  const keychainEnd = removeStart === leftIntersection ? rightIntersection.point : leftIntersection.point;
+  if (keychainStart.x > keychainEnd.x) return null;
+
+  const bodyRemainder = buildBodyRemainderSegments(segments, removeStart, removeEnd);
+  const commands = [
+    `M ${formatSvgNumber(keychainStart.x)} ${formatSvgNumber(keychainStart.y)}`,
+    ...keychainOuterOpenCommands(keychainShape, keychainEnd),
+    ...bodyRemainder.map(segmentToCommand),
+    'Z',
+  ];
+
+  return createPathResult(
+    commands.join(' '),
+    bodyPath.controlPoints,
+    bodyPath.longStraightLines,
+    bodyPath.connectedStraightLines,
+    bodyPath.pathStyle,
+    bodyPath.extraPaths,
+  );
+}
+
 function keychainAttachmentToPath(keychainShape: ReturnType<typeof addKeychainHoleToMask>, longStraightLineMinLength: number): SvgPathResult {
   const circle = keychainShape.outerCircle;
   const leftBottom = { x: circle.centerX - circle.radius, y: keychainShape.leftConnectorBottomY };
@@ -2508,10 +2734,12 @@ function buildServerCutPath(
   if (!keychainShape) return mergePathResults(bodyPathResults, extraPaths);
 
   const hole = { ...keychainShape.hole };
-  const keychainPath = keychainAttachmentToPath(keychainShape, longStraightLineMinLength);
+  const keychainAttachmentPath = keychainAttachmentToPath(keychainShape, longStraightLineMinLength);
+  const mergedOuterPath = bodyPathResults.length === 1 ? mergeKeychainOuterWithBodyPath(bodyPathResults[0], keychainShape) : null;
+  const outerPathResults = mergedOuterPath ? [mergedOuterPath] : [...bodyPathResults, keychainAttachmentPath];
   const holePath = circleToPath(hole);
 
-  return mergePathResults([...bodyPathResults, keychainPath, holePath], extraPaths);
+  return mergePathResults([...outerPathResults, holePath], extraPaths);
 }
 
 function buildControlPointMarkers(controlPoints: DebugPoint[]) {

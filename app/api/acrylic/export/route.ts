@@ -1,6 +1,10 @@
 import { inflateSync } from 'node:zlib';
 import { NextResponse } from 'next/server';
-import { resolveAcrylicGenerationOptions, type AcrylicGenerationOptions } from '@/lib/acrylicGenerationOptions';
+import {
+  DEFAULT_ACRYLIC_GENERATION_OPTIONS,
+  resolveAcrylicGenerationOptions,
+  type AcrylicGenerationOptions,
+} from '@/lib/acrylicGenerationOptions';
 
 export const runtime = 'nodejs';
 
@@ -27,6 +31,7 @@ type Circle = {
 
 type AcrylicMetrics = {
   clearRadius: number;
+  fixedHoleClearRadius: number;
   internalGapCloseRadius: number;
   holeOuterRadius: number;
   holeInnerRadius: number;
@@ -697,6 +702,7 @@ function getAcrylicMetrics(
 ): AcrylicMetrics {
   return {
     clearRadius: scaleArtworkMetric(keychainOptions.clearRadius, artworkWidth, artworkHeight),
+    fixedHoleClearRadius: scaleArtworkMetric(DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.clearRadius, artworkWidth, artworkHeight),
     internalGapCloseRadius: scaleArtworkMetric(BASE_INTERNAL_GAP_CLOSE_RADIUS, artworkWidth, artworkHeight),
     holeOuterRadius: scaleArtworkMetric(keychainOptions.holeOuterRadius, artworkWidth, artworkHeight),
     holeInnerRadius: scaleArtworkMetric(keychainOptions.holeInnerRadius, artworkWidth, artworkHeight),
@@ -874,6 +880,36 @@ function fillNarrowExitTransparentAreas(mask: Uint8Array, patchMask: Uint8Array 
     if (patchMask[index]) output[index] = 1;
   }
   return output;
+}
+
+function subtractMask(outerMask: Uint8Array, innerMask: Uint8Array, width: number, height: number) {
+  const output = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (outerMask[index] && !innerMask[index]) output[index] = 1;
+  }
+  return output;
+}
+
+function unionMask(leftMask: Uint8Array, rightMask: Uint8Array, width: number, height: number) {
+  const output = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    output[index] = leftMask[index] || rightMask[index] ? 1 : 0;
+  }
+  return output;
+}
+
+function buildKeychainLayerMask(
+  baseMask: Uint8Array,
+  keychainShapeMask: Uint8Array,
+  width: number,
+  height: number,
+  bodyRadius: number,
+  holeRadius: number,
+) {
+  const bodyMask = fillEnclosedMaskHoles(dilateMask(baseMask, width, height, Math.max(0, Math.round(bodyRadius))), width, height);
+  const holeMask = fillEnclosedMaskHoles(dilateMask(keychainShapeMask, width, height, Math.max(0, Math.round(holeRadius))), width, height);
+  const fixedBodyMask = fillEnclosedMaskHoles(dilateMask(baseMask, width, height, Math.max(0, Math.round(holeRadius))), width, height);
+  return fillEnclosedMaskHoles(unionMask(bodyMask, subtractMask(holeMask, fixedBodyMask, width, height), width, height), width, height);
 }
 
 function paintCircleOnMask(mask: Uint8Array, width: number, height: number, centerX: number, centerY: number, radius: number, value: 0 | 1) {
@@ -2141,7 +2177,7 @@ function buildServerCutPath(
           bounds.minX + bounds.width * generationOptions.keychain.holeCenterXRatio,
           bounds.width,
           bounds.height,
-          metrics,
+          { ...metrics, clearRadius: metrics.fixedHoleClearRadius },
           generationOptions.keychain,
         )
       : null;
@@ -2149,9 +2185,20 @@ function buildServerCutPath(
   if (DEBUG_OUTPUT_RAW_BASE_MASK_PATH && !DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH) {
     return rawBoundaryLoopsToPath(maskToBoundaryLoops(keychainMask, artwork.width, artwork.height));
   }
-  const clearRadius = Math.max(1, Math.round(metrics.clearRadius));
-  const dilatedClearMask = dilateMask(keychainMask, artwork.width, artwork.height, clearRadius);
-  const clearMask = fillEnclosedMaskHoles(dilatedClearMask, artwork.width, artwork.height);
+  const clearMask = keychainShape
+    ? buildKeychainLayerMask(
+        gapClosedBaseMask,
+        keychainShape.mask,
+        artwork.width,
+        artwork.height,
+        metrics.clearRadius,
+        metrics.fixedHoleClearRadius,
+      )
+    : fillEnclosedMaskHoles(
+        dilateMask(keychainMask, artwork.width, artwork.height, Math.max(1, Math.round(metrics.clearRadius))),
+        artwork.width,
+        artwork.height,
+      );
   const hole = keychainShape ? { ...keychainShape.hole } : null;
   if (hole) paintCircleOnMask(clearMask, artwork.width, artwork.height, hole.centerX, hole.centerY, hole.radius, 0);
 

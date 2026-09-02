@@ -1,7 +1,11 @@
 import { deflateSync } from 'node:zlib';
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
-import { resolveAcrylicGenerationOptions, type AcrylicGenerationOptions } from '@/lib/acrylicGenerationOptions';
+import {
+  DEFAULT_ACRYLIC_GENERATION_OPTIONS,
+  resolveAcrylicGenerationOptions,
+  type AcrylicGenerationOptions,
+} from '@/lib/acrylicGenerationOptions';
 
 export const runtime = 'nodejs';
 
@@ -27,6 +31,17 @@ type StandBaseFrame = {
   depthOffset: number;
 };
 
+type StandShapeGuide = {
+  src: string;
+} | null;
+
+type StandClawFrame = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null;
+
 type RgbaImage = {
   width: number;
   height: number;
@@ -43,6 +58,7 @@ type StandShapeOptions = AcrylicGenerationOptions['stand'];
 
 type AcrylicMetrics = {
   clearRadius: number;
+  fixedHoleClearRadius: number;
   highlightRadius: number;
   internalGapCloseRadius: number;
   holeOuterRadius: number;
@@ -67,6 +83,7 @@ const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124
 const ACRYLIC_EDGE_SHADOW_COLOR: [number, number, number, number] = [88, 96, 112, 34];
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];
 const STAND_CLAW_FILL_COLOR: [number, number, number, number] = [116, 122, 138, 41];
+const STAND_SHAPE_GUIDE_COLOR: [number, number, number, number] = [86, 103, 131, 230];
 const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
 const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
 const BASE_EDGE_SHADOW_WIDTH = 4;
@@ -93,6 +110,7 @@ function getAcrylicMetrics(
 ): AcrylicMetrics {
   return {
     clearRadius: scaleArtworkMetric(keychainOptions.clearRadius, artworkWidth, artworkHeight),
+    fixedHoleClearRadius: scaleArtworkMetric(DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.clearRadius, artworkWidth, artworkHeight),
     highlightRadius: scaleArtworkMetric(BASE_HIGHLIGHT_RADIUS, artworkWidth, artworkHeight),
     internalGapCloseRadius: scaleArtworkMetric(BASE_INTERNAL_GAP_CLOSE_RADIUS, artworkWidth, artworkHeight),
     holeOuterRadius: scaleArtworkMetric(keychainOptions.holeOuterRadius, artworkWidth, artworkHeight),
@@ -471,6 +489,38 @@ function findNearBottomSidePoint(mask: Uint8Array, width: number, bottomPoint: B
   return farthestPoint;
 }
 
+function paintBottomRoundedRectOnMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  rectWidth: number,
+  rectHeight: number,
+  radius: number,
+) {
+  const left = Math.max(0, Math.round(x));
+  const top = Math.max(0, Math.round(y));
+  const right = Math.min(width - 1, Math.round(x + rectWidth - 1));
+  const bottom = Math.min(height - 1, Math.round(y + rectHeight - 1));
+  if (right < left || bottom < top) return;
+
+  const cornerRadius = Math.max(0, Math.min(Math.round(radius), Math.floor((right - left + 1) / 2), Math.floor((bottom - top + 1) / 2)));
+  const radiusSquared = cornerRadius * cornerRadius;
+  for (let pointY = top; pointY <= bottom; pointY += 1) {
+    for (let pointX = left; pointX <= right; pointX += 1) {
+      if (cornerRadius > 0 && pointY > bottom - cornerRadius) {
+        const cornerCenterX = pointX < left + cornerRadius ? left + cornerRadius : pointX > right - cornerRadius ? right - cornerRadius : pointX;
+        const cornerCenterY = bottom - cornerRadius;
+        const deltaX = pointX - cornerCenterX;
+        const deltaY = pointY - cornerCenterY;
+        if (deltaX * deltaX + deltaY * deltaY > radiusSquared) continue;
+      }
+      mask[pointY * width + pointX] = 1;
+    }
+  }
+}
+
 function addStandClawsToMask(
   mask: Uint8Array,
   width: number,
@@ -481,28 +531,60 @@ function addStandClawsToMask(
   artworkCenterX: number,
   artworkWidth: number,
   artworkHeight: number,
-  standBaseDepthOffset: number,
+  standClawLength: number,
+  standClawStartOffset: number,
   standOptions: StandShapeOptions,
-) {
-  const edgeGap = Math.max(0, Math.round(scaleArtworkMetric(BASE_STAND_CLAW_EDGE_GAP, artworkWidth, artworkHeight)));
-  const safeLeftX = Math.min(contactRightX, contactLeftX + edgeGap);
-  const safeRightX = Math.max(contactLeftX, contactRightX - edgeGap);
+): StandClawFrame {
   const centerX = Math.round(artworkCenterX + (standOptions.clawCenterXRatio - 0.5) * artworkWidth);
-  const leftSpan = Math.max(0, centerX - safeLeftX);
-  const rightSpan = Math.max(0, safeRightX - centerX);
+  const edgeGap = Math.max(0, Math.round(scaleArtworkMetric(BASE_STAND_CLAW_EDGE_GAP, artworkWidth, artworkHeight)));
+  const autoSafeLeftX = Math.min(contactRightX, contactLeftX + edgeGap);
+  const autoSafeRightX = Math.max(contactLeftX, contactRightX - edgeGap);
+  const usesFixedPixelWidth = standOptions.clawWidthPx !== null;
+  const leftBound = usesFixedPixelWidth ? 0 : autoSafeLeftX;
+  const rightBound = usesFixedPixelWidth ? width - 1 : autoSafeRightX;
+  const leftSpan = Math.max(0, centerX - autoSafeLeftX);
+  const rightSpan = Math.max(0, autoSafeRightX - centerX);
   const autoHalfSpan = Math.floor(Math.min(leftSpan, rightSpan));
-  const requestedHalfSpan = standOptions.clawWidthRatio === null ? autoHalfSpan : Math.round((artworkWidth * standOptions.clawWidthRatio) / 2);
-  const halfSpan = Math.min(autoHalfSpan, Math.max(0, requestedHalfSpan));
-  if (halfSpan <= 0) return;
+  const autoWidth = autoHalfSpan * 2 + 1;
+  const requestedWidth =
+    standOptions.clawWidthPx !== null
+      ? Math.round(standOptions.clawWidthPx)
+      : standOptions.clawWidthRatio === null
+        ? autoWidth
+        : Math.round(artworkWidth * standOptions.clawWidthRatio);
+  const maxWidth = Math.max(0, rightBound - leftBound + 1);
+  const clawWidth = Math.min(maxWidth, Math.max(1, requestedWidth));
+  if (clawWidth <= 0) return null;
 
-  const clawLeftX = Math.max(contactLeftX, centerX - halfSpan);
-  const clawRightX = Math.min(contactRightX, centerX + halfSpan);
-  const clawBottomY = Math.min(height - 1, contactY + Math.max(1, Math.round(standBaseDepthOffset)));
-  if (clawBottomY <= contactY) return;
+  const clawLeftX = Math.max(leftBound, Math.min(rightBound - clawWidth + 1, Math.round(centerX - clawWidth / 2)));
+  const clawRightX = clawLeftX + clawWidth - 1;
+  const clawTopY = Math.min(height - 1, Math.round(contactY + standClawStartOffset));
+  const requestedLength =
+    standOptions.clawLengthPx !== null
+      ? Math.max(1, Math.round(standOptions.clawLengthPx))
+      : standOptions.clawLengthRatio === null
+        ? Math.max(1, Math.round(standClawLength))
+        : Math.max(1, Math.round(artworkHeight * standOptions.clawLengthRatio));
+  const clawBottomY = Math.min(height - 1, clawTopY + requestedLength - 1);
+  if (clawBottomY <= clawTopY) return null;
 
-  paintLineOnMask(mask, width, height, clawLeftX, contactY, clawLeftX, clawBottomY);
-  paintLineOnMask(mask, width, height, clawRightX, contactY, clawRightX, clawBottomY);
-  paintLineOnMask(mask, width, height, clawLeftX, clawBottomY, clawRightX, clawBottomY);
+  paintBottomRoundedRectOnMask(
+    mask,
+    width,
+    height,
+    clawLeftX,
+    clawTopY,
+    clawRightX - clawLeftX + 1,
+    clawBottomY - clawTopY + 1,
+    scaleArtworkMetric(standOptions.clawCornerRadius, artworkWidth, artworkHeight),
+  );
+
+  return {
+    x: clawLeftX,
+    y: clawTopY,
+    width: Math.max(1, clawRightX - clawLeftX + 1),
+    height: Math.max(1, clawBottomY - clawTopY + 1),
+  };
 }
 
 function addStableStandBaseAreaToMask(
@@ -568,14 +650,16 @@ function addStandBottomOutlineToMask(
   artworkCenterX: number,
   artworkWidth: number,
   artworkHeight: number,
-  standBaseDepthOffset: number,
+  standClawLength: number,
+  standClawStartOffset: number,
   standMode: StandMode,
   standOptions: StandShapeOptions,
 ) {
   const standMask = mask.slice();
   const bottomPoint = findBottomMaskPoint(mask, width, height);
   let contactLine: StandContactLine = null;
-  if (!bottomPoint) return { mask: standMask, maskWithoutClaws: standMask.slice(), contactY: null, contactLine };
+  let clawFrame: StandClawFrame = null;
+  if (!bottomPoint) return { mask: standMask, maskWithoutClaws: standMask.slice(), contactY: null, contactLine, clawFrame };
   paintLineOnMask(standMask, width, height, bottomPoint.minX, bottomPoint.y, bottomPoint.maxX, bottomPoint.y);
   const nearHeightDelta = Math.max(1, Math.round(scaleArtworkMetric(BASE_STAND_BOTTOM_NEAR_HEIGHT_DELTA, artworkWidth, artworkHeight)));
   const leftPoint = findNearBottomSidePoint(mask, width, bottomPoint, 'left', nearHeightDelta);
@@ -601,7 +685,7 @@ function addStandBottomOutlineToMask(
   }
   const maskWithoutClaws = standMask.slice();
   if (standMode === 'simple' || standMode === 'stable') {
-    addStandClawsToMask(
+    clawFrame = addStandClawsToMask(
       standMask,
       width,
       height,
@@ -611,12 +695,13 @@ function addStandBottomOutlineToMask(
       artworkCenterX,
       artworkWidth,
       artworkHeight,
-      standBaseDepthOffset,
+      standClawLength,
+      standClawStartOffset,
       standOptions,
     );
     contactLine = { leftX: contactLeftX, rightX: contactRightX, y: clawContactY };
   }
-  return { mask: standMask, maskWithoutClaws, contactY: bottomPoint.y, contactLine };
+  return { mask: standMask, maskWithoutClaws, contactY: bottomPoint.y, contactLine, clawFrame };
 }
 
 function maskBounds(mask: Uint8Array, width: number, height: number) {
@@ -650,12 +735,75 @@ function layerFromMask(width: number, height: number, mask: Uint8Array, color: [
   return { width, height, rgba };
 }
 
+function outlineLayerFromMask(width: number, height: number, mask: Uint8Array, color: [number, number, number, number]) {
+  const rgba = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (!mask[index]) continue;
+      const touchesOutside =
+        x === 0 ||
+        y === 0 ||
+        x === width - 1 ||
+        y === height - 1 ||
+        !mask[index - 1] ||
+        !mask[index + 1] ||
+        !mask[index - width] ||
+        !mask[index + width];
+      if (!touchesOutside) continue;
+      const target = index * 4;
+      rgba[target] = color[0];
+      rgba[target + 1] = color[1];
+      rgba[target + 2] = color[2];
+      rgba[target + 3] = color[3];
+    }
+  }
+  return { width, height, rgba };
+}
+
 function subtractMask(outerMask: Uint8Array, innerMask: Uint8Array, width: number, height: number) {
   const output = new Uint8Array(width * height);
   for (let index = 0; index < width * height; index += 1) {
     if (outerMask[index] && !innerMask[index]) output[index] = 1;
   }
   return output;
+}
+
+function buildStandClawLayerMask(
+  frame: StandClawFrame,
+  width: number,
+  height: number,
+  radius: number,
+  grow: number,
+) {
+  if (!frame) return null;
+  const mask = new Uint8Array(width * height);
+  const rectWidth = Math.max(1, frame.width + grow * 2);
+  const rectHeight = Math.max(1, frame.height + grow * 2);
+  paintBottomRoundedRectOnMask(mask, width, height, frame.x - grow, frame.y - grow, rectWidth, rectHeight, radius + Math.max(0, grow));
+  return mask;
+}
+
+function unionMask(leftMask: Uint8Array, rightMask: Uint8Array, width: number, height: number) {
+  const output = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    output[index] = leftMask[index] || rightMask[index] ? 1 : 0;
+  }
+  return output;
+}
+
+function buildKeychainLayerMask(
+  baseMask: Uint8Array,
+  keychainShapeMask: Uint8Array,
+  width: number,
+  height: number,
+  bodyRadius: number,
+  holeRadius: number,
+) {
+  const bodyMask = fillEnclosedMaskHoles(dilateMask(baseMask, width, height, Math.max(0, Math.round(bodyRadius))), width, height);
+  const holeMask = fillEnclosedMaskHoles(dilateMask(keychainShapeMask, width, height, Math.max(0, Math.round(holeRadius))), width, height);
+  const fixedBodyMask = fillEnclosedMaskHoles(dilateMask(baseMask, width, height, Math.max(0, Math.round(holeRadius))), width, height);
+  return fillEnclosedMaskHoles(unionMask(bodyMask, subtractMask(holeMask, fixedBodyMask, width, height), width, height), width, height);
 }
 
 function conditionalLayer(width: number, height: number, paint: (index: number) => [number, number, number, number] | null) {
@@ -859,11 +1007,17 @@ function buildPreviewLayers(
   const topLoopSpace = productMode === 'keychain' && shapeMode === 'with-hole' ? Math.ceil(metrics.holeOuterRadius * 2 + metrics.holeGap * 2) : 0;
   const standBaseWidth =
     productMode === 'stand'
-      ? Math.max(1, Math.round(bounds.width * (generationOptions.stand.baseWidthRatioPercent / 100)))
+      ? Math.max(
+          1,
+          Math.round(
+            generationOptions.stand.baseWidthPx ??
+              bounds.width * (generationOptions.stand.baseWidthRatioPercent / 100),
+          ),
+        )
       : 0;
   const standBaseHeight =
     productMode === 'stand'
-      ? Math.max(generationOptions.stand.baseMinHeight, Math.round(standBaseWidth * (generationOptions.stand.baseHeightRatioPercent / 100)))
+      ? Math.max(generationOptions.stand.baseMinHeight, Math.round(bounds.width * (generationOptions.stand.baseHeightRatioPercent / 100)))
       : 0;
   const standBaseDepthOffset = productMode === 'stand' ? Math.max(1, Math.round(standBaseHeight * generationOptions.stand.baseDepthOffsetRatio)) : 0;
   const contentWidth = Math.max(bounds.width, standBaseWidth);
@@ -915,7 +1069,7 @@ function buildPreviewLayers(
           padding + bounds.width * generationOptions.keychain.holeCenterXRatio,
           bounds.width,
           bounds.height,
-          metrics,
+          { ...metrics, clearRadius: metrics.fixedHoleClearRadius },
           generationOptions.keychain,
         )
       : null;
@@ -929,22 +1083,113 @@ function buildPreviewLayers(
           bounds.width,
           bounds.height,
           standBaseDepthOffset,
+          metrics.clearRadius,
           shapeMode as StandMode,
           generationOptions.stand,
         )
       : null;
   const standShapeMask = standShape ? fillEnclosedMaskHoles(standShape.mask, width, height) : null;
   const standShapeMaskWithoutClaws = standShape ? fillEnclosedMaskHoles(standShape.maskWithoutClaws, width, height) : null;
-  const shapeMask = keychainShape?.mask ?? standShapeMask ?? gapClosedBaseMask;
-  const clearMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius))), width, height);
+  const shapeMask = keychainShape?.mask ?? standShapeMaskWithoutClaws ?? standShapeMask ?? gapClosedBaseMask;
+  const standClawCornerRadius = scaleArtworkMetric(generationOptions.stand.clawCornerRadius, bounds.width, bounds.height);
+  const standClawClearMask =
+    productMode === 'stand' ? buildStandClawLayerMask(standShape?.clawFrame ?? null, width, height, standClawCornerRadius, 0) : null;
+  const standClawEdgeMask =
+    productMode === 'stand'
+      ? buildStandClawLayerMask(standShape?.clawFrame ?? null, width, height, standClawCornerRadius, Math.max(1, Math.round(metrics.edgeShadowWidth)))
+      : null;
+  const standClawHighlightMask =
+    productMode === 'stand'
+      ? buildStandClawLayerMask(standShape?.clawFrame ?? null, width, height, standClawCornerRadius, Math.max(1, Math.round(metrics.highlightRadius)))
+      : null;
+  const standClawInnerShineMask =
+    productMode === 'stand'
+      ? buildStandClawLayerMask(standShape?.clawFrame ?? null, width, height, standClawCornerRadius, -Math.max(0, Math.round(metrics.innerShineWidth)))
+      : null;
+  const standBodyClearMask =
+    productMode === 'stand'
+      ? fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius))), width, height)
+      : null;
+  const clearMask = keychainShape
+    ? buildKeychainLayerMask(
+        gapClosedBaseMask,
+        keychainShape.mask,
+        width,
+        height,
+        metrics.clearRadius,
+        metrics.fixedHoleClearRadius,
+      )
+    : standBodyClearMask && standClawClearMask
+      ? fillEnclosedMaskHoles(unionMask(standBodyClearMask, standClawClearMask, width, height), width, height)
+      : fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius))), width, height);
   const clearMaskWithoutClaws =
-    productMode === 'stand' && (shapeMode === 'simple' || shapeMode === 'stable') && standShapeMaskWithoutClaws
-      ? fillEnclosedMaskHoles(dilateMask(standShapeMaskWithoutClaws, width, height, Math.max(1, Math.round(metrics.clearRadius))), width, height)
+    productMode === 'stand' && (shapeMode === 'simple' || shapeMode === 'stable') && standBodyClearMask
+      ? standBodyClearMask
       : null;
   const standClawFillMask = clearMaskWithoutClaws ? buildStandClawFillMask(clearMask, clearMaskWithoutClaws, width, height) : null;
-  const edgeMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.edgeShadowWidth))), width, height);
-  const highlightMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.highlightRadius))), width, height);
-  const innerShineMask = fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(0, Math.round(metrics.clearRadius - metrics.innerShineWidth))), width, height);
+  const edgeMask = keychainShape
+    ? buildKeychainLayerMask(
+        gapClosedBaseMask,
+        keychainShape.mask,
+        width,
+        height,
+        metrics.clearRadius + metrics.edgeShadowWidth,
+        metrics.fixedHoleClearRadius + metrics.edgeShadowWidth,
+      )
+    : standClawEdgeMask
+      ? fillEnclosedMaskHoles(
+          unionMask(
+            fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.edgeShadowWidth))), width, height),
+            standClawEdgeMask,
+            width,
+            height,
+          ),
+          width,
+          height,
+        )
+      : fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.edgeShadowWidth))), width, height);
+  const highlightMask = keychainShape
+    ? buildKeychainLayerMask(
+        gapClosedBaseMask,
+        keychainShape.mask,
+        width,
+        height,
+        metrics.clearRadius + metrics.highlightRadius,
+        metrics.fixedHoleClearRadius + metrics.highlightRadius,
+      )
+    : standClawHighlightMask
+      ? fillEnclosedMaskHoles(
+          unionMask(
+            fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.highlightRadius))), width, height),
+            standClawHighlightMask,
+            width,
+            height,
+          ),
+          width,
+          height,
+        )
+      : fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(1, Math.round(metrics.clearRadius + metrics.highlightRadius))), width, height);
+  const innerShineMask = keychainShape
+    ? buildKeychainLayerMask(
+        gapClosedBaseMask,
+        keychainShape.mask,
+        width,
+        height,
+        metrics.clearRadius - metrics.innerShineWidth,
+        metrics.fixedHoleClearRadius - metrics.innerShineWidth,
+      )
+    : standClawInnerShineMask
+      ? fillEnclosedMaskHoles(
+          unionMask(
+            fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(0, Math.round(metrics.clearRadius - metrics.innerShineWidth))), width, height),
+            standClawInnerShineMask,
+            width,
+            height,
+          ),
+          width,
+          height,
+        )
+      : fillEnclosedMaskHoles(dilateMask(shapeMask, width, height, Math.max(0, Math.round(metrics.clearRadius - metrics.innerShineWidth))), width, height);
   if (keychainShape) {
     const holeTransparentRadius = Math.max(1, keychainShape.hole.radius);
     const holeLineWidth = Math.max(1, Math.round(metrics.edgeShadowWidth));
@@ -967,6 +1212,12 @@ function buildPreviewLayers(
   placeImage(artwork, image, imageX, imageY, true);
   const highlight = conditionalLayer(width, height, (index) => (innerShineMask[index] ? [255, 255, 255, 252] : null));
   const standBase: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
+  const standShapeGuide: StandShapeGuide =
+    productMode === 'stand'
+      ? {
+          src: toDataUrl(outlineLayerFromMask(width, height, clearMask, STAND_SHAPE_GUIDE_COLOR)),
+        }
+      : null;
   const clearBounds = productMode === 'stand' ? maskBounds(clearMask, width, height) : null;
   const standContactY =
     productMode === 'stand' && standShape && standShape.contactY !== null
@@ -994,6 +1245,9 @@ function buildPreviewLayers(
     highlightSrc: toDataUrl(highlight),
     standBaseSrc: toDataUrl(standBase),
     standBaseFrame,
+    standShapeGuide,
+    standContactLine: standShape?.contactLine ?? null,
+    standClawFrame: standShape?.clawFrame ?? null,
     width,
     height,
     fileName,

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "acrylic:baseline": "node scripts/acrylic-regression.mjs baseline",
-    "acrylic:compare": "node scripts/acrylic-regression.mjs compare"
+    "acrylic:compare": "node scripts/acrylic-regression.mjs compare",
+    "acrylic:stand-claw-check": "node scripts/acrylic-regression.mjs stand-claw-check"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

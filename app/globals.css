@@ -2880,11 +2880,52 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .acrylic-demo-page {
+  --site-outer-bg: #eaf4ff;
+  --site-bg: #fbfdff;
+  --site-surface: #ffffff;
+  --site-surface-soft: #f3f8ff;
+  --site-accent: #315acb;
+  --site-accent-soft: #8fb6ff;
+  --site-text: #172554;
+  --site-text-muted: #566783;
+  --site-border: #7ca2e8;
+  --site-dotted: #a9c5f6;
+  --site-focus: #174fd6;
+  --site-shadow: rgba(49, 90, 203, 0.18);
   min-height: 100vh;
   padding: 28px;
   background:
+    radial-gradient(circle, color-mix(in srgb, var(--site-dotted) 28%, transparent) 0.8px, transparent 1px),
     linear-gradient(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.72)),
     var(--site-bg);
+  background-size:
+    4px 4px,
+    auto,
+    auto;
+}
+
+html:has(.acrylic-demo-page),
+body:has(.acrylic-demo-page),
+html:has(.acrylic-demo-page) body {
+  --site-outer-bg: #eaf4ff;
+  --site-bg: #fbfdff;
+  --site-surface: #ffffff;
+  --site-surface-soft: #f3f8ff;
+  --site-accent: #315acb;
+  --site-accent-soft: #8fb6ff;
+  --site-text: #172554;
+  --site-text-muted: #566783;
+  --site-border: #7ca2e8;
+  --site-dotted: #a9c5f6;
+  --site-focus: #174fd6;
+  --site-shadow: rgba(49, 90, 203, 0.18);
+  --pixel-tint-overlay: transparent;
+  --pixel-tint-opacity: 0;
+  --pixel-tint-blend-mode: multiply;
+  background-color: #eaf4ff;
+  background-image: radial-gradient(circle, rgba(169, 197, 246, 0.28) 0.8px, transparent 1px);
+  background-size: 4px 4px;
+  animation: none;
 }
 
 .acrylic-demo-panel {
@@ -2894,10 +2935,18 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   min-height: calc(100vh - 56px);
   align-items: start;
   align-content: center;
+  padding: 18px 18px 24px;
+  background: color-mix(in srgb, var(--site-surface) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--site-border) 64%, white);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.72),
+    0 12px 28px rgba(49, 90, 203, 0.09);
 }
 
 .acrylic-demo-heading {
+  padding: 8px 12px 12px;
   text-align: center;
+  border-bottom: 2px dotted color-mix(in srgb, var(--site-dotted) 70%, white);
 }
 
 .acrylic-demo-heading h1 {
@@ -3433,6 +3482,29 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   touch-action: none;
 }
 
+.acrylic-stand-flat-preview {
+  position: relative;
+  width: auto;
+  max-width: 100%;
+  height: min(42dvh, 360px);
+  aspect-ratio: var(--acrylic-flat-image-aspect);
+  margin: 0 auto 4px;
+  overflow: hidden;
+  background:
+    linear-gradient(45deg, rgba(124, 134, 150, 0.08) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(124, 134, 150, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(124, 134, 150, 0.08) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(124, 134, 150, 0.08) 75%),
+    #ffffff;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+  border: 1px solid var(--site-border);
+}
+
 .acrylic-hole-flat-preview img {
   position: absolute;
   inset: 0;
@@ -3443,10 +3515,26 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   pointer-events: none;
 }
 
+.acrylic-stand-flat-preview img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.acrylic-stand-flat-preview > img:not(.acrylic-stand-flat-margin-guide) {
+  z-index: 3;
+}
+
 .acrylic-hole-flat-art-bounds,
 .acrylic-hole-flat-loop,
-.acrylic-hole-flat-outer,
-.acrylic-hole-flat-inner {
+.acrylic-hole-flat-inner,
+.acrylic-stand-flat-base,
+.acrylic-stand-flat-claw,
+.acrylic-stand-flat-contact {
   position: absolute;
   display: block;
   pointer-events: none;
@@ -3460,11 +3548,28 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
     drop-shadow(0 0 2px rgba(70, 92, 124, 0.55));
 }
 
-.acrylic-hole-flat-margin-guide {
-  opacity: 0.9;
+.acrylic-hole-flat-margin-guide,
+.acrylic-stand-flat-margin-guide {
+  z-index: 4;
+  opacity: 0.96;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95));
+}
+
+.acrylic-stand-flat-outline {
+  z-index: 2;
+  opacity: 0.82;
   filter:
-    drop-shadow(0 0 0 #ffffff)
-    drop-shadow(0 0 1px rgba(70, 92, 124, 0.85));
+    drop-shadow(0 0 0 rgba(255, 255, 255, 0.98))
+    drop-shadow(0 0 1px rgba(70, 92, 124, 0.9))
+    drop-shadow(0 0 2px rgba(70, 92, 124, 0.55));
+}
+
+.acrylic-stand-flat-acrylic {
+  z-index: 4;
+  opacity: 0.42;
+  filter:
+    drop-shadow(0 0 0 rgba(255, 255, 255, 0.98))
+    drop-shadow(0 0 1px rgba(70, 92, 124, 0.55));
 }
 
 .acrylic-hole-flat-art-bounds {
@@ -3489,16 +3594,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   transform: translate(-50%, -50%);
 }
 
-.acrylic-hole-flat-outer {
-  left: var(--acrylic-flat-hole-x);
-  top: var(--acrylic-flat-hole-y);
-  width: var(--acrylic-flat-hole-outer-width);
-  height: var(--acrylic-flat-hole-outer-height);
-  border: 1.5px solid rgba(86, 103, 131, 0.58);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-}
-
 .acrylic-hole-flat-inner {
   left: 50%;
   top: 50%;
@@ -3508,6 +3603,45 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   border: 2px solid rgba(70, 92, 124, 0.72);
   border-radius: 50%;
   transform: translate(-50%, -50%);
+}
+
+.acrylic-stand-flat-base {
+  left: var(--acrylic-stand-flat-base-left);
+  top: var(--acrylic-stand-flat-base-top);
+  z-index: 1;
+  width: var(--acrylic-stand-flat-base-width);
+  height: var(--acrylic-stand-flat-base-height);
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.92) 0 42%, transparent 43%),
+    rgba(116, 122, 138, 0.16);
+  border: 2px solid rgba(116, 122, 138, 0.52);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.88);
+}
+
+.acrylic-stand-flat-claw {
+  left: var(--acrylic-stand-flat-claw-left);
+  top: var(--acrylic-stand-flat-claw-top);
+  z-index: 5;
+  width: var(--acrylic-stand-flat-claw-width);
+  height: var(--acrylic-stand-flat-claw-height);
+  background: rgba(116, 122, 138, 0.2);
+  border: 2px solid rgba(86, 103, 131, 0.62);
+  border-radius: 0 0 var(--acrylic-stand-flat-claw-radius) var(--acrylic-stand-flat-claw-radius);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.86);
+}
+
+.acrylic-stand-flat-contact {
+  left: 0;
+  top: var(--acrylic-stand-flat-contact-y);
+  z-index: 6;
+  width: 100%;
+  height: 0;
+  border-top: 1px dashed rgba(86, 103, 131, 0.34);
 }
 
 .acrylic-options-field {

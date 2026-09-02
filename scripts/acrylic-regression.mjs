@@ -28,20 +28,26 @@ const defaultGenerationOptions = {
     holeOuterRadius: 24,
     holeInnerRadius: 11,
     holeGap: 2,
+    clearRadius: 10,
     paddingSpace: 20,
   },
   stand: {
+    baseWidthPx: null,
     baseWidthRatioPercent: 100,
     baseHeightRatioPercent: 22,
     baseMinHeight: 18,
     baseDepthOffsetRatio: 0.18,
+    clawWidthPx: null,
     clawWidthRatio: null,
     clawCenterXRatio: 0.5,
+    clawLengthPx: 18,
+    clawLengthRatio: null,
+    clawCornerRadius: 2,
   },
 };
 
 function usage() {
-  console.error('Usage: node scripts/acrylic-regression.mjs <baseline|compare>');
+  console.error('Usage: node scripts/acrylic-regression.mjs <baseline|compare|stand-claw-check>');
 }
 
 function hash(content) {
@@ -173,6 +179,102 @@ async function buildArtifacts(fileName) {
   return artifacts;
 }
 
+function hashDataUrl(dataUrl) {
+  return hash(pngBufferFromDataUrl(dataUrl));
+}
+
+function buildStandClawSummary(preview) {
+  return {
+    productMode: preview.productMode,
+    shapeMode: preview.shapeMode,
+    width: preview.width,
+    height: preview.height,
+    standBaseFrame: preview.standBaseFrame,
+    acrylicHash: hashDataUrl(preview.acrylicSrc),
+    edgeHash: hashDataUrl(preview.edgeSrc),
+    sideHash: hashDataUrl(preview.sideSrc),
+    standBaseHash: hashDataUrl(preview.standBaseSrc),
+    standShapeGuideHash: preview.standShapeGuide ? hashDataUrl(preview.standShapeGuide.src) : null,
+  };
+}
+
+function diffStandClawSummaries(reference, candidate) {
+  const differences = [];
+  for (const key of ['productMode', 'shapeMode', 'width', 'height', 'acrylicHash', 'edgeHash', 'sideHash', 'standBaseHash', 'standShapeGuideHash']) {
+    if (reference[key] !== candidate[key]) differences.push(key);
+  }
+  if (stableJson(reference.standBaseFrame) !== stableJson(candidate.standBaseFrame)) {
+    differences.push('standBaseFrame');
+  }
+  return differences;
+}
+
+async function buildStandClawCheckArtifacts(fileName) {
+  const source = await fs.readFile(path.join(illustrationDir, fileName));
+  const imageDataUrl = dataUrlFromPng(source);
+  const clearRadiusCases = [4, 10, 30];
+  const artifacts = [];
+  const differences = [];
+
+  for (const shapeMode of ['simple', 'stable']) {
+    const summaries = [];
+    for (const clearRadius of clearRadiusCases) {
+      const generationOptions = {
+        ...defaultGenerationOptions,
+        keychain: {
+          ...defaultGenerationOptions.keychain,
+          clearRadius,
+        },
+      };
+      const response = await postJson('/api/acrylic/preview', {
+        fileName,
+        imageDataUrl,
+        productMode: 'stand',
+        shapeMode,
+        generationOptions,
+      });
+      const preview = await response.json();
+      const summary = buildStandClawSummary(preview);
+      summaries.push({ clearRadius, summary });
+
+      const artifactDir = path.join(
+        'stand-claw-check',
+        normalizeFileBaseName(fileName),
+        `stand-${shapeMode}`,
+        `clear-${clearRadius}`,
+      );
+      artifacts.push({
+        relativePath: path.join(artifactDir, 'summary.json'),
+        content: stableJson({ fileName, shapeMode, clearRadius, ...summary }),
+      });
+      for (const layerName of ['acrylicSrc', 'edgeSrc', 'sideSrc', 'standBaseSrc']) {
+        artifacts.push({
+          relativePath: path.join(artifactDir, `${layerName.replace(/Src$/, '')}.png`),
+          content: pngBufferFromDataUrl(preview[layerName]),
+        });
+      }
+    }
+
+    const reference = summaries.find((entry) => entry.clearRadius === 10);
+    if (!reference) throw new Error(`Missing stand claw reference for ${fileName} ${shapeMode}`);
+    for (const entry of summaries) {
+      if (entry.clearRadius === reference.clearRadius) continue;
+      const changedFields = diffStandClawSummaries(reference.summary, entry.summary);
+      if (changedFields.length > 0) {
+        differences.push({
+          fileName,
+          shapeMode,
+          referenceClearRadius: reference.clearRadius,
+          comparedClearRadius: entry.clearRadius,
+          changedFields,
+        });
+      }
+    }
+  }
+
+  return { artifacts, differences };
+}
+
 async function writeArtifacts(targetDir, artifacts) {
   for (const artifact of artifacts) {
     const outputPath = path.join(targetDir, artifact.relativePath);
@@ -207,7 +309,7 @@ async function compareArtifacts(artifacts) {
 }
 
 async function main() {
-  if (mode !== 'baseline' && mode !== 'compare') {
+  if (mode !== 'baseline' && mode !== 'compare' && mode !== 'stand-claw-check') {
     usage();
     process.exitCode = 1;
     return;
@@ -217,6 +319,42 @@ async function main() {
   const illustrations = await listIllustrations();
   if (illustrations.length === 0) {
     console.log(`No PNG files found in ${path.relative(rootDir, illustrationDir)}.`);
+    return;
+  }
+
+  if (mode === 'stand-claw-check') {
+    const outputDir = path.join(currentDir, 'stand-claw-check');
+    await fs.rm(outputDir, { recursive: true, force: true });
+    const allArtifacts = [];
+    const allDifferences = [];
+    for (const fileName of illustrations) {
+      console.log(`Checking stand claw shape for ${fileName}...`);
+      const { artifacts, differences } = await buildStandClawCheckArtifacts(fileName);
+      allArtifacts.push(...artifacts);
+      allDifferences.push(...differences);
+    }
+    await writeArtifacts(currentDir, allArtifacts);
+    await fs.writeFile(
+      path.join(outputDir, 'summary.json'),
+      stableJson({
+        checkedAt: new Date().toISOString(),
+        baseUrl,
+        comparedKeychainClearRadii: [4, 10, 30],
+        differences: allDifferences,
+      }),
+    );
+    if (allDifferences.length === 0) {
+      console.log(`No stand claw differences found. Saved review artifacts to ${path.relative(rootDir, outputDir)}.`);
+      return;
+    }
+    console.log('Stand claw differences found:');
+    for (const difference of allDifferences) {
+      console.log(
+        `- ${difference.fileName} / stand-${difference.shapeMode} / clearRadius ${difference.referenceClearRadius} vs ${difference.comparedClearRadius}: ${difference.changedFields.join(', ')}`,
+      );
+    }
+    console.log(`Review artifacts were saved to ${path.relative(rootDir, outputDir)}.`);
+    console.log('Differences are reported for human review; this script does not fail on diffs.');
     return;
   }
 

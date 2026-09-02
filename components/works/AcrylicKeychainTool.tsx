@@ -24,6 +24,20 @@ type PreviewState = {
     height: number;
     depthOffset: number;
   } | null;
+  standShapeGuide: {
+    src: string;
+  } | null;
+  standContactLine: {
+    leftX: number;
+    rightX: number;
+    y: number;
+  } | null;
+  standClawFrame: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
   width: number;
   height: number;
   fileName: string;
@@ -66,6 +80,8 @@ type StandPreviewStyles = {
   base: CSSProperties;
   circle: CSSProperties;
 };
+
+type StandFlatPreviewStyle = CSSProperties | undefined;
 
 export type AcrylicDemoSample = {
   label: string;
@@ -118,8 +134,12 @@ const STAND_BASE_SVG_SAMPLE_COUNT = 48;
 const STAND_BASE_SVG_TILT_DEGREES = 78;
 const STAND_BASE_SVG_PERSPECTIVE = 2200;
 const STAND_BASE_SVG_THICKNESS_Y = 26;
+const STAND_DEFAULT_CLAW_WIDTH_PX = 48;
+const STAND_DEFAULT_CLAW_LENGTH_PX = 18;
+const BASE_STAND_CLAW_EDGE_GAP = 16;
 const STAND_BASE_SIDE_HIGHLIGHT_X = 34;
 const STAND_BASE_SIDE_HIGHLIGHT_WIDTH = 40;
+const STAND_DEFAULT_BASE_WIDTH_PX = 420;
 
 type SvgPoint = {
   x: number;
@@ -278,14 +298,18 @@ async function createAlphaMarginGuide(src: string, width: number, height: number
 
   context.clearRect(0, 0, width, height);
   context.globalAlpha = 1;
-  for (const [offsetX, offsetY] of createRadialOffsets(radius)) {
+  const outerOffsets = createRadialOffsets(radius);
+  for (const [offsetX, offsetY] of outerOffsets) {
     context.drawImage(image, offsetX, offsetY);
   }
   context.globalCompositeOperation = 'source-in';
-  context.fillStyle = 'rgba(70, 92, 124, 0.9)';
+  context.fillStyle = 'rgba(86, 103, 131, 0.92)';
   context.fillRect(0, 0, width, height);
   context.globalCompositeOperation = 'destination-out';
-  context.drawImage(image, 0, 0);
+  const innerOffsets = createRadialOffsets(Math.max(0, radius - 2));
+  for (const [offsetX, offsetY] of innerOffsets) {
+    context.drawImage(image, offsetX, offsetY);
+  }
   context.globalCompositeOperation = 'source-over';
   return canvas.toDataURL('image/png');
 }
@@ -312,13 +336,31 @@ function cloneGenerationOptions(options: AcrylicGenerationOptions): AcrylicGener
   };
 }
 
-function withFixedKeychainHoleSize(options: AcrylicGenerationOptions): AcrylicGenerationOptions {
+function createInitialGenerationOptions(isDemo: boolean): AcrylicGenerationOptions {
+  const options = cloneGenerationOptions(DEFAULT_ACRYLIC_GENERATION_OPTIONS);
+  if (isDemo) {
+    options.stand.baseWidthPx = STAND_DEFAULT_BASE_WIDTH_PX;
+  }
+  return options;
+}
+
+function withFixedPreviewOptions(options: AcrylicGenerationOptions): AcrylicGenerationOptions {
   return {
     ...options,
     keychain: {
       ...options.keychain,
       holeOuterRadius: DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeOuterRadius,
       holeInnerRadius: DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeInnerRadius,
+    },
+    stand: {
+      ...options.stand,
+      baseHeightRatioPercent: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseHeightRatioPercent,
+      baseMinHeight: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseMinHeight,
+      baseDepthOffsetRatio: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseDepthOffsetRatio,
+      clawCenterXRatio: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.clawCenterXRatio,
+      clawLengthPx: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.clawLengthPx,
+      clawLengthRatio: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.clawLengthRatio,
+      clawCornerRadius: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.clawCornerRadius,
     },
   };
 }
@@ -353,7 +395,7 @@ function getPreviewStageSize() {
   };
 }
 
-function createStandPreviewStyles(preview: PreviewState, stage: PreviewStageSize, contactYOverride?: number): StandPreviewStyles | null {
+function createStandPreviewStyles(preview: PreviewState, stage: PreviewStageSize): StandPreviewStyles | null {
   if (preview.productMode !== 'stand' || !preview.standBaseFrame) return null;
 
   const ratios = getPreviewArtworkRatios();
@@ -366,7 +408,7 @@ function createStandPreviewStyles(preview: PreviewState, stage: PreviewStageSize
   const drawX = (stage.width - drawWidth) / 2;
   const drawY = (stage.height - drawHeight) / 2;
   const frame = preview.standBaseFrame;
-  const contactY = contactYOverride ?? drawY + frame.contactY * scale;
+  const contactY = drawY + frame.contactY * scale;
   const standWidth = frame.width * scale;
   const standHeight = frame.height * scale;
   const displayHeight = Math.max(1, standHeight * (STAND_BASE_SVG_VIEW_HEIGHT / STAND_BASE_SVG_TOP_HEIGHT));
@@ -459,9 +501,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewCache, setPreviewCache] = useState<PreviewCache>({});
-  const [generationOptions, setGenerationOptions] = useState<AcrylicGenerationOptions>(() =>
-    cloneGenerationOptions(DEFAULT_ACRYLIC_GENERATION_OPTIONS),
-  );
+  const [generationOptions, setGenerationOptions] = useState<AcrylicGenerationOptions>(() => createInitialGenerationOptions(isDemo));
   const [productMode, setProductMode] = useState<ProductMode>('keychain');
   const [holeMode, setHoleMode] = useState<HoleMode>('with-hole');
   const [standMode, setStandMode] = useState<StandMode>('simple');
@@ -474,7 +514,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const [renderedBackArtworkSrc, setRenderedBackArtworkSrc] = useState('');
   const [renderedHighlightSrc, setRenderedHighlightSrc] = useState('');
   const [sourceArtworkBounds, setSourceArtworkBounds] = useState<AlphaBounds | null>(null);
-  const [keychainMarginGuideSrc, setKeychainMarginGuideSrc] = useState('');
+  const [marginGuideSrc, setMarginGuideSrc] = useState('');
   const [standBaseStyle, setStandBaseStyle] = useState<CSSProperties | null>(null);
   const [standCircleStyle, setStandCircleStyle] = useState<CSSProperties | null>(null);
   const [rotation, setRotation] = useState<PreviewRotation>({ y: 0 });
@@ -493,6 +533,16 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const sourceArtworkMetricScale = sourceArtworkBounds
     ? Math.max(sourceArtworkBounds.width, sourceArtworkBounds.height) / REFERENCE_ARTWORK_SIZE
     : 1;
+  const rememberAutoStandClawWidth = (nextPreview: PreviewState, usedOptions: AcrylicGenerationOptions) => {
+    if (!isDemo || nextPreview.productMode !== 'stand' || usedOptions.stand.clawWidthPx !== null || !nextPreview.standClawFrame) return;
+    setGenerationOptions((current) => ({
+      ...current,
+      stand: {
+        ...current.stand,
+        clawWidthPx: nextPreview.standClawFrame?.width ?? current.stand.clawWidthPx,
+      },
+    }));
+  };
 
   useEffect(() => {
     if (!preview) {
@@ -503,7 +553,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       setRenderedBackArtworkSrc('');
       setRenderedHighlightSrc('');
       setSourceArtworkBounds(null);
-      setKeychainMarginGuideSrc('');
+      setMarginGuideSrc('');
       setStandBaseStyle(null);
       setStandCircleStyle(null);
       return;
@@ -536,8 +586,8 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     const highlightContext = highlightCanvas.getContext('2d');
     if (!acrylicContext || !edgeContext || !sideContext || !artworkContext || !backContext || !highlightContext) return;
 
-    const setStandPreviewStyles = (contactYOverride?: number) => {
-      const nextStyles = createStandPreviewStyles(preview, stage, contactYOverride);
+    const setStandPreviewStyles = () => {
+      const nextStyles = createStandPreviewStyles(preview, stage);
       if (!nextStyles) {
         setStandBaseStyle(null);
         setStandCircleStyle(null);
@@ -617,8 +667,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
         if (cancelled) return;
         setSourceArtworkBounds(nextSourceArtworkBounds);
         if (preview.productMode === 'stand' && preview.standBaseFrame) {
-          const acrylicBounds = findCanvasAlphaBounds(acrylicContext, stage.width, stage.height);
-          setStandPreviewStyles(acrylicBounds?.maxY);
+          setStandPreviewStyles();
         } else {
           setStandBaseStyle(null);
           setStandCircleStyle(null);
@@ -643,8 +692,8 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   }, [preview, previewLayoutKey]);
 
   useEffect(() => {
-    if (!isDemo || !preview || preview.productMode !== 'keychain' || !sourceArtworkBounds) {
-      setKeychainMarginGuideSrc('');
+    if (!isDemo || !preview || !sourceArtworkBounds) {
+      setMarginGuideSrc('');
       return;
     }
     let cancelled = false;
@@ -655,10 +704,10 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       generationOptions.keychain.clearRadius * sourceArtworkMetricScale,
     )
       .then((src) => {
-        if (!cancelled) setKeychainMarginGuideSrc(src);
+        if (!cancelled) setMarginGuideSrc(src);
       })
       .catch(() => {
-        if (!cancelled) setKeychainMarginGuideSrc('');
+        if (!cancelled) setMarginGuideSrc('');
       });
     return () => {
       cancelled = true;
@@ -711,7 +760,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
 
   const loadFile = async (file: File | undefined, options: AcrylicGenerationOptions = generationOptions) => {
     if (!file) return;
-    const resolvedOptions = withFixedKeychainHoleSize(options);
+    const resolvedOptions = withFixedPreviewOptions(options);
     const startedAt = Date.now();
     const nextProductMode = productMode;
     const nextShapeMode = nextProductMode === 'keychain' ? holeMode : standMode;
@@ -728,6 +777,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       if (elapsed < 900) await wait(900 - elapsed);
       setPreviewCache({ [nextCacheKey]: nextPreview });
       setPreview(nextPreview);
+      rememberAutoStandClawWidth(nextPreview, resolvedOptions);
       setRotation({ y: 0 });
       rotationVelocityRef.current = { y: 0 };
       if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
@@ -751,7 +801,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       setStandMode(nextShapeMode as StandMode);
     }
 
-    const resolvedOptions = withFixedKeychainHoleSize(generationOptions);
+    const resolvedOptions = withFixedPreviewOptions(generationOptions);
     const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode, resolvedOptions);
     const cachedPreview = previewCache[nextCacheKey];
     if (cachedPreview) {
@@ -776,6 +826,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       if (elapsed < 900) await wait(900 - elapsed);
       setPreviewCache((current) => ({ ...current, [nextCacheKey]: nextPreview }));
       setPreview(nextPreview);
+      rememberAutoStandClawWidth(nextPreview, resolvedOptions);
       setRotation({ y: 0 });
       rotationVelocityRef.current = { y: 0 };
       if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
@@ -790,9 +841,11 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
 
   const loadSample = async (sample: AcrylicDemoSample) => {
     setActiveSampleSrc(sample.src);
+    const initialOptions = createInitialGenerationOptions(isDemo);
+    setGenerationOptions(initialOptions);
     try {
       const file = await sampleToFile(sample);
-      await loadFile(file);
+      await loadFile(file, initialOptions);
     } catch (error) {
       setPreview(null);
       setSelectedFile(null);
@@ -803,7 +856,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
 
   const regeneratePreview = async (options: AcrylicGenerationOptions = generationOptions) => {
     if (!selectedFile) return;
-    const resolvedOptions = withFixedKeychainHoleSize(options);
+    const resolvedOptions = withFixedPreviewOptions(options);
     const nextProductMode = productMode;
     const nextShapeMode = nextProductMode === 'keychain' ? holeMode : standMode;
     const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode, resolvedOptions);
@@ -823,6 +876,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       if (elapsed < 900) await wait(900 - elapsed);
       setPreviewCache((current) => ({ ...current, [nextCacheKey]: nextPreview }));
       setPreview(nextPreview);
+      rememberAutoStandClawWidth(nextPreview, resolvedOptions);
       setRotation({ y: 0 });
       rotationVelocityRef.current = { y: 0 };
       if (inertiaFrameRef.current !== null) window.cancelAnimationFrame(inertiaFrameRef.current);
@@ -879,7 +933,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           artworkDataUrl: preview.originalArtworkSrc,
           holeMode,
           debug: isDemo ? true : EXPORT_DEBUG_SVG,
-          generationOptions: isDemo ? withFixedKeychainHoleSize(generationOptions) : DEFAULT_ACRYLIC_GENERATION_OPTIONS,
+          generationOptions: isDemo ? withFixedPreviewOptions(generationOptions) : DEFAULT_ACRYLIC_GENERATION_OPTIONS,
         }),
       });
 
@@ -913,7 +967,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           productMode,
           shapeMode: productMode === 'keychain' ? holeMode : standMode,
           artworkDataUrl: preview.originalArtworkSrc,
-          generationOptions: withFixedKeychainHoleSize(generationOptions),
+          generationOptions: withFixedPreviewOptions(generationOptions),
         }),
       });
       const data = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
@@ -995,6 +1049,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     : 1;
   const keychainHoleOuterRadius = DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeOuterRadius * keychainMetricScale;
   const keychainHoleInnerRadius = DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.holeInnerRadius * keychainMetricScale;
+  const keychainFixedHoleClearRadius = DEFAULT_ACRYLIC_GENERATION_OPTIONS.keychain.clearRadius * keychainMetricScale;
   const keychainHoleCenterX = keychainArtworkBounds
     ? keychainArtworkBounds.minX + keychainArtworkBounds.width * generationOptions.keychain.holeCenterXRatio
     : 0;
@@ -1013,12 +1068,69 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           '--acrylic-flat-art-height': `${(keychainArtworkBounds.height / preview.height) * 100}%`,
           '--acrylic-flat-hole-x': `${(keychainHoleCenterX / preview.width) * 100}%`,
           '--acrylic-flat-hole-y': `${(keychainHoleCenterY / preview.height) * 100}%`,
-          '--acrylic-flat-hole-loop-width': `${((keychainHoleOuterRadius * 2) / preview.width) * 100}%`,
-          '--acrylic-flat-hole-loop-height': `${((keychainHoleOuterRadius * 2) / preview.height) * 100}%`,
-          '--acrylic-flat-hole-outer-width': `${((keychainHoleOuterRadius * 2) / preview.width) * 100}%`,
-          '--acrylic-flat-hole-outer-height': `${((keychainHoleOuterRadius * 2) / preview.height) * 100}%`,
-          '--acrylic-flat-hole-inner-size': `${(keychainHoleInnerRadius / Math.max(1, keychainHoleOuterRadius)) * 100}%`,
+          '--acrylic-flat-hole-loop-width': `${(((keychainHoleOuterRadius + keychainFixedHoleClearRadius) * 2) / preview.width) * 100}%`,
+          '--acrylic-flat-hole-loop-height': `${(((keychainHoleOuterRadius + keychainFixedHoleClearRadius) * 2) / preview.height) * 100}%`,
+          '--acrylic-flat-hole-inner-size': `${(keychainHoleInnerRadius / Math.max(1, keychainHoleOuterRadius + keychainFixedHoleClearRadius)) * 100}%`,
         } as CSSProperties)
+      : undefined;
+  const standFlatPreviewStyle: StandFlatPreviewStyle =
+    preview && preview.productMode === 'stand' && preview.standBaseFrame && keychainArtworkBounds
+      ? (() => {
+          const frame = preview.standBaseFrame;
+          const artworkCenterX = keychainArtworkBounds.minX + keychainArtworkBounds.width / 2;
+          const liveBaseWidth = generationOptions.stand.baseWidthPx ?? keychainArtworkBounds.width * (generationOptions.stand.baseWidthRatioPercent / 100);
+          const liveBaseHeight = Math.max(
+            DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseMinHeight,
+            keychainArtworkBounds.width * (DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseHeightRatioPercent / 100),
+          );
+          const baseCenterX = frame.x + frame.width / 2;
+          const baseLeft = baseCenterX - liveBaseWidth / 2;
+          const baseTop = frame.contactY - liveBaseHeight / 2;
+          const contactLine = preview.standContactLine;
+          const fallbackClawFrame = preview.standClawFrame;
+          const clawCenterX =
+            artworkCenterX + (DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.clawCenterXRatio - 0.5) * keychainArtworkBounds.width;
+          const edgeGap = Math.max(0, Math.round(BASE_STAND_CLAW_EDGE_GAP * keychainMetricScale));
+          const autoSafeLeftX = contactLine ? Math.min(contactLine.rightX, contactLine.leftX + edgeGap) : fallbackClawFrame?.x;
+          const autoSafeRightX = contactLine ? Math.max(contactLine.leftX, contactLine.rightX - edgeGap) : fallbackClawFrame ? fallbackClawFrame.x + fallbackClawFrame.width : undefined;
+          const usesFixedPixelClawWidth = generationOptions.stand.clawWidthPx !== null;
+          const leftBound = usesFixedPixelClawWidth ? 0 : autoSafeLeftX;
+          const rightBound = usesFixedPixelClawWidth ? preview.width - 1 : autoSafeRightX;
+          const leftSpan = autoSafeLeftX === undefined ? 0 : Math.max(0, clawCenterX - autoSafeLeftX);
+          const rightSpan = autoSafeRightX === undefined ? 0 : Math.max(0, autoSafeRightX - clawCenterX);
+          const autoHalfSpan = Math.floor(Math.min(leftSpan, rightSpan));
+          const autoClawWidth = autoHalfSpan * 2 + 1;
+          const requestedClawWidth =
+            generationOptions.stand.clawWidthPx !== null
+              ? Math.round(generationOptions.stand.clawWidthPx)
+              : generationOptions.stand.clawWidthRatio === null
+                ? autoClawWidth
+                : Math.round(keychainArtworkBounds.width * generationOptions.stand.clawWidthRatio);
+          const maxClawWidth = leftBound === undefined || rightBound === undefined ? 0 : Math.max(0, rightBound - leftBound + 1);
+          const liveClawWidth = Math.min(maxClawWidth, Math.max(1, requestedClawWidth));
+          const clawLeft =
+            fallbackClawFrame && liveClawWidth <= 0
+              ? fallbackClawFrame.x
+              : Math.max(leftBound ?? 0, Math.min((rightBound ?? 0) - liveClawWidth + 1, Math.round(clawCenterX - liveClawWidth / 2)));
+          const clawWidth = fallbackClawFrame && liveClawWidth <= 0 ? fallbackClawFrame.width : liveClawWidth;
+          const clawTop = fallbackClawFrame?.y ?? frame.contactY;
+          const clawHeight = Math.max(1, Math.round(generationOptions.stand.clawLengthPx ?? STAND_DEFAULT_CLAW_LENGTH_PX));
+          const clawCornerRadius = DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.clawCornerRadius * keychainMetricScale;
+
+          return {
+            '--acrylic-flat-image-aspect': `${preview.width} / ${preview.height}`,
+            '--acrylic-stand-flat-base-left': `${(baseLeft / preview.width) * 100}%`,
+            '--acrylic-stand-flat-base-top': `${(baseTop / preview.height) * 100}%`,
+            '--acrylic-stand-flat-base-width': `${(liveBaseWidth / preview.width) * 100}%`,
+            '--acrylic-stand-flat-base-height': `${(liveBaseHeight / preview.height) * 100}%`,
+            '--acrylic-stand-flat-claw-left': `${(clawLeft / preview.width) * 100}%`,
+            '--acrylic-stand-flat-claw-top': `${(clawTop / preview.height) * 100}%`,
+            '--acrylic-stand-flat-claw-width': `${(clawWidth / preview.width) * 100}%`,
+            '--acrylic-stand-flat-claw-height': `${(clawHeight / preview.height) * 100}%`,
+            '--acrylic-stand-flat-claw-radius': `${clawCornerRadius}px`,
+            '--acrylic-stand-flat-contact-y': `${((contactLine?.y ?? frame.contactY) / preview.height) * 100}%`,
+          } as CSSProperties;
+        })()
       : undefined;
 
   const updateKeychainHoleFromPointer = (event: PointerEvent<HTMLElement>) => {
@@ -1468,15 +1580,12 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={preview.originalArtworkSrc} alt="" aria-hidden="true" />
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img className="acrylic-hole-flat-acrylic" src={preview.acrylicSrc} alt="" aria-hidden="true" />
-                      {keychainMarginGuideSrc ? (
+                      {marginGuideSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="acrylic-hole-flat-margin-guide" src={keychainMarginGuideSrc} alt="" aria-hidden="true" />
+                        <img className="acrylic-hole-flat-margin-guide" src={marginGuideSrc} alt="" aria-hidden="true" />
                       ) : null}
                       <span className="acrylic-hole-flat-art-bounds" aria-hidden="true" />
-                      <span className="acrylic-hole-flat-loop" aria-hidden="true" />
-                      <span className="acrylic-hole-flat-outer" aria-hidden="true">
+                      <span className="acrylic-hole-flat-loop" aria-hidden="true">
                         <span className="acrylic-hole-flat-inner" />
                       </span>
                     </div>
@@ -1501,59 +1610,65 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                 </>
               ) : (
                 <>
+                  {preview && standFlatPreviewStyle ? (
+                    <div className="acrylic-stand-flat-preview" style={standFlatPreviewStyle}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={preview.originalArtworkSrc} alt="" aria-hidden="true" />
+                      {preview.standShapeGuide ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="acrylic-stand-flat-margin-guide" src={preview.standShapeGuide.src} alt="" aria-hidden="true" />
+                      ) : null}
+                      <span className="acrylic-stand-flat-claw" aria-hidden="true" />
+                      <span className="acrylic-stand-flat-base" aria-hidden="true" />
+                      <span className="acrylic-stand-flat-contact" aria-hidden="true" />
+                    </div>
+                  ) : null}
+                  <label className="acrylic-options-field acrylic-options-field-combo">
+                    <span>キャラ余白</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="80"
+                      value={generationOptions.keychain.clearRadius}
+                      onChange={(event) => updateKeychainOption('clearRadius', Number(event.currentTarget.value))}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="240"
+                      value={generationOptions.keychain.clearRadius}
+                      onChange={(event) => updateKeychainOption('clearRadius', Number(event.currentTarget.value))}
+                    />
+                  </label>
                   <label className="acrylic-options-field">
                     <span>台座の横幅</span>
                     <input
                       type="range"
-                      min="20"
-                      max="180"
+                      min="120"
+                      max="900"
                       step="1"
-                      value={generationOptions.stand.baseWidthRatioPercent}
-                      onChange={(event) => updateStandOption('baseWidthRatioPercent', Number(event.currentTarget.value))}
+                      value={Math.round(generationOptions.stand.baseWidthPx ?? STAND_DEFAULT_BASE_WIDTH_PX)}
+                      onChange={(event) => updateStandOption('baseWidthPx', Number(event.currentTarget.value))}
                     />
-                    <output>{generationOptions.stand.baseWidthRatioPercent}%</output>
-                  </label>
-                  <label className="acrylic-options-field">
-                    <span>台座の高さ</span>
-                    <input
-                      type="range"
-                      min="5"
-                      max="80"
-                      step="1"
-                      value={generationOptions.stand.baseHeightRatioPercent}
-                      onChange={(event) => updateStandOption('baseHeightRatioPercent', Number(event.currentTarget.value))}
-                    />
-                    <output>{generationOptions.stand.baseHeightRatioPercent}%</output>
+                    <output>{Math.round(generationOptions.stand.baseWidthPx ?? STAND_DEFAULT_BASE_WIDTH_PX)}px</output>
                   </label>
                   <label className="acrylic-options-field">
                     <span>ツメの横幅</span>
                     <input
                       type="range"
                       min="5"
-                      max="80"
+                      max="180"
                       step="1"
-                      value={Math.round((generationOptions.stand.clawWidthRatio ?? 0.24) * 100)}
-                      onChange={(event) => updateStandOption('clawWidthRatio', Number(event.currentTarget.value) / 100)}
+                      value={Math.round(generationOptions.stand.clawWidthPx ?? STAND_DEFAULT_CLAW_WIDTH_PX)}
+                      onChange={(event) => updateStandOption('clawWidthPx', Number(event.currentTarget.value))}
                     />
-                    <output>{Math.round((generationOptions.stand.clawWidthRatio ?? 0.24) * 100)}%</output>
-                  </label>
-                  <label className="acrylic-options-field">
-                    <span>ツメの位置</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={Math.round(generationOptions.stand.clawCenterXRatio * 100)}
-                      onChange={(event) => updateStandOption('clawCenterXRatio', Number(event.currentTarget.value) / 100)}
-                    />
-                    <output>{Math.round(generationOptions.stand.clawCenterXRatio * 100)}%</output>
+                    <output>{Math.round(generationOptions.stand.clawWidthPx ?? STAND_DEFAULT_CLAW_WIDTH_PX)}px</output>
                   </label>
                 </>
               )}
             </div>
             <div className="acrylic-options-actions">
-              <button type="button" className="acrylic-file-button" onClick={() => setGenerationOptions(cloneGenerationOptions(DEFAULT_ACRYLIC_GENERATION_OPTIONS))}>
+              <button type="button" className="acrylic-file-button" onClick={() => setGenerationOptions(createInitialGenerationOptions(isDemo))}>
                 初期値
               </button>
               <button type="button" className="acrylic-file-button" onClick={() => setIsOptionsOpen(false)}>

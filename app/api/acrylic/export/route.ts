@@ -146,6 +146,7 @@ const CURVE_FIT_SAMPLE_STEPS = 24;
 const LONG_STRAIGHT_LINE_STROKE = '#0066ff';
 const CONNECTED_STRAIGHT_LINE_STROKE = '#ffd400';
 const CONNECTED_STRAIGHT_LINE_MAX_GAP = 4;
+const CONNECTED_STRAIGHT_LINE_MAX_SMOOTH_OP_SPAN = 8;
 const BASE_STRAIGHT_ADJACENT_CONTROL_MAX_GAP = 8;
 const STRAIGHT_OFF_DIRECTION_CONTROL_MIN_ANGLE = 8;
 const STRAIGHT_TO_CONCAVITY_STEEP_MIN_ANGLE = 28;
@@ -154,6 +155,7 @@ const NORMAL_CONTROL_POINT_FILL = '#ff0000';
 const PARALLEL_LINE_MAX_ANGLE_DELTA = 8;
 const REMOVE_INNER_CONTROL_POINTS = true;
 const ENABLE_STRAIGHT_LINE_PROCESSING = true;
+const SMOOTH_CONNECTED_STRAIGHT_LINE_SEGMENTS = true;
 const ENABLE_NARROW_EXIT_AREA_FILL = true;
 const DEBUG_OUTPUT_NARROW_EXIT_AREA_MASK_PATH = false;
 const DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH = false;
@@ -306,6 +308,156 @@ function collectStraightTargetLines(candidates: StraightLineCandidate[], groups:
   ];
 }
 
+function isLineOp(op: PathOp | undefined): op is Extract<PathOp, { kind: 'line' }> {
+  return op?.kind === 'line';
+}
+
+function canSmoothConnectedStraightLineGroup(ops: PathOp[], group: ConnectedStraightLineGroup) {
+  const startIndex = group.opIndices[0];
+  const endIndex = group.opIndices[group.opIndices.length - 1];
+  if (startIndex === undefined || endIndex === undefined || startIndex >= endIndex) return false;
+  if (endIndex - startIndex + 1 > CONNECTED_STRAIGHT_LINE_MAX_SMOOTH_OP_SPAN) return false;
+  for (let index = startIndex; index <= endIndex; index += 1) {
+    if (!isLineOp(ops[index])) return false;
+  }
+  return true;
+}
+
+function buildLocalSmoothConnectedStraightLineGroups(ops: PathOp[], groups: ConnectedStraightLineGroup[]): ConnectedStraightLineGroup[] {
+  return groups.flatMap((group) => {
+    const sortedIndices = group.opIndices.slice().sort((left, right) => left - right);
+    const chunks: number[][] = [];
+    let currentChunk: number[] = [];
+
+    sortedIndices.forEach((opIndex) => {
+      const previousIndex = currentChunk[currentChunk.length - 1];
+      const isLocalContinuation =
+        previousIndex !== undefined &&
+        opIndex > previousIndex &&
+        opIndex - previousIndex + 1 <= CONNECTED_STRAIGHT_LINE_MAX_SMOOTH_OP_SPAN &&
+        ops.slice(previousIndex, opIndex + 1).every(isLineOp);
+
+      if (previousIndex === undefined || isLocalContinuation) {
+        currentChunk.push(opIndex);
+        return;
+      }
+
+      chunks.push(currentChunk);
+      currentChunk = [opIndex];
+    });
+    if (currentChunk.length > 0) chunks.push(currentChunk);
+
+    return chunks
+      .filter((chunk) => chunk.length >= 2)
+      .map((chunk) => {
+        const firstOp = ops[chunk[0]];
+        const lastOp = ops[chunk[chunk.length - 1]];
+        if (!isLineOp(firstOp) || !isLineOp(lastOp)) return null;
+        return {
+          start: firstOp.start,
+          end: lastOp.end,
+          opIndices: chunk,
+        };
+      })
+      .filter((chunk): chunk is ConnectedStraightLineGroup => chunk !== null && canSmoothConnectedStraightLineGroup(ops, chunk));
+  });
+}
+
+function findLeadingWrappedConnectedStraightLineGroupStart(ops: PathOp[], groups: ConnectedStraightLineGroup[]) {
+  for (const group of groups) {
+    const sortedIndices = group.opIndices.slice().sort((left, right) => left - right);
+    if (sortedIndices[0] !== 0) continue;
+
+    const prefixIndices: number[] = [];
+    for (const opIndex of sortedIndices) {
+      if (prefixIndices.length === 0) {
+        if (opIndex === 0) prefixIndices.push(opIndex);
+        continue;
+      }
+      const previousIndex = prefixIndices[prefixIndices.length - 1];
+      if (opIndex - previousIndex + 1 > CONNECTED_STRAIGHT_LINE_MAX_SMOOTH_OP_SPAN) break;
+      if (!ops.slice(previousIndex, opIndex + 1).every(isLineOp)) break;
+      prefixIndices.push(opIndex);
+    }
+
+    const prefixEndIndex = prefixIndices[prefixIndices.length - 1];
+    const suffixStartIndex = sortedIndices.findLast((opIndex) => {
+      if (opIndex <= prefixEndIndex) return false;
+      return ops.slice(opIndex).every(isLineOp);
+    });
+    if (prefixEndIndex === undefined || suffixStartIndex === undefined) continue;
+
+    const wrappedSpan = ops.length - suffixStartIndex + prefixEndIndex + 1;
+    if (wrappedSpan > CONNECTED_STRAIGHT_LINE_MAX_SMOOTH_OP_SPAN) continue;
+    return suffixStartIndex;
+  }
+
+  return null;
+}
+
+function rotateClosedOpsForConnectedSmoothing(ops: PathOp[], minLength: number) {
+  const candidates = buildStraightLineCandidates(ops, minLength);
+  const groups = buildConnectedStraightLineGroups(candidates);
+  const startIndex = findLeadingWrappedConnectedStraightLineGroupStart(ops, groups);
+  if (startIndex === null || startIndex <= 0) return null;
+  return ops.slice(startIndex).concat(ops.slice(0, startIndex));
+}
+
+function buildSmoothConnectedStraightLineOp(ops: PathOp[], group: ConnectedStraightLineGroup): Extract<PathOp, { kind: 'cubic' }> | null {
+  if (!canSmoothConnectedStraightLineGroup(ops, group)) return null;
+  const startIndex = group.opIndices[0];
+  const endIndex = group.opIndices[group.opIndices.length - 1];
+  const lineOps = ops.slice(startIndex, endIndex + 1).filter(isLineOp);
+  const start = lineOps[0].start;
+  const end = lineOps[lineOps.length - 1].end;
+  const totalDistance = distance(start, end);
+  if (totalDistance <= 0.001) return null;
+
+  const flow = lineOps.reduce(
+    (current, op) => {
+      const length = distance(op.start, op.end);
+      if (length <= 0.001) return current;
+      return {
+        x: current.x + ((op.end.x - op.start.x) / length) * length,
+        y: current.y + ((op.end.y - op.start.y) / length) * length,
+      };
+    },
+    { x: 0, y: 0 },
+  );
+  const flowLength = Math.hypot(flow.x, flow.y);
+  const fallbackDirection = { x: (end.x - start.x) / totalDistance, y: (end.y - start.y) / totalDistance };
+  const direction = flowLength > 0.001 ? { x: flow.x / flowLength, y: flow.y / flowLength } : fallbackDirection;
+  const normal = { x: -fallbackDirection.y, y: fallbackDirection.x };
+  const points = lineOps.flatMap((op) => [op.start, op.end]);
+  const interiorPoints = points.slice(1, -1);
+  const dominantDeviation = interiorPoints.reduce(
+    (current, point) => {
+      const deviation = (point.x - start.x) * normal.x + (point.y - start.y) * normal.y;
+      return Math.abs(deviation) > Math.abs(current) ? deviation : current;
+    },
+    0,
+  );
+  const curveOffset = Math.max(
+    -CONNECTED_STRAIGHT_LINE_MAX_GAP,
+    Math.min(CONNECTED_STRAIGHT_LINE_MAX_GAP, dominantDeviation * 1.5),
+  );
+  const handleLength = totalDistance / 3;
+
+  return {
+    kind: 'cubic',
+    start,
+    control1: {
+      x: start.x + direction.x * handleLength + normal.x * curveOffset,
+      y: start.y + direction.y * handleLength + normal.y * curveOffset,
+    },
+    control2: {
+      x: end.x - direction.x * handleLength + normal.x * curveOffset,
+      y: end.y - direction.y * handleLength + normal.y * curveOffset,
+    },
+    end,
+  };
+}
+
 function isNearStraightTargetEndpoint(point: Point, targetLines: Array<{ start: Point; end: Point }>, maxGap: number) {
   return targetLines.some(({ start, end }) => distance(point, start) <= maxGap || distance(point, end) <= maxGap);
 }
@@ -429,11 +581,17 @@ function removeAdjacentQuadraticControlPointsNextToStraightLines(
   return output.filter((op) => op.kind !== 'line' || distance(op.start, op.end) > 0.001);
 }
 
-function buildPathFromOps(ops: PathOp[], start: Point, minLength: number) {
-  const initialCandidates = ENABLE_STRAIGHT_LINE_PROCESSING ? buildStraightLineCandidates(ops, minLength) : [];
-  const initialConnectedGroups = ENABLE_STRAIGHT_LINE_PROCESSING ? buildConnectedStraightLineGroups(initialCandidates) : [];
-  const targetLines = ENABLE_STRAIGHT_LINE_PROCESSING ? collectStraightTargetLines(initialCandidates, initialConnectedGroups) : [];
-  const adjustedOps = ENABLE_STRAIGHT_LINE_PROCESSING
+function buildPathFromOps(
+  ops: PathOp[],
+  start: Point,
+  minLength: number,
+  enableStraightLineProcessing = ENABLE_STRAIGHT_LINE_PROCESSING,
+  rotateClosedConnectedSmoothing = false,
+) {
+  const initialCandidates = enableStraightLineProcessing ? buildStraightLineCandidates(ops, minLength) : [];
+  const initialConnectedGroups = enableStraightLineProcessing ? buildConnectedStraightLineGroups(initialCandidates) : [];
+  const targetLines = enableStraightLineProcessing ? collectStraightTargetLines(initialCandidates, initialConnectedGroups) : [];
+  const adjustedOps = enableStraightLineProcessing
     ? removeAdjacentQuadraticControlPointsNextToStraightLines(
         ops,
         collectStraightTargetOpIndices(initialCandidates, initialConnectedGroups),
@@ -441,19 +599,36 @@ function buildPathFromOps(ops: PathOp[], start: Point, minLength: number) {
         minLength,
       )
     : ops;
-  const commands = [`M ${formatSvgNumber(start.x)} ${formatSvgNumber(start.y)}`];
+  const pathOps =
+    rotateClosedConnectedSmoothing && SMOOTH_CONNECTED_STRAIGHT_LINE_SEGMENTS
+      ? rotateClosedOpsForConnectedSmoothing(adjustedOps, minLength) ?? adjustedOps
+      : adjustedOps;
+  const pathStart = pathOps[0]?.start ?? start;
+  const commands = [`M ${formatSvgNumber(pathStart.x)} ${formatSvgNumber(pathStart.y)}`];
   const controlPoints: DebugPoint[] = [];
-  const longStraightLines: Array<{ start: Point; end: Point }> = [];
-  const connectedGroups = ENABLE_STRAIGHT_LINE_PROCESSING ? buildConnectedStraightLineGroups(buildStraightLineCandidates(adjustedOps, minLength)) : [];
+  const commandLongStraightLines: Array<{ start: Point; end: Point }> = [];
+  const markerCandidates = buildStraightLineCandidates(pathOps, minLength);
+  const markerConnectedGroups = buildConnectedStraightLineGroups(markerCandidates);
+  const connectedMarkerOpIndices = collectStraightTargetOpIndices([], markerConnectedGroups);
+  const longStraightLines = markerCandidates
+    .filter(({ opIndex }) => !connectedMarkerOpIndices.has(opIndex))
+    .map(({ start, end }) => ({ start, end }));
+  const connectedStraightLines = markerCandidates
+    .filter(({ opIndex }) => connectedMarkerOpIndices.has(opIndex))
+    .map(({ start, end }) => ({ start, end }));
+  const connectedGroups = SMOOTH_CONNECTED_STRAIGHT_LINE_SEGMENTS
+    ? buildLocalSmoothConnectedStraightLineGroups(pathOps, markerConnectedGroups)
+    : enableStraightLineProcessing
+      ? markerConnectedGroups
+      : [];
   const connectedGroupByStartIndex = new Map<number, ConnectedStraightLineGroup>();
-  const connectedStraightLines: Array<{ start: Point; end: Point }> = [];
 
   connectedGroups.forEach((group) => {
     const sortedIndices = group.opIndices.slice().sort((left, right) => left - right);
     const firstOpIndex = sortedIndices[0];
     const lastOpIndex = sortedIndices[sortedIndices.length - 1];
-    const firstOp = adjustedOps[firstOpIndex];
-    const lastOp = adjustedOps[lastOpIndex];
+    const firstOp = pathOps[firstOpIndex];
+    const lastOp = pathOps[lastOpIndex];
     if (!firstOp || !lastOp) return;
     const mergedGroup = {
       start: firstOp.start,
@@ -461,20 +636,28 @@ function buildPathFromOps(ops: PathOp[], start: Point, minLength: number) {
       opIndices: sortedIndices,
     };
     connectedGroupByStartIndex.set(firstOpIndex, mergedGroup);
-    connectedStraightLines.push({ start: mergedGroup.start, end: mergedGroup.end });
   });
 
-  for (let index = 0; index < adjustedOps.length; index += 1) {
+  for (let index = 0; index < pathOps.length; index += 1) {
     const connectedGroup = connectedGroupByStartIndex.get(index);
     if (connectedGroup) {
-      pushLineCommand(commands, longStraightLines, connectedGroup.start, connectedGroup.end, minLength);
+      const smoothOp = SMOOTH_CONNECTED_STRAIGHT_LINE_SEGMENTS
+        ? buildSmoothConnectedStraightLineOp(pathOps, connectedGroup)
+        : null;
+      if (smoothOp) {
+        commands.push(
+          `C ${formatSvgNumber(smoothOp.control1.x)} ${formatSvgNumber(smoothOp.control1.y)} ${formatSvgNumber(smoothOp.control2.x)} ${formatSvgNumber(smoothOp.control2.y)} ${formatSvgNumber(smoothOp.end.x)} ${formatSvgNumber(smoothOp.end.y)}`,
+        );
+      } else {
+        pushLineCommand(commands, commandLongStraightLines, connectedGroup.start, connectedGroup.end, minLength);
+      }
       index = connectedGroup.opIndices[connectedGroup.opIndices.length - 1];
       continue;
     }
 
-    const op = adjustedOps[index];
+    const op = pathOps[index];
     if (op.kind === 'line') {
-      pushLineCommand(commands, longStraightLines, op.start, op.end, minLength);
+      pushLineCommand(commands, commandLongStraightLines, op.start, op.end, minLength);
     } else if (op.kind === 'quad') {
       commands.push(
         `Q ${formatSvgNumber(op.control.x)} ${formatSvgNumber(op.control.y)} ${formatSvgNumber(op.end.x)} ${formatSvgNumber(op.end.y)}`,
@@ -882,36 +1065,6 @@ function fillNarrowExitTransparentAreas(mask: Uint8Array, patchMask: Uint8Array 
   return output;
 }
 
-function subtractMask(outerMask: Uint8Array, innerMask: Uint8Array, width: number, height: number) {
-  const output = new Uint8Array(width * height);
-  for (let index = 0; index < width * height; index += 1) {
-    if (outerMask[index] && !innerMask[index]) output[index] = 1;
-  }
-  return output;
-}
-
-function unionMask(leftMask: Uint8Array, rightMask: Uint8Array, width: number, height: number) {
-  const output = new Uint8Array(width * height);
-  for (let index = 0; index < width * height; index += 1) {
-    output[index] = leftMask[index] || rightMask[index] ? 1 : 0;
-  }
-  return output;
-}
-
-function buildKeychainLayerMask(
-  baseMask: Uint8Array,
-  keychainShapeMask: Uint8Array,
-  width: number,
-  height: number,
-  bodyRadius: number,
-  holeRadius: number,
-) {
-  const bodyMask = fillEnclosedMaskHoles(dilateMask(baseMask, width, height, Math.max(0, Math.round(bodyRadius))), width, height);
-  const holeMask = fillEnclosedMaskHoles(dilateMask(keychainShapeMask, width, height, Math.max(0, Math.round(holeRadius))), width, height);
-  const fixedBodyMask = fillEnclosedMaskHoles(dilateMask(baseMask, width, height, Math.max(0, Math.round(holeRadius))), width, height);
-  return fillEnclosedMaskHoles(unionMask(bodyMask, subtractMask(holeMask, fixedBodyMask, width, height), width, height), width, height);
-}
-
 function paintCircleOnMask(mask: Uint8Array, width: number, height: number, centerX: number, centerY: number, radius: number, value: 0 | 1) {
   const squaredRadius = radius * radius;
   for (let y = centerY - radius; y <= centerY + radius; y += 1) {
@@ -989,12 +1142,20 @@ function addKeychainHoleToMask(
   const probeStartY = centerY + outerRadius + 1;
   const leftContactY = findConnectorEdgeContactY(loopMask, width, height, connectorLeft, edgeProbeRadius, probeStartY) ?? artworkTopY;
   const rightContactY = findConnectorEdgeContactY(loopMask, width, height, connectorRight, edgeProbeRadius, probeStartY) ?? artworkTopY;
+  const leftConnectorBottomY = Math.min(height - 1, leftContactY + clearRadius);
+  const rightConnectorBottomY = Math.min(height - 1, rightContactY + clearRadius);
 
   paintCircleOnMask(loopMask, width, height, centerX, centerY, outerRadius, 1);
-  paintSplitBottomConnectorOnMask(loopMask, width, height, connectorLeft, connectorRight, centerY, Math.min(height - 1, leftContactY + clearRadius), Math.min(height - 1, rightContactY + clearRadius));
+  paintSplitBottomConnectorOnMask(loopMask, width, height, connectorLeft, connectorRight, centerY, leftConnectorBottomY, rightConnectorBottomY);
   paintCircleOnMask(loopMask, width, height, centerX, centerY, innerRadius, 0);
 
-  return { mask: loopMask, hole: { centerX, centerY, radius: innerRadius }, outerCircle: { centerX, centerY, radius: outerRadius + clearRadius } };
+  return {
+    mask: loopMask,
+    hole: { centerX, centerY, radius: innerRadius },
+    outerCircle: { centerX, centerY, radius: outerRadius + clearRadius },
+    leftConnectorBottomY,
+    rightConnectorBottomY,
+  };
 }
 
 function findMaskBounds(mask: Uint8Array, width: number, height: number) {
@@ -1129,16 +1290,84 @@ function mergeDebugPoints(controlPoints: DebugPoint[]) {
   return Array.from(merged.values());
 }
 
-function isHoleLoop(loop: Point[], hole: Circle) {
-  const bounds = loop.reduce(
-    (current, point) => ({
-      minX: Math.min(current.minX, point.x),
-      maxX: Math.max(current.maxX, point.x),
-      minY: Math.min(current.minY, point.y),
-      maxY: Math.max(current.maxY, point.y),
+function pointBounds(points: Point[]) {
+  return points.reduce(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      maxX: Math.max(bounds.maxX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxY: Math.max(bounds.maxY, point.y),
     }),
     { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
   );
+}
+
+function pathOpBounds(ops: PathOp[], start: Point) {
+  const points = ops.flatMap((op) => {
+    if (op.kind === 'line') return [op.start, op.end];
+    if (op.kind === 'quad') return [op.start, op.control, op.end];
+    return [op.start, op.control1, op.control2, op.end];
+  });
+  return pointBounds([start, ...points]);
+}
+
+function boundsWidth(bounds: ReturnType<typeof pointBounds>) {
+  return bounds.maxX - bounds.minX;
+}
+
+function boundsHeight(bounds: ReturnType<typeof pointBounds>) {
+  return bounds.maxY - bounds.minY;
+}
+
+function isCollapsedSmoothPath(points: Point[], smoothPath: { start: Point; ops: PathOp[] }) {
+  if (smoothPath.ops.length === 0) return true;
+  const sourceBounds = pointBounds(points);
+  const smoothBounds = pathOpBounds(smoothPath.ops, smoothPath.start);
+  const sourceWidth = boundsWidth(sourceBounds);
+  const sourceHeight = boundsHeight(sourceBounds);
+  const smoothWidth = boundsWidth(smoothBounds);
+  const smoothHeight = boundsHeight(smoothBounds);
+  if (sourceWidth <= 0 || sourceHeight <= 0) return false;
+  return smoothWidth < sourceWidth * 0.7 || smoothHeight < sourceHeight * 0.7;
+}
+
+function svgCommandBounds(commands: string[]) {
+  const points: Point[] = [];
+  commands.forEach((command) => {
+    if (command === 'Z') return;
+    const numbers = command.match(/[-+]?(?:\d*\.\d+|\d+)/g)?.map(Number) ?? [];
+    for (let index = 0; index + 1 < numbers.length; index += 2) {
+      points.push({ x: numbers[index], y: numbers[index + 1] });
+    }
+  });
+  return pointBounds(points);
+}
+
+function isCollapsedSvgCommands(points: Point[], commands: string[]) {
+  const sourceBounds = pointBounds(points);
+  const commandBounds = svgCommandBounds(commands);
+  const sourceWidth = boundsWidth(sourceBounds);
+  const sourceHeight = boundsHeight(sourceBounds);
+  const commandWidth = boundsWidth(commandBounds);
+  const commandHeight = boundsHeight(commandBounds);
+  if (sourceWidth <= 0 || sourceHeight <= 0) return false;
+  return commandWidth < sourceWidth * 0.7 || commandHeight < sourceHeight * 0.7;
+}
+
+function isCollapsedPointSet(sourcePoints: Point[], candidatePoints: Point[]) {
+  if (candidatePoints.length < 3) return true;
+  const sourceBounds = pointBounds(sourcePoints);
+  const candidateBounds = pointBounds(candidatePoints);
+  const sourceWidth = boundsWidth(sourceBounds);
+  const sourceHeight = boundsHeight(sourceBounds);
+  const candidateWidth = boundsWidth(candidateBounds);
+  const candidateHeight = boundsHeight(candidateBounds);
+  if (sourceWidth <= 0 || sourceHeight <= 0) return false;
+  return candidateWidth < sourceWidth * 0.7 || candidateHeight < sourceHeight * 0.7;
+}
+
+function isHoleLoop(loop: Point[], hole: Circle) {
+  const bounds = pointBounds(loop);
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
   const radiusX = (bounds.maxX - bounds.minX) / 2;
@@ -1899,7 +2128,8 @@ function roundedClosedPath(points: Point[], longStraightLineMinLength: number): 
   const rawStraightRuns = collectLongStraightPointRuns(points, longStraightLineMinLength, tolerance);
   const rawProtectedPointKeys = buildStraightProtectedPointKeys(points, rawStraightRuns);
   const rawConcavityPointSet = buildConcavityPointSet(points, detectConcavities(points, { closed: true, protectedPointKeys: rawProtectedPointKeys }));
-  const pathPoints = removeConcavityControlPoints(points, rawConcavityPointSet, true);
+  const concavityRemovedPoints = removeConcavityControlPoints(points, rawConcavityPointSet, true);
+  const pathPoints = isCollapsedPointSet(points, concavityRemovedPoints) ? points : concavityRemovedPoints;
   const debugConcavityPointSet = buildConcavityPointSet(pathPoints, detectConcavities(pathPoints, { closed: true }));
   const straightRuns = filterStraightRunsByConcavityMotion(
     pathPoints,
@@ -1928,13 +2158,27 @@ function roundedClosedPath(points: Point[], longStraightLineMinLength: number): 
     tolerance,
     maxError,
   );
-  if (smoothPath) {
-    const { commands, controlPoints, longStraightLines, connectedStraightLines } = buildPathFromOps(smoothPath.ops, smoothPath.start, longStraightLineMinLength);
+  if (smoothPath && !isCollapsedSmoothPath(pathPoints, smoothPath)) {
+    let pathData = buildPathFromOps(smoothPath.ops, smoothPath.start, longStraightLineMinLength, ENABLE_STRAIGHT_LINE_PROCESSING, true);
+    if (isCollapsedSvgCommands(pathPoints, pathData.commands)) {
+      pathData = buildPathFromOps(smoothPath.ops, smoothPath.start, longStraightLineMinLength, false, true);
+    }
+    if (isCollapsedSvgCommands(pathPoints, pathData.commands)) {
+      return roundedClosedPathFallback(pathPoints, concavityPointKeys, longStraightLineMinLength);
+    }
     const debugPoints = buildPathPointDebugPoints(pathPoints, concavityPointKeys);
-    commands.push('Z');
-    return createPathResult(commands.join(' '), mergeDebugPoints([...controlPoints, ...debugPoints]), longStraightLines, connectedStraightLines);
+    pathData.commands.push('Z');
+    return createPathResult(pathData.commands.join(' '), mergeDebugPoints([...pathData.controlPoints, ...debugPoints]), pathData.longStraightLines, pathData.connectedStraightLines);
   }
 
+  return roundedClosedPathFallback(pathPoints, concavityPointKeys, longStraightLineMinLength);
+}
+
+function roundedClosedPathFallback(
+  pathPoints: Point[],
+  concavityPointKeys: Set<string>,
+  longStraightLineMinLength: number,
+): SvgPathResult {
   const corners = getRoundedCornerData(pathPoints);
   const start = corners[0].exit;
   let cursor = start;
@@ -1955,10 +2199,25 @@ function roundedClosedPath(points: Point[], longStraightLineMinLength: number): 
   }
 
   if (distance(cursor, start) > 0.001) ops.push({ kind: 'line', start: cursor, end: start });
-  const { commands, controlPoints, longStraightLines, connectedStraightLines } = buildPathFromOps(ops, start, longStraightLineMinLength);
+  let pathData = buildPathFromOps(ops, start, longStraightLineMinLength, ENABLE_STRAIGHT_LINE_PROCESSING, true);
+  if (isCollapsedSvgCommands(pathPoints, pathData.commands)) {
+    pathData = buildPathFromOps(ops, start, longStraightLineMinLength, false, true);
+  }
+  if (isCollapsedSvgCommands(pathPoints, pathData.commands)) {
+    return rawClosedPath(pathPoints);
+  }
   const debugPoints = buildPathPointDebugPoints(pathPoints, concavityPointKeys);
+  pathData.commands.push('Z');
+  return createPathResult(pathData.commands.join(' '), mergeDebugPoints([...pathData.controlPoints, ...debugPoints]), pathData.longStraightLines, pathData.connectedStraightLines);
+}
+
+function rawClosedPath(points: Point[]): SvgPathResult {
+  const commands = points.map((point, index) => {
+    const command = index === 0 ? 'M' : 'L';
+    return `${command} ${formatSvgNumber(point.x)} ${formatSvgNumber(point.y)}`;
+  });
   commands.push('Z');
-  return createPathResult(commands.join(' '), mergeDebugPoints([...controlPoints, ...debugPoints]), longStraightLines, connectedStraightLines);
+  return createPathResult(commands.join(' '));
 }
 
 function roundedOpenPath(points: Point[], longStraightLineMinLength: number, areaSign: number): SvgPathResult {
@@ -2106,8 +2365,47 @@ function circleToPath(circle: Circle): SvgPathResult {
   );
 }
 
+function keychainAttachmentToPath(keychainShape: ReturnType<typeof addKeychainHoleToMask>, longStraightLineMinLength: number): SvgPathResult {
+  const circle = keychainShape.outerCircle;
+  const leftBottom = { x: circle.centerX - circle.radius, y: keychainShape.leftConnectorBottomY };
+  const rightBottom = { x: circle.centerX + circle.radius, y: keychainShape.rightConnectorBottomY };
+  const arcPath = upperCircleArcWithVerticalConnectors(
+    circle,
+    true,
+    keychainShape.leftConnectorBottomY,
+    keychainShape.rightConnectorBottomY,
+    longStraightLineMinLength,
+  );
+  const bottomLine = distance(rightBottom, leftBottom) >= longStraightLineMinLength ? [{ start: rightBottom, end: leftBottom }] : [];
+
+  return createPathResult(
+    [
+      `M ${formatSvgNumber(leftBottom.x)} ${formatSvgNumber(leftBottom.y)}`,
+      arcPath.path,
+      lineToCommand(leftBottom),
+      'Z',
+    ].join(' '),
+    arcPath.controlPoints,
+    [...arcPath.longStraightLines, ...bottomLine],
+    arcPath.connectedStraightLines,
+  );
+}
+
 function rawBoundaryLoopsToPath(loops: Point[][], pathStyle?: SvgPathResult['pathStyle']): SvgPathResult {
   return createPathResult(boundaryLoopsToPathData(loops), [], [], [], pathStyle);
+}
+
+function mergePathResults(pathResults: SvgPathResult[], extraPaths: SvgPathResult['extraPaths'] = []): SvgPathResult {
+  return {
+    path: pathResults.map((result) => result.path).filter(Boolean).join(' '),
+    controlPoints: pathResults.flatMap((result) => result.controlPoints),
+    longStraightLines: pathResults.flatMap((result) => result.longStraightLines),
+    connectedStraightLines: pathResults.flatMap((result) => result.connectedStraightLines),
+    extraPaths: [
+      ...extraPaths,
+      ...pathResults.flatMap((result) => result.extraPaths ?? []),
+    ],
+  };
 }
 
 function boundaryLoopsToPathData(loops: Point[][]) {
@@ -2168,6 +2466,11 @@ function buildServerCutPath(
   const gapClosedBaseMask = ENABLE_NARROW_EXIT_AREA_FILL
     ? fillNarrowExitTransparentAreas(filledBaseMask, narrowExitFillPatchMask, artwork.width, artwork.height)
     : filledBaseMask;
+  const bodyClearMask = fillEnclosedMaskHoles(
+    dilateMask(gapClosedBaseMask, artwork.width, artwork.height, Math.max(1, Math.round(metrics.clearRadius))),
+    artwork.width,
+    artwork.height,
+  );
   const keychainShape =
     holeMode === 'with-hole'
       ? addKeychainHoleToMask(
@@ -2181,52 +2484,34 @@ function buildServerCutPath(
           generationOptions.keychain,
         )
       : null;
-  const keychainMask = keychainShape?.mask ?? gapClosedBaseMask;
   if (DEBUG_OUTPUT_RAW_BASE_MASK_PATH && !DEBUG_OUTPUT_HOLE_FILL_TARGET_MASK_PATH) {
-    return rawBoundaryLoopsToPath(maskToBoundaryLoops(keychainMask, artwork.width, artwork.height));
+    return rawBoundaryLoopsToPath(maskToBoundaryLoops(keychainShape?.mask ?? gapClosedBaseMask, artwork.width, artwork.height));
   }
-  const clearMask = keychainShape
-    ? buildKeychainLayerMask(
-        gapClosedBaseMask,
-        keychainShape.mask,
-        artwork.width,
-        artwork.height,
-        metrics.clearRadius,
-        metrics.fixedHoleClearRadius,
-      )
-    : fillEnclosedMaskHoles(
-        dilateMask(keychainMask, artwork.width, artwork.height, Math.max(1, Math.round(metrics.clearRadius))),
-        artwork.width,
-        artwork.height,
-      );
-  const hole = keychainShape ? { ...keychainShape.hole } : null;
-  if (hole) paintCircleOnMask(clearMask, artwork.width, artwork.height, hole.centerX, hole.centerY, hole.radius, 0);
 
-  const loops = maskToBoundaryLoops(clearMask, artwork.width, artwork.height);
   const longStraightLineMinLength = getLongStraightLineMinLength(artwork.width, artwork.height);
-  const pathResults = (hole ? loops.filter((loop) => !isHoleLoop(loop, hole)) : loops).map((loop) =>
-    loopToPath(loop, longStraightLineMinLength, keychainShape?.outerCircle ?? null),
+  const bodyPathResults = maskToBoundaryLoops(bodyClearMask, artwork.width, artwork.height).map((loop) =>
+    loopToPath(loop, longStraightLineMinLength),
   );
-  if (hole) pathResults.push(circleToPath(hole));
-  return {
-    path: pathResults.map((result) => result.path).join(' '),
-    controlPoints: pathResults.flatMap((result) => result.controlPoints),
-    longStraightLines: pathResults.flatMap((result) => result.longStraightLines),
-    connectedStraightLines: pathResults.flatMap((result) => result.connectedStraightLines),
-    extraPaths: [
-      ...(narrowExitDebugPath
-        ? [
-            {
-              path: narrowExitDebugPath,
-              fill: DEBUG_HOLE_FILL_TARGET_FILL,
-              stroke: DEBUG_HOLE_FILL_TARGET_STROKE,
-              strokeWidth: 0.5,
-            },
-          ]
-        : []),
-      ...pathResults.flatMap((result) => result.extraPaths ?? []),
-    ],
-  };
+  const extraPaths = [
+    ...(narrowExitDebugPath
+      ? [
+          {
+            path: narrowExitDebugPath,
+            fill: DEBUG_HOLE_FILL_TARGET_FILL,
+            stroke: DEBUG_HOLE_FILL_TARGET_STROKE,
+            strokeWidth: 0.5,
+          },
+        ]
+      : []),
+  ];
+
+  if (!keychainShape) return mergePathResults(bodyPathResults, extraPaths);
+
+  const hole = { ...keychainShape.hole };
+  const keychainPath = keychainAttachmentToPath(keychainShape, longStraightLineMinLength);
+  const holePath = circleToPath(hole);
+
+  return mergePathResults([...bodyPathResults, keychainPath, holePath], extraPaths);
 }
 
 function buildControlPointMarkers(controlPoints: DebugPoint[]) {

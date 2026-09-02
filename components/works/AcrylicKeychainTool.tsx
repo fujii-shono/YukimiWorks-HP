@@ -16,6 +16,10 @@ type PreviewState = {
   backSrc: string;
   highlightSrc: string;
   standBaseSrc: string;
+  flatGuide: {
+    src: string;
+  };
+  generationOptions: AcrylicGenerationOptions;
   standBaseFrame: {
     x: number;
     y: number;
@@ -267,27 +271,148 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function createRadialOffsets(radius: number) {
+const clientCircleRowSpanCache = new Map<number, Int16Array>();
+
+function getClientCircleRowSpans(radius: number) {
   const roundedRadius = Math.max(0, Math.round(radius));
-  if (roundedRadius <= 0) return [];
-  const offsets: Array<[number, number]> = [];
-  const rings = [roundedRadius * 0.5, roundedRadius];
-  for (const ringRadius of rings) {
-    const steps = Math.max(24, Math.ceil(ringRadius * 1.8));
-    for (let index = 0; index < steps; index += 1) {
-      const angle = (index / steps) * Math.PI * 2;
-      offsets.push([Math.round(Math.cos(angle) * ringRadius), Math.round(Math.sin(angle) * ringRadius)]);
+  const cached = clientCircleRowSpanCache.get(roundedRadius);
+  if (cached) return cached;
+
+  const spans = new Int16Array(roundedRadius * 2 + 1);
+  const squaredRadius = roundedRadius * roundedRadius;
+  for (let offsetY = -roundedRadius; offsetY <= roundedRadius; offsetY += 1) {
+    spans[offsetY + roundedRadius] = Math.floor(Math.sqrt(squaredRadius - offsetY * offsetY));
+  }
+  clientCircleRowSpanCache.set(roundedRadius, spans);
+  return spans;
+}
+
+function dilateClientMask(mask: Uint8Array, width: number, height: number, radius: number) {
+  const roundedRadius = Math.max(0, Math.round(radius));
+  if (roundedRadius <= 0) return mask.slice();
+
+  const output = new Uint8Array(width * height);
+  const rowStride = width + 1;
+  const rowDiffs = new Int32Array(rowStride * height);
+  const rowSpans = getClientCircleRowSpans(roundedRadius);
+
+  for (let sourceY = 0; sourceY < height; sourceY += 1) {
+    const sourceRowStart = sourceY * width;
+    let sourceX = 0;
+
+    while (sourceX < width) {
+      while (sourceX < width && mask[sourceRowStart + sourceX] === 0) sourceX += 1;
+      if (sourceX >= width) break;
+
+      const runStart = sourceX;
+      while (sourceX + 1 < width && mask[sourceRowStart + sourceX + 1] === 1) sourceX += 1;
+      const runEnd = sourceX;
+
+      for (let offsetY = -roundedRadius; offsetY <= roundedRadius; offsetY += 1) {
+        const targetY = sourceY + offsetY;
+        if (targetY < 0 || targetY >= height) continue;
+        const spanX = rowSpans[offsetY + roundedRadius];
+        const startX = Math.max(0, runStart - spanX);
+        const endX = Math.min(width - 1, runEnd + spanX);
+        const diffRowStart = targetY * rowStride;
+        rowDiffs[diffRowStart + startX] += 1;
+        rowDiffs[diffRowStart + endX + 1] -= 1;
+      }
+
+      sourceX += 1;
     }
   }
-  return offsets;
+
+  for (let y = 0; y < height; y += 1) {
+    const diffRowStart = y * rowStride;
+    const outputRowStart = y * width;
+    let coverage = 0;
+    for (let x = 0; x < width; x += 1) {
+      coverage += rowDiffs[diffRowStart + x];
+      if (coverage > 0) output[outputRowStart + x] = 1;
+    }
+  }
+
+  return output;
+}
+
+function fillClientMaskHoles(mask: Uint8Array, width: number, height: number) {
+  const visited = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let head = 0;
+  let tail = 0;
+
+  const push = (x: number, y: number) => {
+    const index = y * width + x;
+    if (mask[index] || visited[index]) return;
+    visited[index] = 1;
+    queue[tail] = index;
+    tail += 1;
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    push(x, 0);
+    push(x, height - 1);
+  }
+  for (let y = 0; y < height; y += 1) {
+    push(0, y);
+    push(width - 1, y);
+  }
+
+  while (head < tail) {
+    const index = queue[head];
+    head += 1;
+    const x = index % width;
+    const y = Math.floor(index / width);
+    const neighbors = [x > 0 ? index - 1 : -1, x < width - 1 ? index + 1 : -1, y > 0 ? index - width : -1, y < height - 1 ? index + width : -1];
+    for (const next of neighbors) {
+      if (next < 0 || mask[next] || visited[next]) continue;
+      visited[next] = 1;
+      queue[tail] = next;
+      tail += 1;
+    }
+  }
+
+  const output = mask.slice();
+  for (let index = 0; index < width * height; index += 1) {
+    if (!output[index] && !visited[index]) output[index] = 1;
+  }
+  return output;
+}
+
+function outlineClientMask(mask: Uint8Array, width: number, height: number) {
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (!mask[index]) continue;
+      const touchesOutside =
+        x === 0 ||
+        y === 0 ||
+        x === width - 1 ||
+        y === height - 1 ||
+        !mask[index - 1] ||
+        !mask[index + 1] ||
+        !mask[index - width] ||
+        !mask[index + width];
+      if (!touchesOutside) continue;
+      const target = index * 4;
+      rgba[target] = 86;
+      rgba[target + 1] = 103;
+      rgba[target + 2] = 131;
+      rgba[target + 3] = 230;
+    }
+  }
+  return new ImageData(rgba, width, height);
 }
 
 async function createAlphaMarginGuide(src: string, width: number, height: number, radius: number) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) return '';
+
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const nextImage = new Image();
     nextImage.decoding = 'async';
@@ -297,20 +422,17 @@ async function createAlphaMarginGuide(src: string, width: number, height: number
   });
 
   context.clearRect(0, 0, width, height);
-  context.globalAlpha = 1;
-  const outerOffsets = createRadialOffsets(radius);
-  for (const [offsetX, offsetY] of outerOffsets) {
-    context.drawImage(image, offsetX, offsetY);
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, width, height).data;
+  const alphaMask = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (pixels[index * 4 + 3] > 8) alphaMask[index] = 1;
   }
-  context.globalCompositeOperation = 'source-in';
-  context.fillStyle = 'rgba(86, 103, 131, 0.92)';
-  context.fillRect(0, 0, width, height);
-  context.globalCompositeOperation = 'destination-out';
-  const innerOffsets = createRadialOffsets(Math.max(0, radius - 2));
-  for (const [offsetX, offsetY] of innerOffsets) {
-    context.drawImage(image, offsetX, offsetY);
-  }
-  context.globalCompositeOperation = 'source-over';
+
+  const filledMask = fillClientMaskHoles(alphaMask, width, height);
+  const guideMask = fillClientMaskHoles(dilateClientMask(filledMask, width, height, radius), width, height);
+  context.clearRect(0, 0, width, height);
+  context.putImageData(outlineClientMask(guideMask, width, height), 0, 0);
   return canvas.toDataURL('image/png');
 }
 
@@ -696,6 +818,11 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       setMarginGuideSrc('');
       return;
     }
+    const previewClearRadius = preview.generationOptions.keychain.clearRadius;
+    if (previewClearRadius === generationOptions.keychain.clearRadius) {
+      setMarginGuideSrc('');
+      return;
+    }
     let cancelled = false;
     void createAlphaMarginGuide(
       preview.originalArtworkSrc,
@@ -1062,10 +1189,6 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     preview && keychainArtworkBounds
       ? ({
           '--acrylic-flat-image-aspect': `${preview.width} / ${preview.height}`,
-          '--acrylic-flat-art-left': `${(keychainArtworkBounds.minX / preview.width) * 100}%`,
-          '--acrylic-flat-art-top': `${(keychainArtworkBounds.minY / preview.height) * 100}%`,
-          '--acrylic-flat-art-width': `${(keychainArtworkBounds.width / preview.width) * 100}%`,
-          '--acrylic-flat-art-height': `${(keychainArtworkBounds.height / preview.height) * 100}%`,
           '--acrylic-flat-hole-x': `${(keychainHoleCenterX / preview.width) * 100}%`,
           '--acrylic-flat-hole-y': `${(keychainHoleCenterY / preview.height) * 100}%`,
           '--acrylic-flat-hole-loop-width': `${(((keychainHoleOuterRadius + keychainFixedHoleClearRadius) * 2) / preview.width) * 100}%`,
@@ -1073,6 +1196,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           '--acrylic-flat-hole-inner-size': `${(keychainHoleInnerRadius / Math.max(1, keychainHoleOuterRadius + keychainFixedHoleClearRadius)) * 100}%`,
         } as CSSProperties)
       : undefined;
+  const activeFlatGuideSrc = marginGuideSrc || preview?.flatGuide.src || '';
   const standFlatPreviewStyle: StandFlatPreviewStyle =
     preview && preview.productMode === 'stand' && preview.standBaseFrame && keychainArtworkBounds
       ? (() => {
@@ -1128,7 +1252,6 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
             '--acrylic-stand-flat-claw-width': `${(clawWidth / preview.width) * 100}%`,
             '--acrylic-stand-flat-claw-height': `${(clawHeight / preview.height) * 100}%`,
             '--acrylic-stand-flat-claw-radius': `${clawCornerRadius}px`,
-            '--acrylic-stand-flat-contact-y': `${((contactLine?.y ?? frame.contactY) / preview.height) * 100}%`,
           } as CSSProperties;
         })()
       : undefined;
@@ -1580,11 +1703,10 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={preview.originalArtworkSrc} alt="" aria-hidden="true" />
-                      {marginGuideSrc ? (
+                      {activeFlatGuideSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="acrylic-hole-flat-margin-guide" src={marginGuideSrc} alt="" aria-hidden="true" />
+                        <img className="acrylic-hole-flat-margin-guide" src={activeFlatGuideSrc} alt="" aria-hidden="true" />
                       ) : null}
-                      <span className="acrylic-hole-flat-art-bounds" aria-hidden="true" />
                       <span className="acrylic-hole-flat-loop" aria-hidden="true">
                         <span className="acrylic-hole-flat-inner" />
                       </span>
@@ -1614,13 +1736,12 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                     <div className="acrylic-stand-flat-preview" style={standFlatPreviewStyle}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={preview.originalArtworkSrc} alt="" aria-hidden="true" />
-                      {preview.standShapeGuide ? (
+                      {activeFlatGuideSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="acrylic-stand-flat-margin-guide" src={preview.standShapeGuide.src} alt="" aria-hidden="true" />
+                        <img className="acrylic-stand-flat-margin-guide" src={activeFlatGuideSrc} alt="" aria-hidden="true" />
                       ) : null}
                       <span className="acrylic-stand-flat-claw" aria-hidden="true" />
                       <span className="acrylic-stand-flat-base" aria-hidden="true" />
-                      <span className="acrylic-stand-flat-contact" aria-hidden="true" />
                     </div>
                   ) : null}
                   <label className="acrylic-options-field acrylic-options-field-combo">

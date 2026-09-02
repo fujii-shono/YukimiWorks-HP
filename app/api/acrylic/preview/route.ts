@@ -35,6 +35,10 @@ type StandShapeGuide = {
   src: string;
 } | null;
 
+type FlatGuide = {
+  src: string;
+};
+
 type StandClawFrame = {
   x: number;
   y: number;
@@ -94,6 +98,7 @@ const BASE_STAND_STABLE_DIAGONAL_DISTANCE = 28;
 const BASE_STAND_CLAW_EDGE_GAP = 16;
 const BASE_STAND_CLAW_CONTACT_LINE_WIDTH = 3;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const circleRowSpanCache = new Map<number, Int16Array>();
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -226,20 +231,68 @@ function createCircleOffsets(radius: number) {
   return offsets;
 }
 
+function getCircleRowSpans(radius: number) {
+  const roundedRadius = Math.max(0, Math.round(radius));
+  const cached = circleRowSpanCache.get(roundedRadius);
+  if (cached) return cached;
+
+  const spans = new Int16Array(roundedRadius * 2 + 1);
+  const squaredRadius = roundedRadius * roundedRadius;
+  for (let offsetY = -roundedRadius; offsetY <= roundedRadius; offsetY += 1) {
+    spans[offsetY + roundedRadius] = Math.floor(Math.sqrt(squaredRadius - offsetY * offsetY));
+  }
+  circleRowSpanCache.set(roundedRadius, spans);
+  return spans;
+}
+
 function dilateMask(mask: Uint8Array, width: number, height: number, radius: number) {
+  const roundedRadius = Math.max(0, Math.round(radius));
+  if (roundedRadius <= 0) return mask.slice();
+
   const output = new Uint8Array(width * height);
-  const offsets = createCircleOffsets(radius);
-  for (let index = 0; index < width * height; index += 1) {
-    if (!mask[index]) continue;
-    const sourceX = index % width;
-    const sourceY = Math.floor(index / width);
-    for (const [offsetX, offsetY] of offsets) {
-      const x = sourceX + offsetX;
-      const y = sourceY + offsetY;
-      if (x < 0 || x >= width || y < 0 || y >= height) continue;
-      output[y * width + x] = 1;
+  const rowStride = width + 1;
+  const rowDiffs = new Int32Array(rowStride * height);
+  const rowSpans = getCircleRowSpans(roundedRadius);
+
+  for (let sourceY = 0; sourceY < height; sourceY += 1) {
+    const sourceRowStart = sourceY * width;
+    let sourceX = 0;
+
+    while (sourceX < width) {
+      while (sourceX < width && mask[sourceRowStart + sourceX] === 0) sourceX += 1;
+      if (sourceX >= width) break;
+
+      const runStart = sourceX;
+      while (sourceX + 1 < width && mask[sourceRowStart + sourceX + 1] === 1) sourceX += 1;
+      const runEnd = sourceX;
+
+      for (let offsetY = -roundedRadius; offsetY <= roundedRadius; offsetY += 1) {
+        const targetY = sourceY + offsetY;
+        if (targetY < 0 || targetY >= height) continue;
+        const spanX = rowSpans[offsetY + roundedRadius];
+        const startX = Math.max(0, runStart - spanX);
+        const endX = Math.min(width - 1, runEnd + spanX);
+        const diffRowStart = targetY * rowStride;
+        rowDiffs[diffRowStart + startX] += 1;
+        rowDiffs[diffRowStart + endX + 1] -= 1;
+      }
+
+      sourceX += 1;
     }
   }
+
+  for (let y = 0; y < height; y += 1) {
+    const diffRowStart = y * rowStride;
+    const outputRowStart = y * width;
+    let coverage = 0;
+    for (let x = 0; x < width; x += 1) {
+      coverage += rowDiffs[diffRowStart + x];
+      if (coverage > 0) {
+        output[outputRowStart + x] = 1;
+      }
+    }
+  }
+
   return output;
 }
 
@@ -1212,6 +1265,10 @@ function buildPreviewLayers(
   placeImage(artwork, image, imageX, imageY, true);
   const highlight = conditionalLayer(width, height, (index) => (innerShineMask[index] ? [255, 255, 255, 252] : null));
   const standBase: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
+  const flatGuideMask = fillEnclosedMaskHoles(clearMask, width, height);
+  const flatGuide: FlatGuide = {
+    src: toDataUrl(outlineLayerFromMask(width, height, flatGuideMask, STAND_SHAPE_GUIDE_COLOR)),
+  };
   const standShapeGuide: StandShapeGuide =
     productMode === 'stand'
       ? {
@@ -1244,6 +1301,8 @@ function buildPreviewLayers(
     backSrc: toDataUrl(back),
     highlightSrc: toDataUrl(highlight),
     standBaseSrc: toDataUrl(standBase),
+    flatGuide,
+    generationOptions,
     standBaseFrame,
     standShapeGuide,
     standContactLine: standShape?.contactLine ?? null,

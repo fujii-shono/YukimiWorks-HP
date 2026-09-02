@@ -13,10 +13,16 @@ type AcrylicExportRequest = {
   width?: unknown;
   height?: unknown;
   artworkDataUrl?: unknown;
+  productMode?: unknown;
   holeMode?: unknown;
+  shapeMode?: unknown;
   debug?: unknown;
   generationOptions?: unknown;
 };
+
+type ProductMode = 'keychain' | 'stand';
+type HoleMode = 'with-hole' | 'without-hole';
+type StandMode = 'simple' | 'stable';
 
 type Point = {
   x: number;
@@ -81,6 +87,7 @@ type SvgPathResult = {
   }>;
   pathStyle?: {
     fill?: string;
+    fillRule?: 'evenodd' | 'nonzero';
     stroke?: string;
     strokeWidth?: number;
   };
@@ -132,11 +139,39 @@ type StraightPointRun = {
   endIndex: number;
 };
 
+type StandClawFrame = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null;
+
+type StandContactLine = {
+  leftX: number;
+  rightX: number;
+  y: number;
+} | null;
+
+type StandCutPathResult = {
+  illustrationCutPath: SvgPathResult;
+  debugBaseCutPath: SvgPathResult;
+  productionBaseCutPath: SvgPathResult;
+  debugWidth: number;
+  debugHeight: number;
+  debugArtworkOffsetX: number;
+  baseDiameter: number;
+};
+
 const MAX_EXPORT_SIZE = 2400;
 const MAX_PNG_BYTES = 12 * 1024 * 1024;
 const MAX_MASK_PIXELS = 2_400_000;
 const REFERENCE_ARTWORK_SIZE = 500;
 const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
+const BASE_STAND_BOTTOM_NEAR_HEIGHT_DELTA = 40;
+const BASE_STAND_STABLE_START_WIDTH_RATIO = 0.6;
+const BASE_STAND_STABLE_DIAGONAL_DISTANCE = 28;
+const BASE_STAND_CLAW_EDGE_GAP = 16;
+const STAND_DEBUG_BASE_GAP = 12;
 const CONTROL_POINT_RADIUS = 0.9;
 const CONTROL_POINT_STROKE_WIDTH = 0.2;
 const BASE_LONG_STRAIGHT_LINE_MIN_LENGTH = 7;
@@ -1086,6 +1121,82 @@ function paintCircleOnMask(mask: Uint8Array, width: number, height: number, cent
   }
 }
 
+function paintLineOnMask(mask: Uint8Array, width: number, height: number, startX: number, startY: number, endX: number, endY: number) {
+  const steps = Math.max(Math.abs(endX - startX), Math.abs(endY - startY), 1);
+  for (let step = 0; step <= steps; step += 1) {
+    const progress = step / steps;
+    const x = Math.round(startX + (endX - startX) * progress);
+    const y = Math.round(startY + (endY - startY) * progress);
+    if (x < 0 || x >= width || y < 0 || y >= height) continue;
+    mask[y * width + x] = 1;
+  }
+}
+
+type MaskPoint = { x: number; y: number };
+
+function paintPolygonOnMask(mask: Uint8Array, width: number, height: number, points: MaskPoint[]) {
+  if (points.length < 3) return;
+  let minX = width - 1;
+  let maxX = 0;
+  let minY = height - 1;
+  let maxY = 0;
+  for (const point of points) {
+    minX = Math.max(0, Math.min(minX, point.x));
+    maxX = Math.min(width - 1, Math.max(maxX, point.x));
+    minY = Math.max(0, Math.min(minY, point.y));
+    maxY = Math.min(height - 1, Math.max(maxY, point.y));
+  }
+
+  for (let y = minY; y <= maxY; y += 1) {
+    const intersections: number[] = [];
+    for (let index = 0; index < points.length; index += 1) {
+      const current = points[index];
+      const next = points[(index + 1) % points.length];
+      if ((current.y > y) === (next.y > y)) continue;
+      intersections.push(current.x + ((y - current.y) * (next.x - current.x)) / (next.y - current.y));
+    }
+    intersections.sort((a, b) => a - b);
+    for (let index = 0; index < intersections.length; index += 2) {
+      const startX = Math.max(minX, Math.ceil(intersections[index]));
+      const endX = Math.min(maxX, Math.floor(intersections[index + 1] ?? intersections[index]));
+      for (let x = startX; x <= endX; x += 1) mask[y * width + x] = 1;
+    }
+  }
+
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index];
+    const next = points[(index + 1) % points.length];
+    paintLineOnMask(mask, width, height, current.x, current.y, next.x, next.y);
+  }
+}
+
+function traceSegmentUntilMask(mask: Uint8Array, width: number, height: number, start: MaskPoint, end: MaskPoint) {
+  const steps = Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y), 1);
+  let point = start;
+  let leftSourceMask = !mask[start.y * width + start.x];
+  for (let step = 1; step <= steps; step += 1) {
+    const progress = step / steps;
+    const x = Math.max(0, Math.min(width - 1, Math.round(start.x + (end.x - start.x) * progress)));
+    const y = Math.max(0, Math.min(height - 1, Math.round(start.y + (end.y - start.y) * progress)));
+    const nextPoint = { x, y };
+    const isMask = mask[y * width + x] === 1;
+    if (!leftSourceMask) {
+      if (!isMask) leftSourceMask = true;
+      point = nextPoint;
+      continue;
+    }
+    if (isMask) return { point: nextPoint, hit: true };
+    point = nextPoint;
+  }
+  return { point, hit: false };
+}
+
+function appendDistinctPoint(points: MaskPoint[], point: MaskPoint) {
+  const lastPoint = points[points.length - 1];
+  if (lastPoint && lastPoint.x === point.x && lastPoint.y === point.y) return;
+  points.push(point);
+}
+
 function paintSplitBottomConnectorOnMask(mask: Uint8Array, width: number, height: number, left: number, right: number, top: number, leftBottom: number, rightBottom: number) {
   const minX = Math.max(0, Math.min(left, right));
   const maxX = Math.min(width - 1, Math.max(left, right));
@@ -1182,6 +1293,219 @@ function findMaskBounds(mask: Uint8Array, width: number, height: number) {
   }
   if (minX > maxX || minY > maxY) throw new Error('透明ではない部分が見つかりませんでした');
   return { minX, maxX, minY, maxY, width: maxX - minX + 1, height: maxY - minY + 1 };
+}
+
+function findBottomMaskPoint(mask: Uint8Array, width: number, height: number) {
+  for (let y = height - 1; y >= 0; y -= 1) {
+    let minX = width;
+    let maxX = -1;
+    for (let x = 0; x < width; x += 1) {
+      if (!mask[y * width + x]) continue;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+    }
+    if (maxX >= 0) return { x: Math.round((minX + maxX) / 2), y, minX, maxX };
+  }
+  return null;
+}
+
+type BottomMaskPoint = NonNullable<ReturnType<typeof findBottomMaskPoint>>;
+
+function findNearBottomSidePoint(mask: Uint8Array, width: number, bottomPoint: BottomMaskPoint, direction: 'left' | 'right', deltaY: number) {
+  const stepX = direction === 'left' ? -1 : 1;
+  const startX = direction === 'left' ? bottomPoint.minX - 1 : bottomPoint.maxX + 1;
+  let farthestPoint: Point | null = null;
+  for (let x = startX; x >= 0 && x < width; x += stepX) {
+    for (let y = bottomPoint.y; y >= Math.max(0, bottomPoint.y - deltaY); y -= 1) {
+      if (!mask[y * width + x]) continue;
+      farthestPoint = { x, y };
+      break;
+    }
+  }
+  return farthestPoint;
+}
+
+function addStableStandBaseAreaToMask(
+  standMask: Uint8Array,
+  sourceMask: Uint8Array,
+  width: number,
+  height: number,
+  contactY: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  artworkHeight: number,
+) {
+  const centerX = Math.round(artworkCenterX);
+  const sourceBounds = findMaskBounds(sourceMask, width, height);
+  const halfStartWidth = Math.max(1, Math.round((artworkWidth * BASE_STAND_STABLE_START_WIDTH_RATIO) / 2));
+  const diagonalDistance = Math.max(1, Math.round(scaleArtworkMetric(BASE_STAND_STABLE_DIAGONAL_DISTANCE, artworkWidth, artworkHeight)));
+  const leftStart = { x: Math.max(0, centerX - halfStartWidth), y: contactY };
+  const rightStart = { x: Math.min(width - 1, centerX + halfStartWidth), y: contactY };
+  const leftDiagonalEnd = {
+    x: Math.min(width - 1, leftStart.x + diagonalDistance),
+    y: Math.max(0, contactY - diagonalDistance),
+  };
+  const rightDiagonalEnd = {
+    x: Math.max(0, rightStart.x - diagonalDistance),
+    y: Math.max(0, contactY - diagonalDistance),
+  };
+  const traceSidePath = (start: MaskPoint, diagonalEnd: MaskPoint) => {
+    const points = [start];
+    const diagonal = traceSegmentUntilMask(sourceMask, width, height, start, diagonalEnd);
+    appendDistinctPoint(points, diagonal.point);
+    if (diagonal.hit) return points;
+    const vertical = traceSegmentUntilMask(sourceMask, width, height, diagonal.point, {
+      x: diagonal.point.x,
+      y: sourceBounds.minY,
+    });
+    appendDistinctPoint(points, vertical.point);
+    if (vertical.hit) return points;
+    const horizontal = traceSegmentUntilMask(sourceMask, width, height, vertical.point, {
+      x: centerX,
+      y: vertical.point.y,
+    });
+    appendDistinctPoint(points, horizontal.point);
+    return points;
+  };
+  const leftPath = traceSidePath(leftStart, leftDiagonalEnd);
+  const rightPath = traceSidePath(rightStart, rightDiagonalEnd);
+  paintPolygonOnMask(standMask, width, height, [leftStart, rightStart, ...rightPath.slice(1), ...leftPath.slice(1).reverse()]);
+  return {
+    contactLeftX: leftStart.x,
+    contactRightX: rightStart.x,
+    contactY,
+  };
+}
+
+function resolveStandClawFrame(
+  width: number,
+  height: number,
+  contactLeftX: number,
+  contactRightX: number,
+  contactY: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  artworkHeight: number,
+  standClawLength: number,
+  standClawStartOffset: number,
+  standOptions: AcrylicGenerationOptions['stand'],
+): StandClawFrame {
+  const centerX = Math.round(artworkCenterX + (standOptions.clawCenterXRatio - 0.5) * artworkWidth);
+  const edgeGap = Math.max(0, Math.round(scaleArtworkMetric(BASE_STAND_CLAW_EDGE_GAP, artworkWidth, artworkHeight)));
+  const autoSafeLeftX = Math.min(contactRightX, contactLeftX + edgeGap);
+  const autoSafeRightX = Math.max(contactLeftX, contactRightX - edgeGap);
+  const usesFixedPixelWidth = standOptions.clawWidthPx !== null;
+  const leftBound = usesFixedPixelWidth ? 0 : autoSafeLeftX;
+  const rightBound = usesFixedPixelWidth ? width - 1 : autoSafeRightX;
+  const leftSpan = Math.max(0, centerX - autoSafeLeftX);
+  const rightSpan = Math.max(0, autoSafeRightX - centerX);
+  const autoWidth = Math.floor(Math.min(leftSpan, rightSpan)) * 2 + 1;
+  const requestedWidth =
+    standOptions.clawWidthPx !== null
+      ? Math.round(standOptions.clawWidthPx)
+      : standOptions.clawWidthRatio === null
+        ? autoWidth
+        : Math.round(artworkWidth * standOptions.clawWidthRatio);
+  const maxWidth = Math.max(0, rightBound - leftBound + 1);
+  const clawWidth = Math.min(maxWidth, Math.max(1, requestedWidth));
+  if (clawWidth <= 0) return null;
+
+  const clawLeftX = Math.max(leftBound, Math.min(rightBound - clawWidth + 1, Math.round(centerX - clawWidth / 2)));
+  const clawTopY = Math.min(height - 1, Math.round(contactY + standClawStartOffset));
+  const requestedLength =
+    standOptions.clawLengthPx !== null
+      ? Math.max(1, Math.round(standOptions.clawLengthPx))
+      : standOptions.clawLengthRatio === null
+        ? Math.max(1, Math.round(standClawLength))
+        : Math.max(1, Math.round(artworkHeight * standOptions.clawLengthRatio));
+  const clawBottomY = Math.min(height - 1, clawTopY + requestedLength - 1);
+  if (clawBottomY <= clawTopY) return null;
+  return {
+    x: clawLeftX,
+    y: clawTopY,
+    width: clawWidth,
+    height: Math.max(1, clawBottomY - clawTopY + 1),
+  };
+}
+
+function paintBottomRoundedRectOnMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  rectWidth: number,
+  rectHeight: number,
+  radius: number,
+) {
+  const left = Math.max(0, Math.round(x));
+  const top = Math.max(0, Math.round(y));
+  const right = Math.min(width - 1, Math.round(x + rectWidth - 1));
+  const bottom = Math.min(height - 1, Math.round(y + rectHeight - 1));
+  if (right < left || bottom < top) return;
+
+  const cornerRadius = Math.max(0, Math.min(Math.round(radius), Math.floor((right - left + 1) / 2), Math.floor((bottom - top + 1) / 2)));
+  const radiusSquared = cornerRadius * cornerRadius;
+  for (let pointY = top; pointY <= bottom; pointY += 1) {
+    for (let pointX = left; pointX <= right; pointX += 1) {
+      if (cornerRadius > 0 && pointY > bottom - cornerRadius) {
+        const cornerCenterX = pointX < left + cornerRadius ? left + cornerRadius : pointX > right - cornerRadius ? right - cornerRadius : pointX;
+        const cornerCenterY = bottom - cornerRadius;
+        const deltaX = pointX - cornerCenterX;
+        const deltaY = pointY - cornerCenterY;
+        if (deltaX * deltaX + deltaY * deltaY > radiusSquared) continue;
+      }
+      mask[pointY * width + pointX] = 1;
+    }
+  }
+}
+
+function unionMask(left: Uint8Array, right: Uint8Array, width: number, height: number) {
+  const output = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (left[index] || right[index]) output[index] = 1;
+  }
+  return output;
+}
+
+function buildStandBodyMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  artworkCenterX: number,
+  artworkWidth: number,
+  artworkHeight: number,
+  standMode: StandMode,
+) {
+  const standMask = mask.slice();
+  const bottomPoint = findBottomMaskPoint(mask, width, height);
+  let contactLine: StandContactLine = null;
+  if (!bottomPoint) return { mask: standMask, contactLine, contactY: null };
+  paintLineOnMask(standMask, width, height, bottomPoint.minX, bottomPoint.y, bottomPoint.maxX, bottomPoint.y);
+  const nearHeightDelta = Math.max(1, Math.round(scaleArtworkMetric(BASE_STAND_BOTTOM_NEAR_HEIGHT_DELTA, artworkWidth, artworkHeight)));
+  const leftPoint = findNearBottomSidePoint(mask, width, bottomPoint, 'left', nearHeightDelta);
+  const rightPoint = findNearBottomSidePoint(mask, width, bottomPoint, 'right', nearHeightDelta);
+  let contactLeftX = bottomPoint.minX;
+  let contactRightX = bottomPoint.maxX;
+  let clawContactY = bottomPoint.y;
+  if (leftPoint) {
+    paintLineOnMask(standMask, width, height, bottomPoint.minX, bottomPoint.y, leftPoint.x, bottomPoint.y);
+    paintLineOnMask(standMask, width, height, leftPoint.x, bottomPoint.y, leftPoint.x, leftPoint.y);
+    contactLeftX = Math.min(contactLeftX, leftPoint.x);
+  }
+  if (rightPoint) {
+    paintLineOnMask(standMask, width, height, bottomPoint.maxX, bottomPoint.y, rightPoint.x, bottomPoint.y);
+    paintLineOnMask(standMask, width, height, rightPoint.x, bottomPoint.y, rightPoint.x, rightPoint.y);
+    contactRightX = Math.max(contactRightX, rightPoint.x);
+  }
+  if (standMode === 'stable') {
+    const stableContact = addStableStandBaseAreaToMask(standMask, mask, width, height, bottomPoint.y, artworkCenterX, artworkWidth, artworkHeight);
+    contactLeftX = Math.min(contactLeftX, stableContact.contactLeftX);
+    contactRightX = Math.max(contactRightX, stableContact.contactRightX);
+    clawContactY = stableContact.contactY;
+  }
+  contactLine = { leftX: contactLeftX, rightX: contactRightX, y: clawContactY };
+  return { mask: standMask, contactLine, contactY: bottomPoint.y };
 }
 
 function pointKey(point: Point) {
@@ -2742,6 +3066,115 @@ function buildServerCutPath(
   return mergePathResults([...outerPathResults, holePath], extraPaths);
 }
 
+function buildStandCutPath(
+  artwork: PngImage,
+  standMode: StandMode,
+  generationOptions: AcrylicGenerationOptions,
+): StandCutPathResult {
+  const baseMask = new Uint8Array(artwork.width * artwork.height);
+  for (let index = 0; index < artwork.width * artwork.height; index += 1) {
+    if (artwork.alpha[index] > 8) baseMask[index] = 1;
+  }
+  const bounds = findMaskBounds(baseMask, artwork.width, artwork.height);
+  const metrics = getAcrylicMetrics(bounds.width, bounds.height, generationOptions.keychain);
+  const filledBaseMask = fillEnclosedMaskHoles(baseMask, artwork.width, artwork.height);
+  const internalGapCloseRadius = Math.max(1, Math.round(metrics.internalGapCloseRadius));
+  const narrowExitAreaMask = ENABLE_NARROW_EXIT_AREA_FILL
+    ? detectNarrowExitTransparentAreas(filledBaseMask, artwork.width, artwork.height, internalGapCloseRadius)
+    : null;
+  const narrowExitFillPatchMask = ENABLE_NARROW_EXIT_AREA_FILL
+    ? buildNarrowExitFillPatchMask(filledBaseMask, narrowExitAreaMask, artwork.width, artwork.height, internalGapCloseRadius)
+    : null;
+  const gapClosedBaseMask = ENABLE_NARROW_EXIT_AREA_FILL
+    ? fillNarrowExitTransparentAreas(filledBaseMask, narrowExitFillPatchMask, artwork.width, artwork.height)
+    : filledBaseMask;
+  const standBody = buildStandBodyMask(
+    gapClosedBaseMask,
+    artwork.width,
+    artwork.height,
+    bounds.minX + bounds.width / 2,
+    bounds.width,
+    bounds.height,
+    standMode,
+  );
+  const bodyClearMask = fillEnclosedMaskHoles(
+    dilateMask(standBody.mask, artwork.width, artwork.height, Math.max(1, Math.round(metrics.clearRadius))),
+    artwork.width,
+    artwork.height,
+  );
+  const clawFrame = standBody.contactLine
+    ? resolveStandClawFrame(
+        artwork.width,
+        artwork.height,
+        standBody.contactLine.leftX,
+        standBody.contactLine.rightX,
+        standBody.contactLine.y,
+        bounds.minX + bounds.width / 2,
+        bounds.width,
+        bounds.height,
+        Math.max(1, Math.round(generationOptions.stand.baseHeightPx ?? generationOptions.stand.baseMinHeight)),
+        metrics.clearRadius,
+        generationOptions.stand,
+      )
+    : null;
+  const bodyWithClawMask = clawFrame
+    ? (() => {
+        const clawMask = new Uint8Array(artwork.width * artwork.height);
+        paintBottomRoundedRectOnMask(
+          clawMask,
+          artwork.width,
+          artwork.height,
+          clawFrame.x,
+          clawFrame.y,
+          clawFrame.width,
+          clawFrame.height,
+          scaleArtworkMetric(generationOptions.stand.clawCornerRadius, bounds.width, bounds.height),
+        );
+        return fillEnclosedMaskHoles(unionMask(bodyClearMask, clawMask, artwork.width, artwork.height), artwork.width, artwork.height);
+      })()
+    : bodyClearMask;
+  const longStraightLineMinLength = getLongStraightLineMinLength(artwork.width, artwork.height);
+  const bodyPathResults = maskToBoundaryLoops(bodyWithClawMask, artwork.width, artwork.height).map((loop) =>
+    loopToPath(loop, longStraightLineMinLength),
+  );
+
+  const baseDiameter = Math.max(
+    1,
+    Math.round(generationOptions.stand.baseWidthPx ?? bounds.width * (generationOptions.stand.baseWidthRatioPercent / 100)),
+  );
+  const illustrationCutPath: SvgPathResult = {
+    ...mergePathResults(bodyPathResults),
+    pathStyle: {
+      fill: 'rgba(179, 229, 252, 0.18)',
+      fillRule: 'nonzero',
+      stroke: '#ff2f7d',
+      strokeWidth: 1,
+    },
+  };
+  const baseRadius = baseDiameter / 2;
+  const productionBaseCutPath = circleToPath({ centerX: baseRadius, centerY: baseRadius, radius: baseRadius });
+  const debugArtworkOffsetX = 0;
+  const debugBaseLeft = bounds.maxX + 1 + STAND_DEBUG_BASE_GAP;
+  const debugBaseTop = Math.max(0, Math.round(bounds.minY + bounds.height / 2 - baseRadius));
+  const debugWidth = Math.max(artwork.width, Math.ceil(debugBaseLeft + baseDiameter + STAND_DEBUG_BASE_GAP));
+  const debugHeight = Math.max(artwork.height, Math.ceil(debugBaseTop + baseDiameter + STAND_DEBUG_BASE_GAP));
+  const debugBaseCutPath = circleToPath({
+    centerX: debugBaseLeft + baseRadius,
+    centerY: debugBaseTop + baseRadius,
+    radius: baseRadius,
+  });
+
+  return {
+    illustrationCutPath,
+    debugBaseCutPath,
+    productionBaseCutPath,
+    debugWidth,
+    debugHeight,
+    debugArtworkOffsetX,
+    baseDiameter,
+  };
+}
+
 function buildControlPointMarkers(controlPoints: DebugPoint[]) {
   return controlPoints
     .map(
@@ -2782,6 +3215,7 @@ function buildSvg(fileName: string, width: number, height: number, artworkDataUr
     })
     .join('\n  ');
   const pathFill = cutPath.pathStyle?.fill ?? 'rgba(179, 229, 252, 0.18)';
+  const pathFillRule = cutPath.pathStyle?.fillRule ?? 'evenodd';
   const pathStroke = cutPath.pathStyle?.stroke ?? '#ff2f7d';
   const pathStrokeWidth = cutPath.pathStyle?.strokeWidth ?? 1;
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -2789,7 +3223,7 @@ function buildSvg(fileName: string, width: number, height: number, artworkDataUr
   <title>${escapeXml(fileName)} acrylic keychain cut line</title>
   <image href="${escapeXml(artworkDataUrl)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="none"/>
   ${extraPaths}
-  <path d="${cutPath.path}" fill="${escapeXml(pathFill)}" fill-rule="evenodd" stroke="${escapeXml(pathStroke)}" stroke-width="${formatSvgNumber(pathStrokeWidth)}" vector-effect="non-scaling-stroke"/>
+  <path d="${cutPath.path}" fill="${escapeXml(pathFill)}" fill-rule="${pathFillRule}" stroke="${escapeXml(pathStroke)}" stroke-width="${formatSvgNumber(pathStrokeWidth)}" vector-effect="non-scaling-stroke"/>
   ${longStraightLineMarkers}
   ${connectedStraightLineMarkers}
   ${controlPointMarkers}
@@ -2797,13 +3231,43 @@ function buildSvg(fileName: string, width: number, height: number, artworkDataUr
 `;
 }
 
+function buildStandDebugSvg(fileName: string, sourceWidth: number, sourceHeight: number, artworkDataUrl: string, cutPaths: StandCutPathResult) {
+  const cutPath = cutPaths.illustrationCutPath;
+  const baseCutPath = cutPaths.debugBaseCutPath;
+  const pathFill = cutPath.pathStyle?.fill ?? 'rgba(179, 229, 252, 0.18)';
+  const pathFillRule = cutPath.pathStyle?.fillRule ?? 'evenodd';
+  const pathStroke = cutPath.pathStyle?.stroke ?? '#ff2f7d';
+  const pathStrokeWidth = cutPath.pathStyle?.strokeWidth ?? 1;
+  const transform = cutPaths.debugArtworkOffsetX === 0 ? '' : ` transform="translate(${formatSvgNumber(cutPaths.debugArtworkOffsetX)} 0)"`;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${cutPaths.debugWidth}" height="${cutPaths.debugHeight}" viewBox="0 0 ${cutPaths.debugWidth} ${cutPaths.debugHeight}" role="img" aria-label="${escapeXml(fileName)} acrylic stand cut line">
+  <title>${escapeXml(fileName)} acrylic stand cut line</title>
+  <image href="${escapeXml(artworkDataUrl)}" x="${formatSvgNumber(cutPaths.debugArtworkOffsetX)}" y="0" width="${sourceWidth}" height="${sourceHeight}" preserveAspectRatio="none"/>
+  <g${transform}>
+    <path d="${cutPath.path}" fill="${escapeXml(pathFill)}" fill-rule="${pathFillRule}" stroke="${escapeXml(pathStroke)}" stroke-width="${formatSvgNumber(pathStrokeWidth)}" vector-effect="non-scaling-stroke"/>
+  </g>
+  <path d="${baseCutPath.path}" fill="${escapeXml(pathFill)}" fill-rule="nonzero" stroke="${escapeXml(pathStroke)}" stroke-width="${formatSvgNumber(pathStrokeWidth)}" vector-effect="non-scaling-stroke"/>
+</svg>
+`;
+}
+
 function buildCutPathOnlySvg(fileName: string, width: number, height: number, cutPath: SvgPathResult) {
+  const pathFillRule = cutPath.pathStyle?.fillRule ?? 'evenodd';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(fileName)} acrylic keychain cut line">
   <title>${escapeXml(fileName)} acrylic keychain cut line</title>
-  <path d="${cutPath.path}" fill="none" fill-rule="evenodd" stroke="#ff2f7d" stroke-width="1" vector-effect="non-scaling-stroke"/>
+  <path d="${cutPath.path}" fill="none" fill-rule="${pathFillRule}" stroke="#ff2f7d" stroke-width="1" vector-effect="non-scaling-stroke"/>
 </svg>
 `;
+}
+
+function buildStandBaseCutPathOnlySvg(fileName: string, cutPaths: StandCutPathResult) {
+  return buildCutPathOnlySvg(`${fileName}-base`, cutPaths.baseDiameter, cutPaths.baseDiameter, {
+    ...cutPaths.productionBaseCutPath,
+    pathStyle: {
+      fillRule: 'nonzero',
+    },
+  });
 }
 
 export async function POST(request: Request) {
@@ -2818,15 +3282,49 @@ export async function POST(request: Request) {
   if (typeof body.width !== 'number' || typeof body.height !== 'number' || !Number.isInteger(body.width) || !Number.isInteger(body.height)) return jsonError('出力サイズが不正です');
   if (body.width <= 0 || body.height <= 0 || body.width > MAX_EXPORT_SIZE || body.height > MAX_EXPORT_SIZE) return jsonError('出力サイズが大きすぎます');
   if (typeof body.artworkDataUrl !== 'string') return jsonError('PNGデータが不正です');
-  if (body.holeMode !== 'with-hole' && body.holeMode !== 'without-hole') return jsonError('穴モードが不正です');
+  const productMode: ProductMode = body.productMode === 'stand' ? 'stand' : 'keychain';
+  if (productMode === 'keychain' && body.holeMode !== 'with-hole' && body.holeMode !== 'without-hole') return jsonError('穴モードが不正です');
+  if (productMode === 'stand' && body.shapeMode !== 'simple' && body.shapeMode !== 'stable') return jsonError('アクスタ底面タイプが不正です');
 
   try {
     const fileBaseName = sanitizeFileName(body.fileName);
     const artworkPng = parsePngDataUrl(body.artworkDataUrl);
     const artwork = decodePngAlpha(artworkPng);
     if (artwork.width !== body.width || artwork.height !== body.height) throw new Error('イラストPNGのサイズが不正です');
-    const cutPath = buildServerCutPath(artwork, body.holeMode, resolveAcrylicGenerationOptions(body.generationOptions));
+    const generationOptions = resolveAcrylicGenerationOptions(body.generationOptions);
     const debug = body.debug === true;
+
+    if (productMode === 'stand') {
+      const standCutPaths = buildStandCutPath(artwork, body.shapeMode as StandMode, generationOptions);
+      if (debug) {
+        const svg = buildStandDebugSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, standCutPaths);
+        return new NextResponse(svg, {
+          headers: {
+            'Content-Type': 'image/svg+xml; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${fileBaseName}.svg"`,
+            'Cache-Control': 'no-store',
+          },
+        });
+      }
+
+      const illustrationSvg = buildCutPathOnlySvg(`${fileBaseName}-illustration-cut`, body.width, body.height, standCutPaths.illustrationCutPath);
+      const baseSvg = buildStandBaseCutPathOnlySvg(fileBaseName, standCutPaths);
+      const zip = createZip([
+        { name: `${fileBaseName}.png`, data: artworkPng },
+        { name: `${fileBaseName}-illustration-cut.svg`, data: Buffer.from(illustrationSvg, 'utf8') },
+        { name: `${fileBaseName}-base-cut.svg`, data: Buffer.from(baseSvg, 'utf8') },
+      ]);
+
+      return new NextResponse(zip, {
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="${fileBaseName}.zip"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
+    const cutPath = buildServerCutPath(artwork, body.holeMode as HoleMode, generationOptions);
 
     if (debug) {
       const svg = buildSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, cutPath);

@@ -19,6 +19,8 @@ const productCases = [
 const exportCases = [
   { productMode: 'keychain', shapeMode: 'with-hole', holeMode: 'with-hole' },
   { productMode: 'keychain', shapeMode: 'without-hole', holeMode: 'without-hole' },
+  { productMode: 'stand', shapeMode: 'simple' },
+  { productMode: 'stand', shapeMode: 'stable' },
 ];
 
 const defaultGenerationOptions = {
@@ -167,7 +169,9 @@ async function buildArtifacts(fileName) {
       width: preview.width,
       height: preview.height,
       artworkDataUrl: preview.originalArtworkSrc,
+      productMode: testCase.productMode,
       holeMode: testCase.holeMode,
+      shapeMode: testCase.shapeMode,
       debug: true,
       generationOptions: defaultGenerationOptions,
     });

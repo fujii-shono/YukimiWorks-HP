@@ -1070,22 +1070,25 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   };
 
   const exportOrderFiles = async () => {
-    if (!preview || isExporting || productMode !== 'keychain') return;
+    if (!preview || isExporting || (!isDemo && productMode !== 'keychain')) return;
     setIsExporting(true);
     setStatus('SVGを作成中です');
     try {
       const fileBaseName = getExportFileBaseName(preview.fileName);
+      const exportFileBaseName = productMode === 'stand' ? `${fileBaseName}-stand-${standMode}` : fileBaseName;
       const response = await fetch('/api/acrylic/export', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          fileName: fileBaseName,
+          fileName: exportFileBaseName,
           width: preview.width,
           height: preview.height,
           artworkDataUrl: preview.originalArtworkSrc,
-          holeMode,
+          productMode,
+          holeMode: productMode === 'keychain' ? holeMode : undefined,
+          shapeMode: productMode === 'stand' ? standMode : undefined,
           debug: isDemo ? true : EXPORT_DEBUG_SVG,
           generationOptions: isDemo ? withFixedPreviewOptions(generationOptions) : DEFAULT_ACRYLIC_GENERATION_OPTIONS,
         }),
@@ -1097,7 +1100,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       }
 
       const blob = await response.blob();
-      downloadBlob(blob, `${fileBaseName}${isDemo || EXPORT_DEBUG_SVG ? '.svg' : '.zip'}`);
+      downloadBlob(blob, `${exportFileBaseName}${isDemo || EXPORT_DEBUG_SVG ? '.svg' : '.zip'}`);
       setStatus(isDemo || EXPORT_DEBUG_SVG ? 'デバッグ用SVGを書き出しました' : '発注用SVGと元画像をZIPで書き出しました');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'SVGを作成できませんでした');
@@ -1688,7 +1691,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
             {productMode === 'stand' ? '台座・ツメ変更' : '穴の位置・余白変更'}
           </button>
         )}
-        {preview && productMode === 'keychain' ? (
+        {preview && (productMode === 'keychain' || isDemo) ? (
           <button type="button" className="acrylic-file-button" disabled={isProcessing || isExporting} onClick={() => void exportOrderFiles()}>
             {isExporting ? '作成中' : isDemo ? 'SVG生成' : 'SVGを書き出す'}
           </button>

@@ -10,6 +10,7 @@ export type AcrylicKeychainGenerationOptions = {
 
 export type AcrylicStandGenerationOptions = {
   baseWidthPx: number | null;
+  baseHeightPx: number | null;
   baseWidthRatioPercent: number;
   baseHeightRatioPercent: number;
   baseMinHeight: number;
@@ -39,6 +40,7 @@ export const DEFAULT_ACRYLIC_GENERATION_OPTIONS: AcrylicGenerationOptions = {
   },
   stand: {
     baseWidthPx: null,
+    baseHeightPx: 18,
     baseWidthRatioPercent: 100,
     baseHeightRatioPercent: 22,
     baseMinHeight: 18,
@@ -94,6 +96,7 @@ export function resolveAcrylicGenerationOptions(value: unknown): AcrylicGenerati
     },
     stand: {
       baseWidthPx: nullableClampedNumberOrDefault(stand.baseWidthPx, defaults.stand.baseWidthPx, 1, 2000),
+      baseHeightPx: nullableClampedNumberOrDefault(stand.baseHeightPx, defaults.stand.baseHeightPx, 1, 480),
       baseWidthRatioPercent: clamp(finiteNumberOrDefault(stand.baseWidthRatioPercent, defaults.stand.baseWidthRatioPercent), 1, 300),
       baseHeightRatioPercent: clamp(finiteNumberOrDefault(stand.baseHeightRatioPercent, defaults.stand.baseHeightRatioPercent), 1, 200),
       baseMinHeight: clamp(finiteNumberOrDefault(stand.baseMinHeight, defaults.stand.baseMinHeight), 1, 480),

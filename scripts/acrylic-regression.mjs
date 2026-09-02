@@ -33,6 +33,7 @@ const defaultGenerationOptions = {
   },
   stand: {
     baseWidthPx: null,
+    baseHeightPx: 18,
     baseWidthRatioPercent: 100,
     baseHeightRatioPercent: 22,
     baseMinHeight: 18,

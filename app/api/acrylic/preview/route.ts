@@ -1072,7 +1072,24 @@ function buildPreviewLayers(
     productMode === 'stand'
       ? Math.max(generationOptions.stand.baseMinHeight, Math.round(bounds.width * (generationOptions.stand.baseHeightRatioPercent / 100)))
       : 0;
-  const standBaseDepthOffset = productMode === 'stand' ? Math.max(1, Math.round(standBaseHeight * generationOptions.stand.baseDepthOffsetRatio)) : 0;
+  const standBaseDepthOffset =
+    productMode === 'stand'
+      ? Math.max(
+          1,
+          Math.round(
+            generationOptions.stand.baseHeightPx ??
+              standBaseHeight * generationOptions.stand.baseDepthOffsetRatio,
+          ),
+        )
+      : 0;
+  const standClawLengthForCanvas =
+    productMode === 'stand'
+      ? generationOptions.stand.clawLengthPx !== null
+        ? Math.max(1, Math.round(generationOptions.stand.clawLengthPx))
+        : generationOptions.stand.clawLengthRatio !== null
+          ? Math.max(1, Math.round(bounds.height * generationOptions.stand.clawLengthRatio))
+          : standBaseDepthOffset
+      : 0;
   const contentWidth = Math.max(bounds.width, standBaseWidth);
   const width = contentWidth + padding * 2;
   const imageX = padding + Math.round((contentWidth - bounds.width) / 2) - bounds.minX;
@@ -1086,7 +1103,7 @@ function buildPreviewLayers(
   const standBaseBottomY = estimatedStandBaseY + standBaseHeight + standBaseDepthOffset;
   const standShapeExtraBottomY =
     productMode === 'stand'
-      ? padding + topLoopSpace + bounds.height + Math.ceil(metrics.clearRadius) + standBaseDepthOffset
+      ? padding + topLoopSpace + bounds.height + Math.ceil(metrics.clearRadius) + Math.max(standBaseDepthOffset, standClawLengthForCanvas)
       : 0;
   const height =
     productMode === 'stand'

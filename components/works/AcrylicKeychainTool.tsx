@@ -126,7 +126,8 @@ const STAND_CYLINDER_SIDE_PANELS = Array.from({ length: STAND_CYLINDER_SIDE_SEGM
   angle: (index / STAND_CYLINDER_SIDE_SEGMENTS) * 360,
   width: (Math.PI * 100) / STAND_CYLINDER_SIDE_SEGMENTS,
 }));
-const SHOW_STAND_BASE_SVG = false;
+const SHOW_STAND_BASE_SVG = true;
+const SHOW_STAND_CSS_CIRCLE = false;
 const STAND_BASE_SVG_VIEW_WIDTH = 1000;
 const STAND_BASE_SVG_VIEW_HEIGHT = 300;
 const STAND_BASE_SVG_VIEW_BOX = `0 0 ${STAND_BASE_SVG_VIEW_WIDTH} ${STAND_BASE_SVG_VIEW_HEIGHT}`;
@@ -135,7 +136,7 @@ const STAND_BASE_SVG_RIGHT = 966;
 const STAND_BASE_SVG_TOP_CENTER_Y = 118;
 const STAND_BASE_SVG_TOP_HEIGHT = 130;
 const STAND_BASE_SVG_SAMPLE_COUNT = 48;
-const STAND_BASE_SVG_TILT_DEGREES = 78;
+const STAND_BASE_SVG_TILT_DEGREES = 85;
 const STAND_BASE_SVG_PERSPECTIVE = 2200;
 const STAND_BASE_SVG_THICKNESS_Y = 26;
 const STAND_DEFAULT_CLAW_WIDTH_PX = 48;
@@ -168,7 +169,14 @@ function offsetSvgPoints(points: SvgPoint[], offsetY: number) {
   return points.map((point) => ({ x: point.x, y: point.y + offsetY }));
 }
 
-function createStandBaseSvgGeometry() {
+function getStandBaseSvgSideThicknessY(preview: PreviewState) {
+  if (preview.productMode !== 'stand' || !preview.standBaseFrame) return STAND_BASE_SVG_THICKNESS_Y;
+
+  const baseHeight = Math.max(1, preview.standBaseFrame.height);
+  return Math.max(1, (preview.standBaseFrame.depthOffset / baseHeight) * STAND_BASE_SVG_TOP_HEIGHT);
+}
+
+function createStandBaseSvgGeometry(sideThicknessY = STAND_BASE_SVG_THICKNESS_Y) {
   const radius = 1;
   const tilt = (STAND_BASE_SVG_TILT_DEGREES * Math.PI) / 180;
   const projectedPoints: SvgPoint[] = [];
@@ -191,15 +199,15 @@ function createStandBaseSvgGeometry() {
   const minY = Math.min(...projectedPoints.map((point) => point.y));
   const maxY = Math.max(...projectedPoints.map((point) => point.y));
   const centerY = STAND_BASE_SVG_TOP_CENTER_Y;
-  const topY = centerY - STAND_BASE_SVG_TOP_HEIGHT / 2;
   const widthScale = (STAND_BASE_SVG_RIGHT - STAND_BASE_SVG_LEFT) / (maxX - minX);
-  const heightScale = STAND_BASE_SVG_TOP_HEIGHT / (maxY - minY);
+  const projectedHeight = (maxY - minY) * widthScale;
+  const topY = centerY - projectedHeight / 2;
 
   const topPoints = projectedPoints.map((point) => ({
     x: STAND_BASE_SVG_LEFT + (point.x - minX) * widthScale,
-    y: topY + (point.y - minY) * heightScale,
+    y: topY + (point.y - minY) * widthScale,
   }));
-  const bottomPoints = offsetSvgPoints(topPoints, STAND_BASE_SVG_THICKNESS_Y);
+  const bottomPoints = offsetSvgPoints(topPoints, sideThicknessY);
   const lowerTopPoints = topPoints.slice(0, STAND_BASE_SVG_SAMPLE_COUNT / 2 + 1);
   const lowerBottomPoints = bottomPoints.slice(0, STAND_BASE_SVG_SAMPLE_COUNT / 2 + 1).reverse();
   const rightPoint = topPoints[0];
@@ -215,8 +223,6 @@ function createStandBaseSvgGeometry() {
     sideRightPath: pointsToSvgPath([rightPoint, bottomRightPoint]),
   };
 }
-
-const STAND_BASE_SVG_GEOMETRY = createStandBaseSvgGeometry();
 
 function drawImageSource(context: CanvasRenderingContext2D, src: string) {
   return new Promise<void>((resolve, reject) => {
@@ -476,6 +482,7 @@ function withFixedPreviewOptions(options: AcrylicGenerationOptions): AcrylicGene
     },
     stand: {
       ...options.stand,
+      baseHeightPx: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseHeightPx,
       baseHeightRatioPercent: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseHeightRatioPercent,
       baseMinHeight: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseMinHeight,
       baseDepthOffsetRatio: DEFAULT_ACRYLIC_GENERATION_OPTIONS.stand.baseDepthOffsetRatio,
@@ -624,6 +631,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewCache, setPreviewCache] = useState<PreviewCache>({});
   const [generationOptions, setGenerationOptions] = useState<AcrylicGenerationOptions>(() => createInitialGenerationOptions(isDemo));
+  const generationOptionsRef = useRef(generationOptions);
   const [productMode, setProductMode] = useState<ProductMode>('keychain');
   const [holeMode, setHoleMode] = useState<HoleMode>('with-hole');
   const [standMode, setStandMode] = useState<StandMode>('simple');
@@ -652,19 +660,29 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     preview && preview.productMode === 'stand' && preview.standBaseFrame ? createStandPreviewStyles(preview, getPreviewStageSize()) : null;
   const visibleStandBaseStyle = preview?.productMode === 'stand' ? (immediateStandPreviewStyles?.base ?? standBaseStyle ?? null) : null;
   const visibleStandCircleStyle = preview?.productMode === 'stand' ? (immediateStandPreviewStyles?.circle ?? standCircleStyle ?? null) : null;
+  const visibleStandBaseGeometry =
+    preview?.productMode === 'stand' ? createStandBaseSvgGeometry(getStandBaseSvgSideThicknessY(preview)) : null;
   const sourceArtworkMetricScale = sourceArtworkBounds
     ? Math.max(sourceArtworkBounds.width, sourceArtworkBounds.height) / REFERENCE_ARTWORK_SIZE
     : 1;
   const rememberAutoStandClawWidth = (nextPreview: PreviewState, usedOptions: AcrylicGenerationOptions) => {
     if (!isDemo || nextPreview.productMode !== 'stand' || usedOptions.stand.clawWidthPx !== null || !nextPreview.standClawFrame) return;
-    setGenerationOptions((current) => ({
-      ...current,
-      stand: {
-        ...current.stand,
-        clawWidthPx: nextPreview.standClawFrame?.width ?? current.stand.clawWidthPx,
-      },
-    }));
+    setGenerationOptions((current) => {
+      const next = {
+        ...current,
+        stand: {
+          ...current.stand,
+          clawWidthPx: nextPreview.standClawFrame?.width ?? current.stand.clawWidthPx,
+        },
+      };
+      generationOptionsRef.current = next;
+      return next;
+    });
   };
+
+  useEffect(() => {
+    generationOptionsRef.current = generationOptions;
+  }, [generationOptions]);
 
   useEffect(() => {
     if (!preview) {
@@ -969,6 +987,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const loadSample = async (sample: AcrylicDemoSample) => {
     setActiveSampleSrc(sample.src);
     const initialOptions = createInitialGenerationOptions(isDemo);
+    generationOptionsRef.current = initialOptions;
     setGenerationOptions(initialOptions);
     try {
       const file = await sampleToFile(sample);
@@ -981,7 +1000,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     }
   };
 
-  const regeneratePreview = async (options: AcrylicGenerationOptions = generationOptions) => {
+  const regeneratePreview = async (options: AcrylicGenerationOptions = generationOptionsRef.current) => {
     if (!selectedFile) return;
     const resolvedOptions = withFixedPreviewOptions(options);
     const nextProductMode = productMode;
@@ -1020,26 +1039,34 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     key: Key,
     value: AcrylicGenerationOptions['keychain'][Key],
   ) => {
-    setGenerationOptions((current) => ({
-      ...current,
-      keychain: {
-        ...current.keychain,
-        [key]: value,
-      },
-    }));
+    setGenerationOptions((current) => {
+      const next = {
+        ...current,
+        keychain: {
+          ...current.keychain,
+          [key]: value,
+        },
+      };
+      generationOptionsRef.current = next;
+      return next;
+    });
   };
 
   const updateStandOption = <Key extends keyof AcrylicGenerationOptions['stand']>(
     key: Key,
     value: AcrylicGenerationOptions['stand'][Key],
   ) => {
-    setGenerationOptions((current) => ({
-      ...current,
-      stand: {
-        ...current.stand,
-        [key]: value,
-      },
-    }));
+    setGenerationOptions((current) => {
+      const next = {
+        ...current,
+        stand: {
+          ...current.stand,
+          [key]: value,
+        },
+      };
+      generationOptionsRef.current = next;
+      return next;
+    });
   };
 
   const exportOrderFiles = async () => {
@@ -1450,7 +1477,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
               setIsRotating(false);
             }}
           >
-            {preview.productMode === 'stand' && visibleStandCircleStyle ? (
+            {SHOW_STAND_CSS_CIRCLE && preview.productMode === 'stand' && visibleStandCircleStyle ? (
               <div
                 className="acrylic-preview-object acrylic-preview-stand-circle-object acrylic-preview-stand-circle-object-back"
                 style={{
@@ -1486,7 +1513,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
             ) : null}
             {renderedAcrylicSrc && renderedEdgeSrc && renderedSideSrc && renderedArtworkSrc && renderedBackArtworkSrc && renderedHighlightSrc ? (
               <>
-                {SHOW_STAND_BASE_SVG && preview.productMode === 'stand' && visibleStandBaseStyle ? (
+                {SHOW_STAND_BASE_SVG && preview.productMode === 'stand' && visibleStandBaseStyle && visibleStandBaseGeometry ? (
                   <div className="acrylic-preview-stand-base" style={visibleStandBaseStyle} aria-hidden="true">
                     <svg className="acrylic-preview-stand-base-svg" viewBox={STAND_BASE_SVG_VIEW_BOX} preserveAspectRatio="none">
                       <defs>
@@ -1496,10 +1523,10 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                           <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
                         </linearGradient>
                         <clipPath id="acrylicStandBaseSideClip">
-                          <path d={STAND_BASE_SVG_GEOMETRY.sideFillPath} />
+                          <path d={visibleStandBaseGeometry.sideFillPath} />
                         </clipPath>
                       </defs>
-                      <path className="acrylic-preview-stand-base-side-fill" d={STAND_BASE_SVG_GEOMETRY.sideFillPath} />
+                      <path className="acrylic-preview-stand-base-side-fill" d={visibleStandBaseGeometry.sideFillPath} />
                       <rect
                         className="acrylic-preview-stand-base-side-highlight"
                         x={STAND_BASE_SIDE_HIGHLIGHT_X}
@@ -1508,10 +1535,10 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                         height={STAND_BASE_SVG_VIEW_HEIGHT}
                         clipPath="url(#acrylicStandBaseSideClip)"
                       />
-                      <path className="acrylic-preview-stand-base-bottom" d={STAND_BASE_SVG_GEOMETRY.bottomPath} />
-                      <path className="acrylic-preview-stand-base-side-left" d={STAND_BASE_SVG_GEOMETRY.sideLeftPath} />
-                      <path className="acrylic-preview-stand-base-side-right" d={STAND_BASE_SVG_GEOMETRY.sideRightPath} />
-                      <path className="acrylic-preview-stand-base-top" d={STAND_BASE_SVG_GEOMETRY.topPath} />
+                      <path className="acrylic-preview-stand-base-bottom" d={visibleStandBaseGeometry.bottomPath} />
+                      <path className="acrylic-preview-stand-base-side-left" d={visibleStandBaseGeometry.sideLeftPath} />
+                      <path className="acrylic-preview-stand-base-side-right" d={visibleStandBaseGeometry.sideRightPath} />
+                      <path className="acrylic-preview-stand-base-top" d={visibleStandBaseGeometry.topPath} />
                     </svg>
                   </div>
                 ) : null}
@@ -1563,7 +1590,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                 </div>
               </>
             ) : null}
-            {preview.productMode === 'stand' && visibleStandCircleStyle ? (
+            {SHOW_STAND_CSS_CIRCLE && preview.productMode === 'stand' && visibleStandCircleStyle ? (
               <div
                 className="acrylic-preview-object acrylic-preview-stand-circle-object acrylic-preview-stand-circle-object-front"
                 style={{
@@ -1761,7 +1788,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                       onChange={(event) => updateKeychainOption('clearRadius', Number(event.currentTarget.value))}
                     />
                   </label>
-                  <label className="acrylic-options-field">
+                  <label className="acrylic-options-field acrylic-options-field-combo">
                     <span>台座の横幅</span>
                     <input
                       type="range"
@@ -1771,9 +1798,15 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                       value={Math.round(generationOptions.stand.baseWidthPx ?? STAND_DEFAULT_BASE_WIDTH_PX)}
                       onChange={(event) => updateStandOption('baseWidthPx', Number(event.currentTarget.value))}
                     />
-                    <output>{Math.round(generationOptions.stand.baseWidthPx ?? STAND_DEFAULT_BASE_WIDTH_PX)}px</output>
+                    <input
+                      type="number"
+                      min="1"
+                      max="2000"
+                      value={Math.round(generationOptions.stand.baseWidthPx ?? STAND_DEFAULT_BASE_WIDTH_PX)}
+                      onChange={(event) => updateStandOption('baseWidthPx', Number(event.currentTarget.value))}
+                    />
                   </label>
-                  <label className="acrylic-options-field">
+                  <label className="acrylic-options-field acrylic-options-field-combo">
                     <span>ツメの横幅</span>
                     <input
                       type="range"
@@ -1783,13 +1816,27 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                       value={Math.round(generationOptions.stand.clawWidthPx ?? STAND_DEFAULT_CLAW_WIDTH_PX)}
                       onChange={(event) => updateStandOption('clawWidthPx', Number(event.currentTarget.value))}
                     />
-                    <output>{Math.round(generationOptions.stand.clawWidthPx ?? STAND_DEFAULT_CLAW_WIDTH_PX)}px</output>
+                    <input
+                      type="number"
+                      min="1"
+                      max="480"
+                      value={Math.round(generationOptions.stand.clawWidthPx ?? STAND_DEFAULT_CLAW_WIDTH_PX)}
+                      onChange={(event) => updateStandOption('clawWidthPx', Number(event.currentTarget.value))}
+                    />
                   </label>
                 </>
               )}
             </div>
             <div className="acrylic-options-actions">
-              <button type="button" className="acrylic-file-button" onClick={() => setGenerationOptions(createInitialGenerationOptions(isDemo))}>
+              <button
+                type="button"
+                className="acrylic-file-button"
+                onClick={() => {
+                  const initialOptions = createInitialGenerationOptions(isDemo);
+                  generationOptionsRef.current = initialOptions;
+                  setGenerationOptions(initialOptions);
+                }}
+              >
                 初期値
               </button>
               <button type="button" className="acrylic-file-button" onClick={() => setIsOptionsOpen(false)}>

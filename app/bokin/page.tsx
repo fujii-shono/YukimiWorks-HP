@@ -65,7 +65,7 @@ export default function BokinPage() {
           おみくじを提供しております。
         </p>
         <p>小さな運試しとしてお楽しみください。</p>
-        <p className="bokin-donation-note">
+        {/* <p className="bokin-donation-note">
           ※支援金の10%は熊本震災の募金に使用します
           <br />
           （８月末までにいただいたご支援が対象）
@@ -73,7 +73,7 @@ export default function BokinPage() {
           <Link href="https://donation.yahoo.co.jp/detail/925104" target="_blank" rel="noopener noreferrer">
             https://donation.yahoo.co.jp/detail/925104
           </Link>
-        </p>
+        </p> */}
         <BokinSupportForm />
       </RetroPanel>
     </SiteFrame>

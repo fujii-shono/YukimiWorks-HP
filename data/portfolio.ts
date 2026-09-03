@@ -53,6 +53,22 @@ export const portfolioItems: PortfolioItem[] = [
   {
     id: 'to-eda',
     title: '小日向えだ様キービジュアル',
+    href: '/portfolio/to-applechan',
+    category: 'illustration',
+    content: {
+      kind: 'image',  
+      src: '/portfolio/skeb/to-applechan.png',
+      alt: '70centsApple様ご依頼'
+    },
+    description: '70centsApple様からのご依頼でした！ありがとうございました。',
+    date: '2026-09-03',
+    year: 2026,
+    tags: ['イラスト'],
+    featured: true,
+  },
+  {
+    id: 'to-eda',
+    title: '小日向えだ様キービジュアル',
     href: '/portfolio/to-eda',
     category: 'illustration',
     content: {

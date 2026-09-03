@@ -51,8 +51,8 @@ export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {
 
 export const portfolioItems: PortfolioItem[] = [
   {
-    id: 'to-eda',
-    title: '小日向えだ様キービジュアル',
+    id: 'to-applechan',
+    title: '🍎',
     href: '/portfolio/to-applechan',
     category: 'illustration',
     content: {

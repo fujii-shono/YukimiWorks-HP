@@ -113,6 +113,7 @@ const BACK_SIDE_SIDE_VISIBLE_START = 0.42;
 const SURFACE_GLOSS_OPACITY = 0.46;
 const REFERENCE_ARTWORK_SIZE = 500;
 const EXPORT_DEBUG_SVG = false;
+const SHOW_AI_GENERATION_BUTTON = false;
 const ACRYLIC_PREVIEW_FRONT_Z = 6;
 const ACRYLIC_PREVIEW_BACK_Z = -4;
 const ACRYLIC_SIDE_LAYER_COUNT = 6;
@@ -1696,7 +1697,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
             {isExporting ? '作成中' : isDemo ? 'SVG生成' : 'SVGを書き出す'}
           </button>
         ) : null}
-        {isDemo && preview ? (
+        {SHOW_AI_GENERATION_BUTTON && isDemo && preview ? (
           <button type="button" className="acrylic-file-button" disabled={isProcessing || isAiGenerating} onClick={() => void requestAiGeneration()}>
             {isAiGenerating ? '送信中' : 'AI生成'}
           </button>

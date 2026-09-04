@@ -80,6 +80,7 @@ const REFERENCE_ARTWORK_SIZE = 500;
 const BASE_HIGHLIGHT_RADIUS = 1;
 const BASE_INTERNAL_GAP_CLOSE_RADIUS = 14;
 const HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER = 1.18;
+const PREVIEW_OUTER_BAND_SAFETY_PX = 2;
 const ARTWORK_MULTIPLY = 242 / 255;
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
 const ACRYLIC_SIDE_FACE_COLOR: [number, number, number, number] = [116, 122, 138, 33];
@@ -822,6 +823,54 @@ function subtractMask(outerMask: Uint8Array, innerMask: Uint8Array, width: numbe
   return output;
 }
 
+function intersectMask(leftMask: Uint8Array, rightMask: Uint8Array, width: number, height: number) {
+  const output = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (leftMask[index] && rightMask[index]) output[index] = 1;
+  }
+  return output;
+}
+
+// 近接した余白同士が接続した箇所では、外周から見えない境界を縁として描画しない。
+function keepOuterMaskBand(mask: Uint8Array, width: number, height: number, bandWidth: number) {
+  const filledMask = fillEnclosedMaskHoles(mask, width, height);
+  const exteriorMask = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (!filledMask[index]) exteriorMask[index] = 1;
+  }
+
+  const exteriorBand = dilateMask(exteriorMask, width, height, Math.max(1, Math.ceil(bandWidth)));
+  const output = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    if (mask[index] && exteriorBand[index]) output[index] = 1;
+  }
+  return output;
+}
+
+function restoreMaskInsideCircle(
+  targetMask: Uint8Array,
+  sourceMask: Uint8Array,
+  width: number,
+  height: number,
+  centerX: number,
+  centerY: number,
+  radius: number,
+) {
+  const roundedRadius = Math.max(0, Math.ceil(radius));
+  const squaredRadius = roundedRadius * roundedRadius;
+  for (let y = Math.floor(centerY - roundedRadius); y <= Math.ceil(centerY + roundedRadius); y += 1) {
+    if (y < 0 || y >= height) continue;
+    for (let x = Math.floor(centerX - roundedRadius); x <= Math.ceil(centerX + roundedRadius); x += 1) {
+      if (x < 0 || x >= width) continue;
+      const offsetX = x - centerX;
+      const offsetY = y - centerY;
+      if (offsetX * offsetX + offsetY * offsetY > squaredRadius) continue;
+      const index = y * width + x;
+      targetMask[index] = sourceMask[index];
+    }
+  }
+}
+
 function buildStandClawLayerMask(
   frame: StandClawFrame,
   width: number,
@@ -1270,11 +1319,49 @@ function buildPreviewLayers(
     paintCircleOnMask(innerShineMask, width, height, keychainShape.hole.centerX, keychainShape.hole.centerY, holeTransparentRadius, 0);
   }
 
-  const acrylic = buildAcrylicLayer(width, height, clearMask, highlightMask, innerShineMask);
+  const visibleHighlightMask = keepOuterMaskBand(
+    highlightMask,
+    width,
+    height,
+    metrics.highlightRadius + metrics.innerShineWidth + PREVIEW_OUTER_BAND_SAFETY_PX,
+  );
+  const visibleEdgeMask = keepOuterMaskBand(
+    edgeMask,
+    width,
+    height,
+    metrics.edgeShadowWidth + PREVIEW_OUTER_BAND_SAFETY_PX,
+  );
+  if (keychainShape) {
+    const protectedHoleRadius = keychainShape.hole.radius + metrics.edgeShadowWidth + PREVIEW_OUTER_BAND_SAFETY_PX;
+    restoreMaskInsideCircle(
+      visibleHighlightMask,
+      highlightMask,
+      width,
+      height,
+      keychainShape.hole.centerX,
+      keychainShape.hole.centerY,
+      protectedHoleRadius,
+    );
+    restoreMaskInsideCircle(
+      visibleEdgeMask,
+      edgeMask,
+      width,
+      height,
+      keychainShape.hole.centerX,
+      keychainShape.hole.centerY,
+      protectedHoleRadius,
+    );
+  }
+
+  const acrylic = buildAcrylicLayer(width, height, clearMask, visibleHighlightMask, innerShineMask);
   compositeStandContactLine(acrylic, standShape?.contactLine ?? null, bounds.width, bounds.height, metrics.clearRadius);
-  const edge = buildEdgeLayer(width, height, clearMask, edgeMask);
+  const edge = buildEdgeLayer(width, height, clearMask, visibleEdgeMask);
   compositeStandClawFill(edge, standClawFillMask);
-  const side = layerFromMask(width, height, subtractMask(clearMask, innerShineMask, width, height), ACRYLIC_SIDE_FACE_COLOR);
+  const unfilteredSideMask = subtractMask(clearMask, innerShineMask, width, height);
+  const sideMask = productMode === 'keychain'
+    ? intersectMask(unfilteredSideMask, visibleHighlightMask, width, height)
+    : unfilteredSideMask;
+  const side = layerFromMask(width, height, sideMask, ACRYLIC_SIDE_FACE_COLOR);
   const back = layerFromMask(width, height, gapClosedBaseMask, BACK_FACE_MULTIPLY_COLOR);
   const originalArtwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
   const artwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };

@@ -2,6 +2,16 @@ import type { Metadata } from 'next';
 import { AcrylicKeychainTool, type AcrylicDemoSample } from '@/components/works/AcrylicKeychainTool';
 
 const demoSamples: AcrylicDemoSample[] = [
+    {
+    label: 'Sample 02',
+    src: '/works/acrylic-keychain-tool-demo/samples/sample-02.png',
+    fileName: 'sample-02.png',
+  },
+  {
+    label: 'Sample 01',
+    src: '/works/acrylic-keychain-tool-demo/samples/sample-01.png',
+    fileName: 'sample-01.png',
+  },
   {
     label: 'Sample 670',
     src: '/works/acrylic-keychain-tool-demo/samples/sample-670.png',

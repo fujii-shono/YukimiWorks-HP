@@ -1326,18 +1326,16 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
 
   return (
     <div className="acrylic-tool">
-      {!isDemo ? (
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png"
-          className="visually-hidden"
-          onChange={(event) => {
-            void loadFile(event.target.files?.[0]);
-            event.currentTarget.value = '';
-          }}
-        />
-      ) : null}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png"
+        className="visually-hidden"
+        onChange={(event) => {
+          void loadFile(event.target.files?.[0]);
+          event.currentTarget.value = '';
+        }}
+      />
       {isDemo ? (
         <div className="acrylic-demo-samples" aria-label="サンプル画像">
           {samples.map((sample) => (
@@ -1386,12 +1384,12 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       </div>
       <div
         className={cn('acrylic-preview-wrap', preview && 'has-preview', isDragging && 'is-dragging')}
-        role={!isDemo && !preview ? 'button' : undefined}
-        tabIndex={!isDemo && !preview ? 0 : undefined}
+        role={!preview ? 'button' : undefined}
+        tabIndex={!preview ? 0 : undefined}
         aria-live="polite"
-        onClick={!isDemo && !preview ? () => inputRef.current?.click() : undefined}
+        onClick={!preview ? () => inputRef.current?.click() : undefined}
         onKeyDown={
-          isDemo || preview
+          preview
             ? undefined
             : (event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -1401,37 +1399,29 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
               }
         }
         onDragEnter={
-          isDemo
-            ? undefined
-            : (event) => {
-                event.preventDefault();
-                setIsDragging(true);
-              }
+          (event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }
         }
         onDragOver={
-          isDemo
-            ? undefined
-            : (event) => {
-                event.preventDefault();
-                setIsDragging(true);
-              }
+          (event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }
         }
         onDragLeave={
-          isDemo
-            ? undefined
-            : (event) => {
-                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-                setIsDragging(false);
-              }
+          (event) => {
+            if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+            setIsDragging(false);
+          }
         }
         onDrop={
-          isDemo
-            ? undefined
-            : (event) => {
-                event.preventDefault();
-                setIsDragging(false);
-                void loadFile(event.dataTransfer.files[0]);
-              }
+          (event) => {
+            event.preventDefault();
+            setIsDragging(false);
+            void loadFile(event.dataTransfer.files[0]);
+          }
         }
       >
         {preview ? (
@@ -1683,15 +1673,14 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
         )}
       </div>
       <div className="acrylic-tool-actions">
-        {!isDemo ? (
-          <button type="button" className="acrylic-file-button" onClick={() => inputRef.current?.click()}>
-            {preview ? '新しいPNGを選択' : 'PNGを選択'}
-          </button>
-        ) : (
+        <button type="button" className="acrylic-file-button" disabled={isProcessing} onClick={() => inputRef.current?.click()}>
+          {preview ? '新しいPNGを選択' : 'PNGを選択'}
+        </button>
+        {isDemo ? (
           <button type="button" className="acrylic-file-button" disabled={!preview || isProcessing} onClick={() => setIsOptionsOpen(true)}>
             {productMode === 'stand' ? '台座・ツメ変更' : '穴の位置・余白変更'}
           </button>
-        )}
+        ) : null}
         {preview && (productMode === 'keychain' || isDemo) ? (
           <button type="button" className="acrylic-file-button" disabled={isProcessing || isExporting} onClick={() => void exportOrderFiles()}>
             {isExporting ? '作成中' : isDemo ? 'SVG生成' : 'SVGを書き出す'}

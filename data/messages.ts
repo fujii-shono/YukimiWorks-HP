@@ -16,6 +16,18 @@ export type MessagePost = {
 };
 
 export const messagePosts: readonly MessagePost[] = [
+    {
+    icon: {
+      src: '/logo/yukimi_works_favicon.png',
+      alt: 'YukimiWorks',
+    },
+    image: {
+      src: '/message/20260909.png',
+      alt: 'マスコット',
+    },
+    publishedAt: '2026-09-09 18:17',
+    body: '作成中会計アプリのマスコットたちです！',
+  },
   {
     icon: {
       src: '/logo/yukimi_works_favicon.png',

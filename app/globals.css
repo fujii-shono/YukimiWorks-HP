@@ -3084,6 +3084,75 @@ html:has(.acrylic-demo-page) body {
   cursor: grabbing;
 }
 
+.can-badge-tool {
+  display: grid;
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.can-badge-tool-intro {
+  margin: 0 0 14px;
+  color: var(--site-text-muted);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.can-badge-preview-wrap {
+  display: grid;
+  place-items: center;
+  min-height: min(56vh, 600px);
+  padding: 24px;
+  overflow: hidden;
+  background-image: url('/works/Acrylic/bg.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  border: 1px solid color-mix(in srgb, var(--site-border) 62%, #ffffff);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+
+.can-badge-preview {
+  position: relative;
+  width: min(100%, 560px);
+  aspect-ratio: 1;
+  cursor: grab;
+  perspective: 900px;
+  touch-action: none;
+}
+
+.can-badge-preview.is-rotating {
+  cursor: grabbing;
+}
+
+.can-badge-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.can-badge-webgl-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  color: var(--site-text);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+@media (max-width: 640px) {
+  .can-badge-preview-wrap {
+    min-height: min(58vh, 480px);
+    padding: 20px;
+  }
+
+  .can-badge-preview {
+    width: min(100%, 400px);
+  }
+}
+
 .acrylic-preview-object {
   position: relative;
   z-index: 1;

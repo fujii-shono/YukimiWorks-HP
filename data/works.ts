@@ -33,6 +33,34 @@ export const workCategoryLabels: Record<WorkCategory, string> = {
 
 export const works: Work[] = [
   {
+    id: 'xnocount',
+    title: 'Xのいいね数を消すやつ',
+    description: 'Xのいいね数を消す拡張機能',
+    body: [
+      {
+        type: 'text',
+        value:
+          '「Xのいいね数を消すやつ」は名前の通りXのいいね数やリポスト数・フォロワー数などの表示を消す、ブラウザ拡張機能です。\n\n承認欲求を無効化し、穏やかなSNSとしてXを利用できます。',
+      },
+      {
+        type: 'link',
+        label: 'Chrome板',
+        href: 'https://chromewebstore.google.com/detail/xのいいね数を消すやつ/ggfmlifppcafahejkkbpdlopkjolegea?authuser=0&hl=ja&pli=1',
+      },
+      {
+        type: 'link',
+        label: 'iOS・Safari板',
+        href: 'https://apps.apple.com/app/sns%E3%81%AE%E3%81%84%E3%81%84%E3%81%AD%E6%95%B0%E3%82%92%E6%B6%88%E3%81%99%E3%82%84%E3%81%A4/id6808113264',
+      },
+    ],
+    category: 'apps',
+    tags: ['拡張機能'],
+    thumbnail: '/works/xnocount/hero.jpeg',
+    media: [{ type: 'image', src: '/works/xnocount/hero.jpeg', alt: 'サービス紹介' }],
+    date: '2026-09-11',
+    featured: true,
+  },
+  {
     id: 'rikuari',
     title: 'リクあり',
     description: 'クリエイターのための業務効率化ツール',

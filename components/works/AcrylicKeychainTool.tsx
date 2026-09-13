@@ -904,7 +904,11 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     };
   }, []);
 
-  const loadFile = async (file: File | undefined, options: AcrylicGenerationOptions = generationOptions) => {
+  const loadFile = async (
+    file: File | undefined,
+    options: AcrylicGenerationOptions = generationOptions,
+    sampleSrc = '',
+  ) => {
     if (!file) return;
     const resolvedOptions = withFixedPreviewOptions(options);
     const startedAt = Date.now();
@@ -913,6 +917,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     const nextCacheKey = getPreviewCacheKey(nextProductMode, nextShapeMode, resolvedOptions);
     setIsProcessing(true);
     setStatus('プレビューを作成中です');
+    setActiveSampleSrc(sampleSrc);
     setSelectedFile(file);
     setPreviewCache({});
     try {
@@ -986,14 +991,14 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   };
 
   const loadSample = async (sample: AcrylicDemoSample) => {
-    setActiveSampleSrc(sample.src);
     const initialOptions = createInitialGenerationOptions(isDemo);
     generationOptionsRef.current = initialOptions;
     setGenerationOptions(initialOptions);
     try {
       const file = await sampleToFile(sample);
-      await loadFile(file, initialOptions);
+      await loadFile(file, initialOptions, sample.src);
     } catch (error) {
+      setActiveSampleSrc('');
       setPreview(null);
       setSelectedFile(null);
       setPreviewCache({});
@@ -1073,7 +1078,8 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const exportOrderFiles = async () => {
     if (!preview || isExporting || (!isDemo && productMode !== 'keychain')) return;
     setIsExporting(true);
-    setStatus('SVGを作成中です');
+    const isDemoSample = isDemo && activeSampleSrc !== '';
+    setStatus(isDemo && !isDemoSample ? 'PNGサンプルを作成中です' : 'SVGを作成中です');
     try {
       const fileBaseName = getExportFileBaseName(preview.fileName);
       const exportFileBaseName = productMode === 'stand' ? `${fileBaseName}-stand-${standMode}` : fileBaseName;
@@ -1090,7 +1096,8 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           productMode,
           holeMode: productMode === 'keychain' ? holeMode : undefined,
           shapeMode: productMode === 'stand' ? standMode : undefined,
-          debug: isDemo ? true : EXPORT_DEBUG_SVG,
+          debug: isDemo ? undefined : EXPORT_DEBUG_SVG,
+          demoOutput: isDemo ? (isDemoSample ? 'bundle' : 'png') : undefined,
           generationOptions: isDemo ? withFixedPreviewOptions(generationOptions) : DEFAULT_ACRYLIC_GENERATION_OPTIONS,
         }),
       });
@@ -1101,10 +1108,25 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
       }
 
       const blob = await response.blob();
-      downloadBlob(blob, `${exportFileBaseName}${isDemo || EXPORT_DEBUG_SVG ? '.svg' : '.zip'}`);
-      setStatus(isDemo || EXPORT_DEBUG_SVG ? 'デバッグ用SVGを書き出しました' : '発注用SVGと元画像をZIPで書き出しました');
+      const extension = isDemo ? (isDemoSample ? '.zip' : '-preview.png') : EXPORT_DEBUG_SVG ? '.svg' : '.zip';
+      downloadBlob(blob, `${exportFileBaseName}${extension}`);
+      setStatus(
+        isDemo
+          ? isDemoSample
+            ? '確認用SVGと本番用ファイルをZIPで書き出しました'
+            : 'PNGサンプルを書き出しました'
+          : EXPORT_DEBUG_SVG
+            ? 'デバッグ用SVGを書き出しました'
+            : '発注用SVGと元画像をZIPで書き出しました',
+      );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'SVGを作成できませんでした');
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : isDemo && !isDemoSample
+            ? 'PNGサンプルを作成できませんでした'
+            : 'SVGを作成できませんでした',
+      );
     } finally {
       setIsExporting(false);
     }
@@ -1682,9 +1704,32 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           </button>
         ) : null}
         {preview && (productMode === 'keychain' || isDemo) ? (
-          <button type="button" className="acrylic-file-button" disabled={isProcessing || isExporting} onClick={() => void exportOrderFiles()}>
-            {isExporting ? '作成中' : isDemo ? 'SVG生成' : 'SVGを書き出す'}
-          </button>
+          isDemo ? (
+            <>
+              <button
+                type="button"
+                className="acrylic-file-button"
+                disabled={!activeSampleSrc || isProcessing || isExporting}
+                onClick={() => void exportOrderFiles()}
+              >
+                {isExporting && activeSampleSrc ? '作成中' : 'SVG生成'}
+              </button>
+              {!activeSampleSrc ? (
+                <button
+                  type="button"
+                  className="acrylic-file-button"
+                  disabled={isProcessing || isExporting}
+                  onClick={() => void exportOrderFiles()}
+                >
+                  {isExporting ? '作成中' : 'PNGサンプル'}
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <button type="button" className="acrylic-file-button" disabled={isProcessing || isExporting} onClick={() => void exportOrderFiles()}>
+              {isExporting ? '作成中' : 'SVGを書き出す'}
+            </button>
+          )
         ) : null}
         {SHOW_AI_GENERATION_BUTTON && isDemo && preview ? (
           <button type="button" className="acrylic-file-button" disabled={isProcessing || isAiGenerating} onClick={() => void requestAiGeneration()}>
@@ -1692,6 +1737,9 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           </button>
         ) : null}
       </div>
+      {isDemo && preview && !activeSampleSrc ? (
+        <p className="acrylic-demo-export-note">サンプル以外のファイルはsvg確認はできません</p>
+      ) : null}
       <p className="acrylic-tool-status" role="status" aria-live="polite">
         {status}
       </p>

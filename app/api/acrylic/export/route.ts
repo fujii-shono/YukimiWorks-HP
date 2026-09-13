@@ -1,5 +1,6 @@
 import { inflateSync } from 'node:zlib';
 import { NextResponse } from 'next/server';
+import sharp from 'sharp';
 import {
   DEFAULT_ACRYLIC_GENERATION_OPTIONS,
   resolveAcrylicGenerationOptions,
@@ -17,6 +18,7 @@ type AcrylicExportRequest = {
   holeMode?: unknown;
   shapeMode?: unknown;
   debug?: unknown;
+  demoOutput?: unknown;
   generationOptions?: unknown;
 };
 
@@ -3285,6 +3287,7 @@ export async function POST(request: Request) {
   const productMode: ProductMode = body.productMode === 'stand' ? 'stand' : 'keychain';
   if (productMode === 'keychain' && body.holeMode !== 'with-hole' && body.holeMode !== 'without-hole') return jsonError('穴モードが不正です');
   if (productMode === 'stand' && body.shapeMode !== 'simple' && body.shapeMode !== 'stable') return jsonError('アクスタ底面タイプが不正です');
+  if (body.demoOutput !== undefined && body.demoOutput !== 'bundle' && body.demoOutput !== 'png') return jsonError('デモ出力形式が不正です');
 
   try {
     const fileBaseName = sanitizeFileName(body.fileName);
@@ -3293,12 +3296,23 @@ export async function POST(request: Request) {
     if (artwork.width !== body.width || artwork.height !== body.height) throw new Error('イラストPNGのサイズが不正です');
     const generationOptions = resolveAcrylicGenerationOptions(body.generationOptions);
     const debug = body.debug === true;
+    const demoOutput = body.demoOutput === 'bundle' || body.demoOutput === 'png' ? body.demoOutput : null;
 
     if (productMode === 'stand') {
       const standCutPaths = buildStandCutPath(artwork, body.shapeMode as StandMode, generationOptions);
-      if (debug) {
-        const svg = buildStandDebugSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, standCutPaths);
-        return new NextResponse(svg, {
+      const previewSvg = buildStandDebugSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, standCutPaths);
+      if (demoOutput === 'png') {
+        const previewPng = await sharp(Buffer.from(previewSvg, 'utf8')).png().toBuffer();
+        return new NextResponse(previewPng, {
+          headers: {
+            'Content-Type': 'image/png',
+            'Content-Disposition': `attachment; filename="${fileBaseName}-preview.png"`,
+            'Cache-Control': 'no-store',
+          },
+        });
+      }
+      if (debug && demoOutput === null) {
+        return new NextResponse(previewSvg, {
           headers: {
             'Content-Type': 'image/svg+xml; charset=utf-8',
             'Content-Disposition': `attachment; filename="${fileBaseName}.svg"`,
@@ -3310,6 +3324,7 @@ export async function POST(request: Request) {
       const illustrationSvg = buildCutPathOnlySvg(`${fileBaseName}-illustration-cut`, body.width, body.height, standCutPaths.illustrationCutPath);
       const baseSvg = buildStandBaseCutPathOnlySvg(fileBaseName, standCutPaths);
       const zip = createZip([
+        ...(demoOutput === 'bundle' ? [{ name: `${fileBaseName}-preview.svg`, data: Buffer.from(previewSvg, 'utf8') }] : []),
         { name: `${fileBaseName}.png`, data: artworkPng },
         { name: `${fileBaseName}-illustration-cut.svg`, data: Buffer.from(illustrationSvg, 'utf8') },
         { name: `${fileBaseName}-base-cut.svg`, data: Buffer.from(baseSvg, 'utf8') },
@@ -3325,10 +3340,21 @@ export async function POST(request: Request) {
     }
 
     const cutPath = buildServerCutPath(artwork, body.holeMode as HoleMode, generationOptions);
+    const previewSvg = buildSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, cutPath);
 
-    if (debug) {
-      const svg = buildSvg(fileBaseName, body.width, body.height, body.artworkDataUrl, cutPath);
-      return new NextResponse(svg, {
+    if (demoOutput === 'png') {
+      const previewPng = await sharp(Buffer.from(previewSvg, 'utf8')).png().toBuffer();
+      return new NextResponse(previewPng, {
+        headers: {
+          'Content-Type': 'image/png',
+          'Content-Disposition': `attachment; filename="${fileBaseName}-preview.png"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
+    if (debug && demoOutput === null) {
+      return new NextResponse(previewSvg, {
         headers: {
           'Content-Type': 'image/svg+xml; charset=utf-8',
           'Content-Disposition': `attachment; filename="${fileBaseName}.svg"`,
@@ -3339,6 +3365,7 @@ export async function POST(request: Request) {
 
     const svg = buildCutPathOnlySvg(fileBaseName, body.width, body.height, cutPath);
     const zip = createZip([
+      ...(demoOutput === 'bundle' ? [{ name: `${fileBaseName}-preview.svg`, data: Buffer.from(previewSvg, 'utf8') }] : []),
       { name: `${fileBaseName}.svg`, data: Buffer.from(svg, 'utf8') },
       { name: `${fileBaseName}.png`, data: artworkPng },
     ]);

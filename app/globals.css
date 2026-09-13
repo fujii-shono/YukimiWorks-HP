@@ -3458,6 +3458,13 @@ html:has(.acrylic-demo-page) body {
   background: var(--site-surface-soft);
 }
 
+.acrylic-demo-export-note {
+  margin: 9px 0 0;
+  color: var(--site-text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 .acrylic-tool-status {
   margin: 10px 0 0;
   color: var(--site-text-muted);

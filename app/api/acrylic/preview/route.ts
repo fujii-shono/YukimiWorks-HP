@@ -83,7 +83,9 @@ const HTML_PREVIEW_GAP_CLOSE_RADIUS_MULTIPLIER = 1.18;
 const PREVIEW_OUTER_BAND_SAFETY_PX = 2;
 const ARTWORK_MULTIPLY = 242 / 255;
 const BACK_FACE_MULTIPLY_COLOR: [number, number, number, number] = [242, 241, 241, 255];
-const ACRYLIC_SIDE_FACE_COLOR: [number, number, number, number] = [116, 122, 138, 33];
+// The side texture also acts as the client-side silhouette mask. Its RGB is
+// ignored by WebGL's transparent edge shader, so keep the mask alpha opaque.
+const ACRYLIC_SIDE_FACE_COLOR: [number, number, number, number] = [116, 122, 138, 255];
 const ACRYLIC_DARK_EDGE_COLOR: [number, number, number, number] = [108, 112, 124, 58];
 const ACRYLIC_EDGE_SHADOW_COLOR: [number, number, number, number] = [88, 96, 112, 34];
 const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 255, 255, 230];

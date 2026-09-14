@@ -65,6 +65,8 @@ type ShapeMode = HoleMode | StandMode;
 
 type StandBaseShape = 'circle' | 'star' | 'hexagon';
 
+type AcrylicFinish = 'normal' | 'color' | 'hologram';
+
 type PreviewCacheKey = string;
 
 type PreviewCache = Partial<Record<PreviewCacheKey, PreviewState>>;
@@ -157,6 +159,12 @@ const STAND_BASE_SHAPE_OPTIONS: Array<{ value: StandBaseShape; label: string }> 
   { value: 'circle', label: '円形' },
   { value: 'star', label: '星型' },
   { value: 'hexagon', label: '六角形' },
+];
+
+const ACRYLIC_FINISH_OPTIONS: Array<{ value: AcrylicFinish; label: string }> = [
+  { value: 'normal', label: '通常' },
+  { value: 'color', label: 'カラーアクリル' },
+  { value: 'hologram', label: 'ホログラム' },
 ];
 
 function createRadialShapePoints(vertexCount: number, innerRadius?: number, startAngle = -Math.PI / 2) {
@@ -724,6 +732,8 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const [holeMode, setHoleMode] = useState<HoleMode>('with-hole');
   const [standMode, setStandMode] = useState<StandMode>('simple');
   const [standBaseShape, setStandBaseShape] = useState<StandBaseShape>('circle');
+  const [finish, setFinish] = useState<AcrylicFinish>('normal');
+  const [acrylicColor, setAcrylicColor] = useState('#ff8eb8');
   const [activeSampleSrc, setActiveSampleSrc] = useState('');
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
@@ -1435,6 +1445,37 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     }
   };
 
+  const finishControls = (
+    <div className="acrylic-finish-controls">
+      <div className="acrylic-finish-toggle" role="group" aria-label="加工">
+        <span className="acrylic-finish-label">加工</span>
+        {ACRYLIC_FINISH_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={cn('acrylic-finish-toggle-button', finish === option.value && 'is-active')}
+            aria-pressed={finish === option.value}
+            disabled={isProcessing}
+            onClick={() => setFinish(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {finish === 'color' ? (
+        <label className="acrylic-color-palette">
+          <span>カラー</span>
+          <input
+            type="color"
+            value={acrylicColor}
+            aria-label="カラーアクリルの色"
+            onChange={(event) => setAcrylicColor(event.currentTarget.value)}
+          />
+        </label>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="acrylic-tool">
       <input
@@ -1689,6 +1730,8 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                   rightShade={Number(rightShadeOpacity)}
                   backLeftHighlight={Number(backLeftHighlightOpacity)}
                   backRightShade={Number(backRightShadeOpacity)}
+                  finish={finish}
+                  acrylicColor={acrylicColor}
                 />
               </>
             ) : null}
@@ -1859,6 +1902,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
         <div className="acrylic-options-modal" role="dialog" aria-modal="true" aria-label={productMode === 'stand' ? '台座・ツメ変更' : '穴の位置・余白変更'}>
           <div className="acrylic-options-panel">
             <div className="acrylic-options-fields">
+              {finishControls}
               {productMode === 'keychain' ? (
                 <>
                   {preview && keychainFlatPreviewStyle ? (

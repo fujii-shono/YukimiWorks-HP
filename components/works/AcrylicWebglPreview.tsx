@@ -14,6 +14,8 @@ type AcrylicWebglPreviewProps = {
   rightShade: number;
   backLeftHighlight: number;
   backRightShade: number;
+  finish: 'normal' | 'color' | 'hologram';
+  acrylicColor: string;
 };
 
 type TextureLayer = {
@@ -31,8 +33,10 @@ type Renderer = {
     rightShade: number,
     backLeftHighlight: number,
     backRightShade: number,
+    finish: 'normal' | 'color' | 'hologram',
+    acrylicColor: [number, number, number],
   ) => void;
-  setImages: (images: HTMLImageElement[]) => void;
+  setImages: (images: HTMLImageElement[], finish: 'normal' | 'color' | 'hologram') => void;
   dispose: () => void;
 };
 
@@ -45,7 +49,9 @@ const TEXTURE_EDGE = 2;
 const TEXTURE_ACRYLIC = 3;
 const TEXTURE_ARTWORK = 4;
 const TEXTURE_HIGHLIGHT = 5;
-const TEXTURE_COUNT = 6;
+const TEXTURE_BACKGROUND = 6;
+const TEXTURE_COUNT = 7;
+const ACRYLIC_BACKGROUND_SRC = '/works/Acrylic/bg.png';
 const SURFACE_DEFAULT = 0;
 const SURFACE_FRONT_ACRYLIC = 1;
 const SURFACE_ARTWORK = 2;
@@ -54,6 +60,7 @@ const SURFACE_REAR_EDGE = 4;
 const SURFACE_REAR_ARTWORK_HIGHLIGHT = 5;
 const SURFACE_BACK = 6;
 const SURFACE_SIDE_WALL = 7;
+const SURFACE_REAR_COLOR_ACRYLIC = 8;
 
 const vertexShaderSource = `
 attribute vec3 aPosition;
@@ -83,6 +90,8 @@ precision mediump float;
 uniform sampler2D uTexture;
 uniform sampler2D uArtworkMask;
 uniform sampler2D uSideMask;
+uniform sampler2D uBackMask;
+uniform sampler2D uBackground;
 uniform float uOpacity;
 uniform float uRightShade;
 uniform float uLeftHighlight;
@@ -91,11 +100,53 @@ uniform float uBackLeftHighlight;
 uniform float uSurface;
 uniform vec2 uTexelSize;
 uniform float uFrontFacing;
+uniform float uFinish;
+uniform vec3 uAcrylicColor;
+uniform float uMaterialRotation;
+uniform vec2 uResolution;
+uniform vec2 uBackgroundUvOrigin;
+uniform vec2 uBackgroundUvPerPixel;
 varying vec2 vUv;
+
+const float COLOR_SIDE_BRIGHTNESS = 1.28;
 
 void main() {
   vec4 color = texture2D(uTexture, vUv);
   color.a *= uOpacity;
+  if (uFinish > 0.5 && uFinish < 1.5) {
+    if (uSurface > 5.5 && uSurface < 6.5) discard;
+    float acrylicMask = texture2D(uSideMask, vUv).a > 0.004 ? 1.0 : 0.0;
+    vec2 screenPosition = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
+    vec2 backgroundUv = uBackgroundUvOrigin + screenPosition * uBackgroundUvPerPixel;
+    vec4 backgroundColor = texture2D(uBackground, backgroundUv);
+    if (uSurface > 6.5 && uSurface < 7.5) {
+      vec3 sideColor = min(uAcrylicColor * COLOR_SIDE_BRIGHTNESS, vec3(1.0));
+      gl_FragColor = vec4(backgroundColor.rgb * sideColor, uOpacity);
+      return;
+    }
+    vec4 backingColor = texture2D(uBackMask, vUv);
+    vec3 backdropColor = mix(backgroundColor.rgb, backingColor.rgb, backingColor.a);
+    if (uSurface > 0.5 && uSurface < 1.5) {
+      gl_FragColor = vec4(backdropColor * uAcrylicColor, acrylicMask * uFrontFacing);
+      return;
+    }
+    if (uSurface > 7.5 && uSurface < 8.5) {
+      gl_FragColor = vec4(backdropColor * uAcrylicColor, acrylicMask * (1.0 - uFrontFacing));
+      return;
+    }
+  }
+  if (uSurface > 0.5 && uSurface < 1.5 && uFinish > 1.5) {
+    float acrylicMask = texture2D(uSideMask, vUv).a > 0.004 ? 1.0 : 0.0;
+    float diagonalBands = sin((vUv.x * 22.0 - vUv.y * 17.0) + uMaterialRotation * 3.2);
+    float sparkle = max(0.0, sin(vUv.x * 91.0 + vUv.y * 63.0 + uMaterialRotation * 7.0));
+    sparkle = sparkle * sparkle * sparkle * sparkle * sparkle * sparkle;
+    vec3 prism = vec3(
+      0.5 + 0.5 * cos(diagonalBands * 2.4 + uMaterialRotation * 2.0),
+      0.5 + 0.5 * cos(diagonalBands * 2.4 + uMaterialRotation * 2.0 + 2.1),
+      0.5 + 0.5 * cos(diagonalBands * 2.4 + uMaterialRotation * 2.0 + 4.2)
+    );
+    color = vec4(mix(color.rgb, prism, 0.88), max(color.a, acrylicMask * (0.1 + sparkle * 0.4)));
+  }
   // Acrylic coating and print exist only on the front-facing physical plane.
   // WebGL planes are otherwise double-sided, which exposed them from the rear.
   if (uSurface > 0.5 && uSurface < 2.5) color.a *= uFrontFacing;
@@ -129,9 +180,16 @@ void main() {
     color.rgb = mix(color.rgb, vec3(1.0), uBackLeftHighlight * 0.18);
   }
   if (uSurface > 6.5 && uSurface < 7.5) {
-    // The edge is clear acrylic, not a grey solid. Keep only a faint white
-    // reflection so the background remains visible through the thickness.
-    color = vec4(1.0, 1.0, 1.0, 0.055 * uOpacity);
+    if (uFinish > 0.5 && uFinish < 1.5) {
+      discard;
+    } else {
+      // The edge is clear acrylic, not a grey solid. Keep only a faint white
+      // reflection so the background remains visible through the thickness.
+      color = vec4(1.0, 1.0, 1.0, 0.055 * uOpacity);
+    }
+  }
+  if (uSurface > 7.5 && uSurface < 8.5) {
+    discard;
   }
   if (color.a < 0.004) discard;
   gl_FragColor = color;
@@ -236,6 +294,8 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   const texture = gl.getUniformLocation(program, 'uTexture');
   const artworkMask = gl.getUniformLocation(program, 'uArtworkMask');
   const sideMask = gl.getUniformLocation(program, 'uSideMask');
+  const backMask = gl.getUniformLocation(program, 'uBackMask');
+  const background = gl.getUniformLocation(program, 'uBackground');
   const opacity = gl.getUniformLocation(program, 'uOpacity');
   const rightShade = gl.getUniformLocation(program, 'uRightShade');
   const leftHighlight = gl.getUniformLocation(program, 'uLeftHighlight');
@@ -244,21 +304,28 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   const surface = gl.getUniformLocation(program, 'uSurface');
   const texelSize = gl.getUniformLocation(program, 'uTexelSize');
   const frontFacing = gl.getUniformLocation(program, 'uFrontFacing');
+  const finish = gl.getUniformLocation(program, 'uFinish');
+  const acrylicColor = gl.getUniformLocation(program, 'uAcrylicColor');
+  const materialRotation = gl.getUniformLocation(program, 'uMaterialRotation');
+  const resolution = gl.getUniformLocation(program, 'uResolution');
+  const backgroundUvOrigin = gl.getUniformLocation(program, 'uBackgroundUvOrigin');
+  const backgroundUvPerPixel = gl.getUniformLocation(program, 'uBackgroundUvPerPixel');
   const textures = Array.from({ length: TEXTURE_COUNT }, () => gl.createTexture());
   if (textures.some((item) => !item)) return null;
   let layers: TextureLayer[] = [];
   let textureWidth = 1;
   let textureHeight = 1;
   let sideWallVertexCount = 0;
+  let imagesRef: HTMLImageElement[] = [];
 
-  const configureTexture = (nextTexture: WebGLTexture) => {
+  const configureTexture = (nextTexture: WebGLTexture, smooth = false) => {
     gl.bindTexture(gl.TEXTURE_2D, nextTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // PNG masks already define the final contour. Filtering softens alpha and
-    // makes the outline look as though it extends past the physical side.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    // PNG masks already define the final contour. Only the photographic
+    // background uses linear filtering to match CSS background rendering.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, smooth ? gl.LINEAR : gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, smooth ? gl.LINEAR : gl.NEAREST);
   };
 
   const render = (
@@ -267,6 +334,8 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     rightShadeAmount: number,
     backLeftHighlightAmount: number,
     backRightShadeAmount: number,
+    finishMode: 'normal' | 'color' | 'hologram',
+    acrylicColorValue: [number, number, number],
   ) => {
     const bounds = canvas.getBoundingClientRect();
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -294,12 +363,50 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     gl.uniform1i(artworkMask, 1);
     gl.uniform1i(sideMask, 2);
     gl.uniform2f(texelSize, 1 / textureWidth, 1 / textureHeight);
+    if (finishMode === 'color') {
+      gl.uniform1i(backMask, 3);
+      gl.uniform1i(background, 4);
+      gl.uniform2f(resolution, width, height);
+      const previewWrap = canvas.closest<HTMLElement>('.acrylic-preview-wrap');
+      const backgroundImage = imagesRef[TEXTURE_BACKGROUND];
+      if (previewWrap && backgroundImage) {
+        const wrapBounds = previewWrap.getBoundingClientRect();
+        const positioningWidth = Math.max(1, previewWrap.clientWidth);
+        const positioningHeight = Math.max(1, previewWrap.clientHeight);
+        const positioningLeft = wrapBounds.left + previewWrap.clientLeft;
+        const positioningTop = wrapBounds.top + previewWrap.clientTop;
+        const backgroundScale = Math.max(
+          positioningWidth / Math.max(1, backgroundImage.naturalWidth),
+          positioningHeight / Math.max(1, backgroundImage.naturalHeight),
+        );
+        const backgroundWidth = Math.max(1, backgroundImage.naturalWidth * backgroundScale);
+        const backgroundHeight = Math.max(1, backgroundImage.naturalHeight * backgroundScale);
+        const backgroundLeft = positioningLeft + (positioningWidth - backgroundWidth) / 2;
+        const backgroundTop = positioningTop + (positioningHeight - backgroundHeight) / 2;
+        gl.uniform2f(
+          backgroundUvOrigin,
+          (bounds.left - backgroundLeft) / backgroundWidth,
+          (bounds.top - backgroundTop) / backgroundHeight,
+        );
+        gl.uniform2f(
+          backgroundUvPerPixel,
+          bounds.width / width / backgroundWidth,
+          bounds.height / height / backgroundHeight,
+        );
+      } else {
+        gl.uniform2f(backgroundUvOrigin, 0, 0);
+        gl.uniform2f(backgroundUvPerPixel, 1 / width, 1 / height);
+      }
+    }
     // Do not fade the print with the viewing angle. Fading it exposed the white
     // ink backing underneath and made both left and right rotations look white.
     // The print stays opaque on the front hemisphere and switches off only once
     // the physical rear face points toward the viewer.
     const faceDirection = Math.cos(rotationRadians);
     gl.uniform1f(frontFacing, faceDirection >= 0 ? 1 : 0);
+    gl.uniform1f(finish, finishMode === 'color' ? 1 : finishMode === 'hologram' ? 2 : 0);
+    gl.uniform3fv(acrylicColor, acrylicColorValue);
+    gl.uniform1f(materialRotation, rotationRadians);
     gl.uniform1f(leftHighlight, leftHighlightAmount);
     gl.uniform1f(rightShade, rightShadeAmount);
     gl.uniform1f(backLeftHighlight, backLeftHighlightAmount);
@@ -313,6 +420,18 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     if (sideMaskTexture) {
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, sideMaskTexture);
+    }
+    if (finishMode === 'color') {
+      const backMaskTexture = textures[TEXTURE_BACK];
+      if (backMaskTexture) {
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, backMaskTexture);
+      }
+      const backgroundTexture = textures[TEXTURE_BACKGROUND];
+      if (backgroundTexture) {
+        gl.activeTexture(gl.TEXTURE4);
+        gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
+      }
     }
 
     const depthDirection = faceDirection;
@@ -352,7 +471,8 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
 
   return {
     render,
-    setImages: (images) => {
+    setImages: (images, finishMode) => {
+      imagesRef = images;
       textureWidth = Math.max(1, images[TEXTURE_EDGE]?.naturalWidth ?? 1);
       textureHeight = Math.max(1, images[TEXTURE_EDGE]?.naturalHeight ?? 1);
       const sideWallMesh = images[TEXTURE_SIDE] ? createSideWallMesh(images[TEXTURE_SIDE]) : new Float32Array();
@@ -360,21 +480,32 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
       gl.bindBuffer(gl.ARRAY_BUFFER, sideWallBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, sideWallMesh, gl.STATIC_DRAW);
       layers = [
-        // The white ink backing is physically behind the artwork and remains
-        // visible from the rear. It is distinct from the front-only reflection.
-        { depth: -1, opacity: 1, surface: SURFACE_BACK, textureIndex: TEXTURE_BACK },
-        { depth: -1, opacity: 1, surface: SURFACE_REAR_EDGE, textureIndex: TEXTURE_EDGE },
+        // For color acrylic, white ink is attached directly behind the front
+        // print, rather than being placed on the distant rear acrylic face.
+        ...(finishMode === 'color'
+          ? []
+          : [{ depth: -1, opacity: 1, surface: SURFACE_BACK, textureIndex: TEXTURE_BACK }]),
+        ...(finishMode === 'color'
+          ? [{ depth: -1, opacity: 1, surface: SURFACE_REAR_COLOR_ACRYLIC, textureIndex: TEXTURE_SIDE }]
+          : []),
+        ...(finishMode === 'color'
+          ? []
+          : [{ depth: -1, opacity: 1, surface: SURFACE_REAR_EDGE, textureIndex: TEXTURE_EDGE }]),
         { depth: 0, opacity: 1, surface: SURFACE_SIDE_WALL, textureIndex: TEXTURE_SIDE, geometry: 'sideWall' },
-        { depth: -0.96, opacity: 1, surface: SURFACE_ARTWORK, textureIndex: TEXTURE_ARTWORK },
-        { depth: -0.95, opacity: 1, surface: SURFACE_REAR_ARTWORK_HIGHLIGHT, textureIndex: TEXTURE_HIGHLIGHT },
-        { depth: 1, opacity: 1, surface: SURFACE_FRONT_ACRYLIC, textureIndex: TEXTURE_ACRYLIC },
-        { depth: 1, opacity: 0.95, surface: SURFACE_DEFAULT, textureIndex: TEXTURE_EDGE },
+        // Color acrylic is the sheet below the print. Place the print in front
+        // of its surface so its original colors are never tinted.
+        { depth: finishMode === 'color' ? 1.02 : -0.96, opacity: 1, surface: SURFACE_ARTWORK, textureIndex: TEXTURE_ARTWORK },
+        { depth: finishMode === 'color' ? -1 : -0.95, opacity: 1, surface: SURFACE_REAR_ARTWORK_HIGHLIGHT, textureIndex: TEXTURE_HIGHLIGHT },
+        { depth: finishMode === 'color' ? 0.97 : 1, opacity: 1, surface: SURFACE_FRONT_ACRYLIC, textureIndex: TEXTURE_ACRYLIC },
+        ...(finishMode === 'color'
+          ? []
+          : [{ depth: 1, opacity: 0.95, surface: SURFACE_DEFAULT, textureIndex: TEXTURE_EDGE }]),
         { depth: 1, opacity: 1, surface: SURFACE_FRONT_HIGHLIGHT, textureIndex: TEXTURE_HIGHLIGHT },
       ];
       images.forEach((image, index) => {
         const layerTexture = textures[index];
         if (!layerTexture) return;
-        configureTexture(layerTexture);
+        configureTexture(layerTexture, index === TEXTURE_BACKGROUND);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
       });
@@ -401,6 +532,13 @@ function loadImage(src: string) {
   });
 }
 
+function hexToRgb(color: string): [number, number, number] {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return [1, 0.56, 0.72];
+  const value = Number.parseInt(match[1], 16);
+  return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255];
+}
+
 export function AcrylicWebglPreview({
   acrylicSrc,
   artworkSrc,
@@ -413,12 +551,14 @@ export function AcrylicWebglPreview({
   rightShade,
   backLeftHighlight,
   backRightShade,
+  finish,
+  acrylicColor,
 }: AcrylicWebglPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
-  const renderValuesRef = useRef({ rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade });
+  const renderValuesRef = useRef({ rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, acrylicColor });
   const [isWebglAvailable, setIsWebglAvailable] = useState(true);
-  renderValuesRef.current = { rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade };
+  renderValuesRef.current = { rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, acrylicColor };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -438,6 +578,8 @@ export function AcrylicWebglPreview({
           values.rightShade,
           values.backLeftHighlight,
           values.backRightShade,
+          values.finish,
+          hexToRgb(values.acrylicColor),
         );
       });
       observer.observe(canvas);
@@ -456,10 +598,11 @@ export function AcrylicWebglPreview({
   useEffect(() => {
     let cancelled = false;
     const sources = [backSrc, sideSrc, edgeSrc, acrylicSrc, artworkSrc, highlightSrc];
+    if (finish === 'color') sources.push(ACRYLIC_BACKGROUND_SRC);
     void Promise.all(sources.map(loadImage))
       .then((images) => {
         if (cancelled || !rendererRef.current) return;
-        rendererRef.current.setImages(images);
+        rendererRef.current.setImages(images, finish);
         const values = renderValuesRef.current;
         rendererRef.current.render(
           values.rotationY,
@@ -467,6 +610,8 @@ export function AcrylicWebglPreview({
           values.rightShade,
           values.backLeftHighlight,
           values.backRightShade,
+          values.finish,
+          hexToRgb(values.acrylicColor),
         );
       })
       .catch(() => {
@@ -475,15 +620,20 @@ export function AcrylicWebglPreview({
     return () => {
       cancelled = true;
     };
-  }, [acrylicSrc, artworkSrc, backSrc, edgeSrc, highlightSrc, sideSrc]);
+  }, [acrylicSrc, artworkSrc, backSrc, edgeSrc, finish, highlightSrc, sideSrc]);
 
   useEffect(() => {
-    rendererRef.current?.render(rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade);
-  }, [backLeftHighlight, backRightShade, leftHighlight, rightShade, rotationY]);
+    rendererRef.current?.render(rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, hexToRgb(acrylicColor));
+  }, [acrylicColor, backLeftHighlight, backRightShade, finish, leftHighlight, rightShade, rotationY]);
 
   return (
     <>
-      <canvas ref={canvasRef} className="acrylic-preview-canvas" aria-label="回転可能な3Dアクリルプレビュー" role="img" />
+      <canvas
+        ref={canvasRef}
+        className="acrylic-preview-canvas"
+        aria-label="回転可能な3Dアクリルプレビュー"
+        role="img"
+      />
       {!isWebglAvailable ? <p className="acrylic-webgl-error">このブラウザでは3Dプレビューを表示できません。</p> : null}
     </>
   );

@@ -2998,6 +2998,63 @@ html:has(.acrylic-demo-page) body {
   color: var(--site-text-muted);
 }
 
+.acrylic-finish-controls {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: -2px 0 14px;
+}
+
+.acrylic-finish-toggle,
+.acrylic-color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.acrylic-finish-label {
+  margin-right: 2px;
+  color: var(--site-text-muted);
+  font-size: 0.88rem;
+}
+
+.acrylic-finish-toggle-button {
+  padding: 6px 10px;
+  color: var(--site-text-muted);
+  cursor: pointer;
+  background: var(--site-surface);
+  border: 1px solid var(--site-border);
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.acrylic-finish-toggle-button.is-active {
+  color: var(--site-accent);
+  background: var(--site-surface-soft);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
+.acrylic-finish-toggle-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.acrylic-color-palette {
+  color: var(--site-text-muted);
+  font-size: 0.88rem;
+}
+
+.acrylic-color-palette input[type='color'] {
+  width: 36px;
+  height: 30px;
+  padding: 2px;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid var(--site-border);
+}
+
 .acrylic-demo-samples {
   display: flex;
   flex-wrap: wrap;

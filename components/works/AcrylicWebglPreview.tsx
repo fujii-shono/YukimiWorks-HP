@@ -110,6 +110,66 @@ varying vec2 vUv;
 
 const float COLOR_SIDE_BRIGHTNESS = 1.28;
 
+float randomValue(vec2 seed) {
+  return fract(sin(dot(seed, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float crossProduct(vec2 first, vec2 second) {
+  return first.x * second.y - first.y * second.x;
+}
+
+float triangleMask(vec2 point, vec2 first, vec2 second, vec2 third) {
+  float winding = sign(crossProduct(second - first, third - first));
+  float firstEdge = winding * crossProduct(second - first, point - first) / length(second - first);
+  float secondEdge = winding * crossProduct(third - second, point - second) / length(third - second);
+  float thirdEdge = winding * crossProduct(first - third, point - third) / length(first - third);
+  return smoothstep(0.0, 0.028, min(firstEdge, min(secondEdge, thirdEdge)));
+}
+
+float hologramShardMask(vec2 uv) {
+  // Work in material space so the pattern keeps its proportions and remains
+  // attached to the acrylic while the object rotates.
+  float textureAspect = uTexelSize.y / max(uTexelSize.x, 0.000001);
+  vec2 shardPosition = vec2(uv.x * textureAspect, uv.y) * 12.0;
+  vec2 cell = floor(shardPosition);
+  vec2 localPosition = fract(shardPosition) - 0.5;
+  float visible = step(0.24, randomValue(cell + vec2(2.7, 8.3)));
+  vec2 offset = vec2(
+    randomValue(cell + vec2(4.1, 1.9)),
+    randomValue(cell + vec2(7.4, 5.6))
+  ) - 0.5;
+  localPosition -= offset * 0.16;
+
+  float angle = randomValue(cell + vec2(9.2, 3.8)) * 6.2831853;
+  float cosine = cos(angle);
+  float sine = sin(angle);
+  localPosition = mat2(cosine, -sine, sine, cosine) * localPosition;
+
+  float halfWidth = mix(0.22, 0.39, randomValue(cell + vec2(6.6, 2.2)));
+  float halfHeight = mix(0.25, 0.43, randomValue(cell + vec2(1.3, 9.7)));
+  float topSkew = mix(-0.13, 0.13, randomValue(cell + vec2(8.8, 7.1)));
+  float leftHeight = mix(0.19, 0.37, randomValue(cell + vec2(3.5, 6.4)));
+  float rightHeight = mix(0.19, 0.37, randomValue(cell + vec2(5.9, 4.6)));
+  vec2 first = vec2(topSkew, -halfHeight);
+  vec2 second = vec2(-halfWidth, leftHeight);
+  vec2 third = vec2(
+    halfWidth * mix(0.72, 1.08, randomValue(cell + vec2(7.8, 0.9))),
+    rightHeight
+  );
+  return visible * triangleMask(localPosition, first, second, third);
+}
+
+float hologramShardVisibility(vec2 uv) {
+  float textureAspect = uTexelSize.y / max(uTexelSize.x, 0.000001);
+  vec2 cell = floor(vec2(uv.x * textureAspect, uv.y) * 12.0);
+  float phase = randomValue(cell + vec2(0.8, 6.2)) * 6.2831853;
+  float responseSpeed = mix(2.2, 3.8, randomValue(cell + vec2(4.7, 9.1)));
+  float angleResponse = 0.5 + 0.5 * cos(uMaterialRotation * responseSpeed + phase);
+  // Each foil shard catches the light at a different angle. The narrow
+  // transition changes its strength, while a faint reflection always remains.
+  return mix(0.2, 1.0, smoothstep(0.34, 0.68, angleResponse));
+}
+
 void main() {
   vec4 color = texture2D(uTexture, vUv);
   color.a *= uOpacity;
@@ -135,20 +195,32 @@ void main() {
       return;
     }
   }
-  if (uSurface > 0.5 && uSurface < 1.5 && uFinish > 1.5) {
+  bool isFrontHologramSurface = uSurface > 0.5 && uSurface < 1.5;
+  bool isRearHologramSurface = uSurface > 5.5 && uSurface < 6.5;
+  if ((isFrontHologramSurface || isRearHologramSurface) && uFinish > 1.5) {
     float acrylicMask = texture2D(uSideMask, vUv).a > 0.004 ? 1.0 : 0.0;
-    float diagonalBands = sin((vUv.x * 22.0 - vUv.y * 17.0) + uMaterialRotation * 3.2);
-    float sparkle = max(0.0, sin(vUv.x * 91.0 + vUv.y * 63.0 + uMaterialRotation * 7.0));
-    sparkle = sparkle * sparkle * sparkle * sparkle * sparkle * sparkle;
+    float surfaceFacing = isFrontHologramSurface ? uFrontFacing : 1.0 - uFrontFacing;
+    float shardMask = hologramShardMask(vUv) * hologramShardVisibility(vUv) * surfaceFacing;
+    float prismPhase = vUv.x * 6.2 - vUv.y * 4.6 + uMaterialRotation * 2.4;
+    float sparkle = 0.5 + 0.5 * sin(vUv.x * 18.0 + vUv.y * 14.0 + uMaterialRotation * 4.0);
+    sparkle = smoothstep(0.72, 1.0, sparkle);
     vec3 prism = vec3(
-      0.5 + 0.5 * cos(diagonalBands * 2.4 + uMaterialRotation * 2.0),
-      0.5 + 0.5 * cos(diagonalBands * 2.4 + uMaterialRotation * 2.0 + 2.1),
-      0.5 + 0.5 * cos(diagonalBands * 2.4 + uMaterialRotation * 2.0 + 4.2)
+      0.5 + 0.5 * cos(prismPhase),
+      0.5 + 0.5 * cos(prismPhase + 2.1),
+      0.5 + 0.5 * cos(prismPhase + 4.2)
     );
-    color = vec4(mix(color.rgb, prism, 0.88), max(color.a, acrylicMask * (0.1 + sparkle * 0.4)));
+    float rotationGlow = 0.5 + 0.5 * cos(prismPhase);
+    // White ink makes fully saturated RGB look like a dark multiply layer.
+    // Keep the rear reflection close to white so it reads as a bright pearl.
+    vec3 hologramColor = isRearHologramSurface ? mix(vec3(1.0), prism, 0.28) : prism;
+    color.rgb = mix(color.rgb, hologramColor, shardMask * 0.88);
+    color.a = max(
+      color.a,
+      acrylicMask * shardMask * (0.12 + rotationGlow * 0.32 + sparkle * 0.1)
+    );
   }
-  // Acrylic coating and print exist only on the front-facing physical plane.
-  // WebGL planes are otherwise double-sided, which exposed them from the rear.
+  // Front coating and print exist only on the front-facing physical plane.
+  // The rear hologram is rendered separately on the physical rear surface.
   if (uSurface > 0.5 && uSurface < 2.5) color.a *= uFrontFacing;
   if (uSurface > 1.5 && uSurface < 2.5) color.rgb *= 1.0 - uRightShade * 0.14;
   if (uSurface > 2.5 && uSurface < 3.5) {
@@ -175,7 +247,7 @@ void main() {
     float insideAcrylic = step(0.004, texture2D(uSideMask, vUv).a);
     color = vec4(108.0 / 255.0, 112.0 / 255.0, 124.0 / 255.0, min(1.0, edgeAlpha * 1.8) * insideAcrylic);
   }
-  if (uSurface > 5.5) {
+  if (uSurface > 5.5 && !(uFinish > 1.5 && isRearHologramSurface)) {
     color.rgb *= 1.0 - uBackRightShade * 0.14;
     color.rgb = mix(color.rgb, vec3(1.0), uBackLeftHighlight * 0.18);
   }

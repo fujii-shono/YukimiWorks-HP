@@ -1839,6 +1839,31 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
           </>
         )}
       </div>
+      {!isDemo ? (
+        <div className="acrylic-hole-toggle acrylic-standard-finish-toggle" role="group" aria-label="加工">
+          <button
+            type="button"
+            className={cn('acrylic-hole-toggle-button', finish === 'normal' && 'is-active')}
+            aria-pressed={finish === 'normal'}
+            disabled={isProcessing}
+            onClick={() => setFinish('normal')}
+          >
+            通常
+          </button>
+          <span className="acrylic-hole-toggle-separator" aria-hidden="true">
+            ｜
+          </span>
+          <button
+            type="button"
+            className={cn('acrylic-hole-toggle-button', finish === 'hologram' && 'is-active')}
+            aria-pressed={finish === 'hologram'}
+            disabled={isProcessing}
+            onClick={() => setFinish('hologram')}
+          >
+            ホログラム
+          </button>
+        </div>
+      ) : null}
       <div className="acrylic-tool-actions">
         <button type="button" className="acrylic-file-button" disabled={isProcessing} onClick={() => inputRef.current?.click()}>
           {preview ? '新しいPNGを選択' : 'PNGを選択'}

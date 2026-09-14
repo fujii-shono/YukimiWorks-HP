@@ -3546,6 +3546,10 @@ html:has(.acrylic-demo-page) body {
   color: var(--site-text-muted);
 }
 
+.acrylic-standard-finish-toggle {
+  margin-top: 4px;
+}
+
 .acrylic-tool-actions {
   display: flex;
   flex-wrap: wrap;

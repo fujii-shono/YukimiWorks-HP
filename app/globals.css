@@ -3014,6 +3014,23 @@ html:has(.acrylic-demo-page) body {
   gap: 8px;
 }
 
+.acrylic-color-settings {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.acrylic-color-opacity-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.acrylic-color-opacity-separator {
+  color: var(--site-text-muted);
+}
+
 .acrylic-finish-label {
   margin-right: 2px;
   color: var(--site-text-muted);

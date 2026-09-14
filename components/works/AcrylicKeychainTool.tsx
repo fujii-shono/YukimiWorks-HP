@@ -67,6 +67,8 @@ type StandBaseShape = 'circle' | 'star' | 'hexagon';
 
 type AcrylicFinish = 'normal' | 'color' | 'hologram';
 
+type ColorAcrylicOpacity = 'transparent' | 'opaque';
+
 type PreviewCacheKey = string;
 
 type PreviewCache = Partial<Record<PreviewCacheKey, PreviewState>>;
@@ -734,6 +736,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const [standBaseShape, setStandBaseShape] = useState<StandBaseShape>('circle');
   const [finish, setFinish] = useState<AcrylicFinish>('normal');
   const [acrylicColor, setAcrylicColor] = useState('#ff8eb8');
+  const [colorAcrylicOpacity, setColorAcrylicOpacity] = useState<ColorAcrylicOpacity>('transparent');
   const [activeSampleSrc, setActiveSampleSrc] = useState('');
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
@@ -1463,15 +1466,40 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
         ))}
       </div>
       {finish === 'color' ? (
-        <label className="acrylic-color-palette">
-          <span>カラー</span>
-          <input
-            type="color"
-            value={acrylicColor}
-            aria-label="カラーアクリルの色"
-            onChange={(event) => setAcrylicColor(event.currentTarget.value)}
-          />
-        </label>
+        <div className="acrylic-color-settings">
+          <label className="acrylic-color-palette">
+            <span>カラー</span>
+            <input
+              type="color"
+              value={acrylicColor}
+              aria-label="カラーアクリルの色"
+              onChange={(event) => setAcrylicColor(event.currentTarget.value)}
+            />
+          </label>
+          <div className="acrylic-color-opacity-toggle" role="group" aria-label="カラーアクリルの透明度">
+            <button
+              type="button"
+              className={cn('acrylic-finish-toggle-button', colorAcrylicOpacity === 'transparent' && 'is-active')}
+              aria-pressed={colorAcrylicOpacity === 'transparent'}
+              disabled={isProcessing}
+              onClick={() => setColorAcrylicOpacity('transparent')}
+            >
+              透明
+            </button>
+            <span className="acrylic-color-opacity-separator" aria-hidden="true">
+              ｜
+            </span>
+            <button
+              type="button"
+              className={cn('acrylic-finish-toggle-button', colorAcrylicOpacity === 'opaque' && 'is-active')}
+              aria-pressed={colorAcrylicOpacity === 'opaque'}
+              disabled={isProcessing}
+              onClick={() => setColorAcrylicOpacity('opaque')}
+            >
+              不透明
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   );
@@ -1732,6 +1760,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                   backRightShade={Number(backRightShadeOpacity)}
                   finish={finish}
                   acrylicColor={acrylicColor}
+                  colorAcrylicOpacity={colorAcrylicOpacity}
                 />
               </>
             ) : null}

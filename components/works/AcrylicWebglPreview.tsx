@@ -16,6 +16,7 @@ type AcrylicWebglPreviewProps = {
   backRightShade: number;
   finish: 'normal' | 'color' | 'hologram';
   acrylicColor: string;
+  colorAcrylicOpacity: 'transparent' | 'opaque';
 };
 
 type TextureLayer = {
@@ -35,6 +36,7 @@ type Renderer = {
     backRightShade: number,
     finish: 'normal' | 'color' | 'hologram',
     acrylicColor: [number, number, number],
+    colorAcrylicOpacity: 'transparent' | 'opaque',
   ) => void;
   setImages: (images: HTMLImageElement[], finish: 'normal' | 'color' | 'hologram') => void;
   dispose: () => void;
@@ -61,6 +63,7 @@ const SURFACE_REAR_ARTWORK_HIGHLIGHT = 5;
 const SURFACE_BACK = 6;
 const SURFACE_SIDE_WALL = 7;
 const SURFACE_REAR_COLOR_ACRYLIC = 8;
+const SURFACE_FRONT_COLOR_EDGE = 9;
 
 const vertexShaderSource = `
 attribute vec3 aPosition;
@@ -102,13 +105,12 @@ uniform vec2 uTexelSize;
 uniform float uFrontFacing;
 uniform float uFinish;
 uniform vec3 uAcrylicColor;
+uniform float uColorOpaque;
 uniform float uMaterialRotation;
 uniform vec2 uResolution;
 uniform vec2 uBackgroundUvOrigin;
 uniform vec2 uBackgroundUvPerPixel;
 varying vec2 vUv;
-
-const float COLOR_SIDE_BRIGHTNESS = 1.28;
 
 float randomValue(vec2 seed) {
   return fract(sin(dot(seed, vec2(127.1, 311.7))) * 43758.5453);
@@ -170,28 +172,65 @@ float hologramShardVisibility(vec2 uv) {
   return mix(0.2, 1.0, smoothstep(0.34, 0.68, angleResponse));
 }
 
+vec3 colorBurn(vec3 baseColor, vec3 blendColor) {
+  return vec3(1.0) - min(
+    vec3(1.0),
+    (vec3(1.0) - baseColor) / max(blendColor, vec3(0.001))
+  );
+}
+
+vec3 colorDodgeSameColor(vec3 sourceColor) {
+  return min(
+    vec3(1.0),
+    sourceColor / max(vec3(1.0) - sourceColor, vec3(0.001))
+  );
+}
+
 void main() {
   vec4 color = texture2D(uTexture, vUv);
   color.a *= uOpacity;
   if (uFinish > 0.5 && uFinish < 1.5) {
     if (uSurface > 5.5 && uSurface < 6.5) discard;
     float acrylicMask = texture2D(uSideMask, vUv).a > 0.004 ? 1.0 : 0.0;
-    vec2 screenPosition = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
-    vec2 backgroundUv = uBackgroundUvOrigin + screenPosition * uBackgroundUvPerPixel;
-    vec4 backgroundColor = texture2D(uBackground, backgroundUv);
-    if (uSurface > 6.5 && uSurface < 7.5) {
-      vec3 sideColor = min(uAcrylicColor * COLOR_SIDE_BRIGHTNESS, vec3(1.0));
-      gl_FragColor = vec4(backgroundColor.rgb * sideColor, uOpacity);
+    vec3 dodgedEdgeColor = colorDodgeSameColor(uAcrylicColor);
+    if (uSurface > 8.5 && uSurface < 9.5) {
+      float edgeAlpha = 0.0;
+      for (int y = -2; y <= 2; y += 1) {
+        for (int x = -2; x <= 2; x += 1) {
+          edgeAlpha = max(edgeAlpha, texture2D(uTexture, vUv + vec2(float(x), float(y)) * uTexelSize).a);
+        }
+      }
+      float insideAcrylic = step(0.004, texture2D(uSideMask, vUv).a);
+      vec2 edgeDirectionOffset = vec2(uTexelSize.x * 4.0, 0.0);
+      float acrylicOnLeft = step(0.004, texture2D(uSideMask, vUv - edgeDirectionOffset).a);
+      float acrylicOnRight = step(0.004, texture2D(uSideMask, vUv + edgeDirectionOffset).a);
+      float leftFacingEdge = clamp(acrylicOnRight - acrylicOnLeft, 0.0, 1.0);
+      gl_FragColor = vec4(
+        dodgedEdgeColor,
+        min(1.0, edgeAlpha * 2.2) * insideAcrylic * leftFacingEdge * uFrontFacing
+      );
       return;
     }
-    vec4 backingColor = texture2D(uBackMask, vUv);
-    vec3 backdropColor = mix(backgroundColor.rgb, backingColor.rgb, backingColor.a);
+    vec3 backgroundColor = vec3(1.0);
+    vec3 backdropColor = uAcrylicColor;
+    if (uColorOpaque < 0.5) {
+      vec2 screenPosition = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
+      vec2 backgroundUv = uBackgroundUvOrigin + screenPosition * uBackgroundUvPerPixel;
+      backgroundColor = texture2D(uBackground, backgroundUv).rgb;
+      vec4 backingColor = texture2D(uBackMask, vUv);
+      backdropColor = mix(backgroundColor, backingColor.rgb, backingColor.a) * uAcrylicColor;
+    }
+    if (uSurface > 6.5 && uSurface < 7.5) {
+      vec3 sideColor = colorBurn(uAcrylicColor, uAcrylicColor);
+      gl_FragColor = vec4(sideColor, uOpacity);
+      return;
+    }
     if (uSurface > 0.5 && uSurface < 1.5) {
-      gl_FragColor = vec4(backdropColor * uAcrylicColor, acrylicMask * uFrontFacing);
+      gl_FragColor = vec4(backdropColor, acrylicMask * uFrontFacing);
       return;
     }
     if (uSurface > 7.5 && uSurface < 8.5) {
-      gl_FragColor = vec4(backdropColor * uAcrylicColor, acrylicMask * (1.0 - uFrontFacing));
+      gl_FragColor = vec4(backdropColor, acrylicMask * (1.0 - uFrontFacing));
       return;
     }
   }
@@ -378,6 +417,7 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
   const frontFacing = gl.getUniformLocation(program, 'uFrontFacing');
   const finish = gl.getUniformLocation(program, 'uFinish');
   const acrylicColor = gl.getUniformLocation(program, 'uAcrylicColor');
+  const colorOpaque = gl.getUniformLocation(program, 'uColorOpaque');
   const materialRotation = gl.getUniformLocation(program, 'uMaterialRotation');
   const resolution = gl.getUniformLocation(program, 'uResolution');
   const backgroundUvOrigin = gl.getUniformLocation(program, 'uBackgroundUvOrigin');
@@ -408,6 +448,7 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     backRightShadeAmount: number,
     finishMode: 'normal' | 'color' | 'hologram',
     acrylicColorValue: [number, number, number],
+    colorAcrylicOpacityValue: 'transparent' | 'opaque',
   ) => {
     const bounds = canvas.getBoundingClientRect();
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -478,6 +519,7 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
     gl.uniform1f(frontFacing, faceDirection >= 0 ? 1 : 0);
     gl.uniform1f(finish, finishMode === 'color' ? 1 : finishMode === 'hologram' ? 2 : 0);
     gl.uniform3fv(acrylicColor, acrylicColorValue);
+    gl.uniform1f(colorOpaque, colorAcrylicOpacityValue === 'opaque' ? 1 : 0);
     gl.uniform1f(materialRotation, rotationRadians);
     gl.uniform1f(leftHighlight, leftHighlightAmount);
     gl.uniform1f(rightShade, rightShadeAmount);
@@ -570,7 +612,7 @@ function createRenderer(canvas: HTMLCanvasElement): Renderer | null {
         { depth: finishMode === 'color' ? -1 : -0.95, opacity: 1, surface: SURFACE_REAR_ARTWORK_HIGHLIGHT, textureIndex: TEXTURE_HIGHLIGHT },
         { depth: finishMode === 'color' ? 0.97 : 1, opacity: 1, surface: SURFACE_FRONT_ACRYLIC, textureIndex: TEXTURE_ACRYLIC },
         ...(finishMode === 'color'
-          ? []
+          ? [{ depth: 1, opacity: 1, surface: SURFACE_FRONT_COLOR_EDGE, textureIndex: TEXTURE_EDGE }]
           : [{ depth: 1, opacity: 0.95, surface: SURFACE_DEFAULT, textureIndex: TEXTURE_EDGE }]),
         { depth: 1, opacity: 1, surface: SURFACE_FRONT_HIGHLIGHT, textureIndex: TEXTURE_HIGHLIGHT },
       ];
@@ -625,12 +667,13 @@ export function AcrylicWebglPreview({
   backRightShade,
   finish,
   acrylicColor,
+  colorAcrylicOpacity,
 }: AcrylicWebglPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
-  const renderValuesRef = useRef({ rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, acrylicColor });
+  const renderValuesRef = useRef({ rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, acrylicColor, colorAcrylicOpacity });
   const [isWebglAvailable, setIsWebglAvailable] = useState(true);
-  renderValuesRef.current = { rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, acrylicColor };
+  renderValuesRef.current = { rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, acrylicColor, colorAcrylicOpacity };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -652,6 +695,7 @@ export function AcrylicWebglPreview({
           values.backRightShade,
           values.finish,
           hexToRgb(values.acrylicColor),
+          values.colorAcrylicOpacity,
         );
       });
       observer.observe(canvas);
@@ -684,6 +728,7 @@ export function AcrylicWebglPreview({
           values.backRightShade,
           values.finish,
           hexToRgb(values.acrylicColor),
+          values.colorAcrylicOpacity,
         );
       })
       .catch(() => {
@@ -695,8 +740,17 @@ export function AcrylicWebglPreview({
   }, [acrylicSrc, artworkSrc, backSrc, edgeSrc, finish, highlightSrc, sideSrc]);
 
   useEffect(() => {
-    rendererRef.current?.render(rotationY, leftHighlight, rightShade, backLeftHighlight, backRightShade, finish, hexToRgb(acrylicColor));
-  }, [acrylicColor, backLeftHighlight, backRightShade, finish, leftHighlight, rightShade, rotationY]);
+    rendererRef.current?.render(
+      rotationY,
+      leftHighlight,
+      rightShade,
+      backLeftHighlight,
+      backRightShade,
+      finish,
+      hexToRgb(acrylicColor),
+      colorAcrylicOpacity,
+    );
+  }, [acrylicColor, backLeftHighlight, backRightShade, colorAcrylicOpacity, finish, leftHighlight, rightShade, rotationY]);
 
   return (
     <>

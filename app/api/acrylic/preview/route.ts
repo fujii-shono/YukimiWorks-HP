@@ -90,7 +90,9 @@ const ACRYLIC_WHITE_HIGHLIGHT_COLOR: [number, number, number, number] = [255, 25
 const STAND_CLAW_FILL_COLOR: [number, number, number, number] = [116, 122, 138, 41];
 const STAND_SHAPE_GUIDE_COLOR: [number, number, number, number] = [86, 103, 131, 230];
 const ACRYLIC_DARK_EDGE_OFFSET = { x: 1, y: -1 };
-const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: -1, y: -1 };
+// Keep the front highlight inside the acrylic silhouette. An outward offset made
+// the white edge appear wider than the physical side after WebGL compositing.
+const ACRYLIC_WHITE_HIGHLIGHT_OFFSET = { x: 0, y: 0 };
 const BASE_EDGE_SHADOW_WIDTH = 4;
 const BASE_INNER_SHINE_WIDTH = 2;
 const BASE_STAND_BOTTOM_NEAR_HEIGHT_DELTA = 40;
@@ -823,14 +825,6 @@ function subtractMask(outerMask: Uint8Array, innerMask: Uint8Array, width: numbe
   return output;
 }
 
-function intersectMask(leftMask: Uint8Array, rightMask: Uint8Array, width: number, height: number) {
-  const output = new Uint8Array(width * height);
-  for (let index = 0; index < width * height; index += 1) {
-    if (leftMask[index] && rightMask[index]) output[index] = 1;
-  }
-  return output;
-}
-
 // 近接した余白同士が接続した箇所では、外周から見えない境界を縁として描画しない。
 function keepOuterMaskBand(mask: Uint8Array, width: number, height: number, bandWidth: number) {
   const filledMask = fillEnclosedMaskHoles(mask, width, height);
@@ -1323,7 +1317,8 @@ function buildPreviewLayers(
     highlightMask,
     width,
     height,
-    metrics.highlightRadius + metrics.innerShineWidth + PREVIEW_OUTER_BAND_SAFETY_PX,
+    // The front white edge must remain a fine highlight, not a second outline.
+    metrics.highlightRadius,
   );
   const visibleEdgeMask = keepOuterMaskBand(
     edgeMask,
@@ -1357,12 +1352,8 @@ function buildPreviewLayers(
   compositeStandContactLine(acrylic, standShape?.contactLine ?? null, bounds.width, bounds.height, metrics.clearRadius);
   const edge = buildEdgeLayer(width, height, clearMask, visibleEdgeMask);
   compositeStandClawFill(edge, standClawFillMask);
-  const unfilteredSideMask = subtractMask(clearMask, innerShineMask, width, height);
-  const sideMask = productMode === 'keychain'
-    ? intersectMask(unfilteredSideMask, visibleHighlightMask, width, height)
-    : unfilteredSideMask;
-  const side = layerFromMask(width, height, sideMask, ACRYLIC_SIDE_FACE_COLOR);
-  const back = layerFromMask(width, height, gapClosedBaseMask, BACK_FACE_MULTIPLY_COLOR);
+  const side = layerFromMask(width, height, edgeMask, ACRYLIC_SIDE_FACE_COLOR);
+  const back = layerFromMask(width, height, baseMask, BACK_FACE_MULTIPLY_COLOR);
   const originalArtwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
   const artwork: RgbaImage = { width, height, rgba: new Uint8Array(width * height * 4) };
   placeImage(originalArtwork, image, imageX, imageY);

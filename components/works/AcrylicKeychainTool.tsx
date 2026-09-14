@@ -6,6 +6,7 @@ import {
   type AcrylicGenerationOptions,
 } from '@/lib/acrylicGenerationOptions';
 import { cn } from '@/lib/format';
+import { AcrylicWebglPreview } from './AcrylicWebglPreview';
 
 type PreviewState = {
   acrylicSrc: string;
@@ -111,19 +112,10 @@ const MOBILE_PREVIEW_ARTWORK_MAX_WIDTH_RATIO = 0.98;
 const MOBILE_PREVIEW_ARTWORK_MAX_HEIGHT_RATIO = 0.98;
 const ROTATION_MIN_SPEED = 0.015;
 const HIGHLIGHT_VISIBLE_START = 0.78;
-const BACK_SIDE_SIDE_VISIBLE_START = 0.42;
-const SURFACE_GLOSS_OPACITY = 0.46;
 const REFERENCE_ARTWORK_SIZE = 500;
 const EXPORT_DEBUG_SVG = false;
 const SHOW_AI_GENERATION_BUTTON = false;
-const ACRYLIC_PREVIEW_FRONT_Z = 6;
-const ACRYLIC_PREVIEW_BACK_Z = -4;
-const ACRYLIC_SIDE_LAYER_COUNT = 6;
-const ACRYLIC_SIDE_LAYERS = Array.from({ length: ACRYLIC_SIDE_LAYER_COUNT }, (_, index) => {
-  const progress = (index + 1) / (ACRYLIC_SIDE_LAYER_COUNT + 1);
-  return ACRYLIC_PREVIEW_BACK_Z + (ACRYLIC_PREVIEW_FRONT_Z - ACRYLIC_PREVIEW_BACK_Z) * progress;
-});
-const STAND_CIRCLE_DEPTH_PX = ACRYLIC_PREVIEW_FRONT_Z - ACRYLIC_PREVIEW_BACK_Z;
+const STAND_CIRCLE_DEPTH_PX = 10;
 const STAND_CYLINDER_SIDE_SEGMENTS = 48;
 const STAND_CYLINDER_SIDE_PANELS = Array.from({ length: STAND_CYLINDER_SIDE_SEGMENTS }, (_, index) => ({
   angle: (index / STAND_CYLINDER_SIDE_SEGMENTS) * 360,
@@ -866,10 +858,6 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
         acrylicContext.scale(scale, scale);
         await drawImageSource(acrylicContext, preview.acrylicSrc);
         if (cancelled) return;
-        acrylicContext.globalAlpha = SURFACE_GLOSS_OPACITY;
-        acrylicContext.globalCompositeOperation = 'screen';
-        await drawImageSource(acrylicContext, preview.acrylicSrc);
-        if (cancelled) return;
 
         edgeContext.translate(drawX, drawY);
         edgeContext.scale(scale, scale);
@@ -1296,19 +1284,22 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
     inertiaFrameRef.current = window.requestAnimationFrame(tick);
   };
 
-  const isBackSide = Math.cos((rotation.y * Math.PI) / 180) < 0;
-  const sideFacing = Math.sin((rotation.y * Math.PI) / 180);
+  const rotationRadians = (rotation.y * Math.PI) / 180;
+  const isBackSide = Math.cos(rotationRadians) < 0;
+  const sideFacing = Math.sin(rotationRadians);
   const visibleSideFacing = isBackSide ? -sideFacing : sideFacing;
   const leftFacingAmount = Math.max(0, -visibleSideFacing);
+  const directionalHighlightAmount = Math.max(
+    0,
+    (leftFacingAmount - HIGHLIGHT_VISIBLE_START) / (1 - HIGHLIGHT_VISIBLE_START),
+  );
   const leftHighlightOpacity = (
-    isBackSide ? 0 : Math.max(0, (leftFacingAmount - HIGHLIGHT_VISIBLE_START) / (1 - HIGHLIGHT_VISIBLE_START))
+    isBackSide ? 0 : directionalHighlightAmount
   ).toFixed(3);
-  const rightShadeOpacity = Math.max(0, visibleSideFacing).toFixed(3);
-  const sideLayerOpacity = (
-    isBackSide
-      ? Math.max(0, (Math.abs(sideFacing) - BACK_SIDE_SIDE_VISIBLE_START) / (1 - BACK_SIDE_SIDE_VISIBLE_START)) * 0.72
-      : 1
-  ).toFixed(3);
+  const backLeftHighlightOpacity = (isBackSide ? directionalHighlightAmount : 0).toFixed(3);
+  const directionalRightShadeAmount = Math.max(0, visibleSideFacing);
+  const rightShadeOpacity = (isBackSide ? 0 : directionalRightShadeAmount).toFixed(3);
+  const backRightShadeOpacity = (isBackSide ? directionalRightShadeAmount : 0).toFixed(3);
   const keychainArtworkBounds =
     preview && sourceArtworkBounds
       ? sourceArtworkBounds
@@ -1686,52 +1677,19 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                     </svg>
                   </div>
                 ) : null}
-                <div
-                  className="acrylic-preview-object"
-                  style={{
-                    transform: `rotateY(${rotation.y}deg)`,
-                  } as CSSProperties}
-                >
-                  {preview.productMode === 'keychain' ? ACRYLIC_SIDE_LAYERS.map((zPosition) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={zPosition}
-                      className="acrylic-preview-image acrylic-preview-side-image"
-                      src={renderedSideSrc}
-                      alt=""
-                      style={
-                        {
-                          '--acrylic-side-z': `${zPosition}px`,
-                          '--acrylic-side-opacity': sideLayerOpacity,
-                        } as CSSProperties
-                      }
-                      aria-hidden="true"
-                    />
-                  )) : null}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="acrylic-preview-image acrylic-preview-edge-image" src={renderedEdgeSrc} alt="" aria-hidden="true" />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="acrylic-preview-image acrylic-preview-acrylic-image" src={renderedAcrylicSrc} alt="" aria-hidden="true" />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className="acrylic-preview-image acrylic-preview-artwork-image"
-                    src={isBackSide ? renderedBackArtworkSrc : renderedArtworkSrc}
-                    alt={`${preview.fileName}の${preview.productMode === 'stand' ? 'アクスタ' : 'アクキー'}完成予想`}
-                    style={{
-                      '--acrylic-right-shade': rightShadeOpacity,
-                    } as CSSProperties}
-                  />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className="acrylic-preview-image acrylic-preview-light-image"
-                    src={renderedHighlightSrc}
-                    alt=""
-                    style={{
-                      '--acrylic-left-light': leftHighlightOpacity,
-                    } as CSSProperties}
-                    aria-hidden="true"
-                  />
-                </div>
+                <AcrylicWebglPreview
+                  acrylicSrc={renderedAcrylicSrc}
+                  artworkSrc={renderedArtworkSrc}
+                  backSrc={renderedBackArtworkSrc}
+                  edgeSrc={renderedEdgeSrc}
+                  highlightSrc={renderedHighlightSrc}
+                  sideSrc={renderedSideSrc}
+                  rotationY={rotation.y}
+                  leftHighlight={Number(leftHighlightOpacity)}
+                  rightShade={Number(rightShadeOpacity)}
+                  backLeftHighlight={Number(backLeftHighlightOpacity)}
+                  backRightShade={Number(backRightShadeOpacity)}
+                />
               </>
             ) : null}
             {SHOW_STAND_CSS_CIRCLE && preview.productMode === 'stand' && visibleStandCircleStyle ? (

@@ -62,6 +62,8 @@ type StandMode = 'simple' | 'stable';
 
 type ShapeMode = HoleMode | StandMode;
 
+type StandBaseShape = 'circle' | 'star' | 'hexagon';
+
 type PreviewCacheKey = string;
 
 type PreviewCache = Partial<Record<PreviewCacheKey, PreviewState>>;
@@ -127,8 +129,8 @@ const STAND_CYLINDER_SIDE_PANELS = Array.from({ length: STAND_CYLINDER_SIDE_SEGM
   angle: (index / STAND_CYLINDER_SIDE_SEGMENTS) * 360,
   width: (Math.PI * 100) / STAND_CYLINDER_SIDE_SEGMENTS,
 }));
-const SHOW_STAND_BASE_SVG = true;
-const SHOW_STAND_CSS_CIRCLE = false;
+const SHOW_STAND_BASE_SVG = false;
+const SHOW_STAND_CSS_CIRCLE = true;
 const STAND_BASE_SVG_VIEW_WIDTH = 1000;
 const STAND_BASE_SVG_VIEW_HEIGHT = 300;
 const STAND_BASE_SVG_VIEW_BOX = `0 0 ${STAND_BASE_SVG_VIEW_WIDTH} ${STAND_BASE_SVG_VIEW_HEIGHT}`;
@@ -151,6 +153,91 @@ type SvgPoint = {
   x: number;
   y: number;
 };
+
+type StandPrismEdge = {
+  angle: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
+const STAND_BASE_SHAPE_OPTIONS: Array<{ value: StandBaseShape; label: string }> = [
+  { value: 'circle', label: '円形' },
+  { value: 'star', label: '星型' },
+  { value: 'hexagon', label: '六角形' },
+];
+
+function createRadialShapePoints(vertexCount: number, innerRadius?: number, startAngle = -Math.PI / 2) {
+  const pointCount = innerRadius === undefined ? vertexCount : vertexCount * 2;
+  return Array.from({ length: pointCount }, (_, index): SvgPoint => {
+    const radius = innerRadius !== undefined && index % 2 === 1 ? innerRadius : 46;
+    const angle = startAngle + (index / pointCount) * Math.PI * 2;
+    return {
+      x: 50 + Math.cos(angle) * radius,
+      y: 50 + Math.sin(angle) * radius,
+    };
+  });
+}
+
+function createRoundedShapePoints(points: SvgPoint[], cornerRatio: number, cornerSteps: number) {
+  return points.flatMap((point, index) => {
+    const previousPoint = points[(index - 1 + points.length) % points.length];
+    const nextPoint = points[(index + 1) % points.length];
+    const previousDelta = { x: previousPoint.x - point.x, y: previousPoint.y - point.y };
+    const nextDelta = { x: nextPoint.x - point.x, y: nextPoint.y - point.y };
+    const previousLength = Math.hypot(previousDelta.x, previousDelta.y);
+    const nextLength = Math.hypot(nextDelta.x, nextDelta.y);
+    const cornerLength = Math.min(previousLength, nextLength) * cornerRatio;
+    const start = {
+      x: point.x + (previousDelta.x / previousLength) * cornerLength,
+      y: point.y + (previousDelta.y / previousLength) * cornerLength,
+    };
+    const end = {
+      x: point.x + (nextDelta.x / nextLength) * cornerLength,
+      y: point.y + (nextDelta.y / nextLength) * cornerLength,
+    };
+
+    return Array.from({ length: cornerSteps + 1 }, (_, step): SvgPoint => {
+      const progress = step / cornerSteps;
+      const inverseProgress = 1 - progress;
+      return {
+        x: inverseProgress * inverseProgress * start.x + 2 * inverseProgress * progress * point.x + progress * progress * end.x,
+        y: inverseProgress * inverseProgress * start.y + 2 * inverseProgress * progress * point.y + progress * progress * end.y,
+      };
+    });
+  });
+}
+
+function createStandPrismEdges(points: SvgPoint[]): StandPrismEdge[] {
+  return points.map((point, index) => {
+    const nextPoint = points[(index + 1) % points.length];
+    const deltaX = nextPoint.x - point.x;
+    const deltaY = nextPoint.y - point.y;
+    return {
+      left: (point.x + nextPoint.x) / 2,
+      top: (point.y + nextPoint.y) / 2,
+      width: Math.hypot(deltaX, deltaY),
+      angle: (Math.atan2(deltaY, deltaX) * 180) / Math.PI,
+    };
+  });
+}
+
+const STAND_BASE_POLYGON_POINTS: Record<Exclude<StandBaseShape, 'circle'>, SvgPoint[]> = {
+  star: createRoundedShapePoints(createRadialShapePoints(5, 25), 0.18, 3),
+  hexagon: createRadialShapePoints(6, undefined, -Math.PI / 3),
+};
+
+function formatStandPolygonPoints(points: SvgPoint[]) {
+  return points.map((point) => `${formatSvgNumber(point.x)},${formatSvgNumber(point.y)}`).join(' ');
+}
+
+function StandPolygonSurface({ className, points }: { className: string; points: SvgPoint[] }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points={formatStandPolygonPoints(points)} />
+    </svg>
+  );
+}
 
 function formatSvgNumber(value: number) {
   return Number(value.toFixed(2));
@@ -541,7 +628,15 @@ function createStandPreviewStyles(preview: PreviewState, stage: PreviewStageSize
   const contactY = drawY + frame.contactY * scale;
   const standWidth = frame.width * scale;
   const standHeight = frame.height * scale;
-  const displayHeight = Math.max(1, standHeight * (STAND_BASE_SVG_VIEW_HEIGHT / STAND_BASE_SVG_TOP_HEIGHT));
+  const baseSizeScale =
+    preview.generationOptions.stand.baseWidthPx === null
+      ? 1
+      : frame.width / STAND_DEFAULT_BASE_WIDTH_PX;
+  // Preserve the existing projection angle, then scale the whole 3D base from the demo's default diameter.
+  const displayHeight = Math.max(
+    1,
+    standHeight * (STAND_BASE_SVG_VIEW_HEIGHT / STAND_BASE_SVG_TOP_HEIGHT) * baseSizeScale,
+  );
   const top = (contactY - displayHeight * (STAND_BASE_SVG_TOP_CENTER_Y / STAND_BASE_SVG_VIEW_HEIGHT)) / stage.height;
 
   return {
@@ -636,6 +731,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const [productMode, setProductMode] = useState<ProductMode>('keychain');
   const [holeMode, setHoleMode] = useState<HoleMode>('with-hole');
   const [standMode, setStandMode] = useState<StandMode>('simple');
+  const [standBaseShape, setStandBaseShape] = useState<StandBaseShape>('circle');
   const [activeSampleSrc, setActiveSampleSrc] = useState('');
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [renderedAcrylicSrc, setRenderedAcrylicSrc] = useState('');
@@ -663,6 +759,8 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
   const visibleStandCircleStyle = preview?.productMode === 'stand' ? (immediateStandPreviewStyles?.circle ?? standCircleStyle ?? null) : null;
   const visibleStandBaseGeometry =
     preview?.productMode === 'stand' ? createStandBaseSvgGeometry(getStandBaseSvgSideThicknessY(preview)) : null;
+  const standPolygonPoints = standBaseShape === 'circle' ? null : STAND_BASE_POLYGON_POINTS[standBaseShape];
+  const standPrismEdges = standPolygonPoints ? createStandPrismEdges(standPolygonPoints) : [];
   const sourceArtworkMetricScale = sourceArtworkBounds
     ? Math.max(sourceArtworkBounds.width, sourceArtworkBounds.height) / REFERENCE_ARTWORK_SIZE
     : 1;
@@ -1493,6 +1591,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
               setIsRotating(false);
             }}
           >
+            <div className={cn('acrylic-preview-scene', preview.productMode === 'stand' && 'is-stand')}>
             {SHOW_STAND_CSS_CIRCLE && preview.productMode === 'stand' && visibleStandCircleStyle ? (
               <div
                 className="acrylic-preview-object acrylic-preview-stand-circle-object acrylic-preview-stand-circle-object-back"
@@ -1510,20 +1609,49 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                   }
                   aria-hidden="true"
                 >
-                  <span className="acrylic-preview-stand-test-circle-bottom" />
-                  {STAND_CYLINDER_SIDE_PANELS.map((panel) => (
-                    <span
-                      key={panel.angle}
-                      className="acrylic-preview-stand-test-cylinder-side"
-                      style={
-                        {
-                          '--stand-cylinder-side-angle': `${panel.angle}deg`,
-                          '--stand-cylinder-side-width': `${panel.width}%`,
-                        } as CSSProperties
-                      }
-                    />
-                  ))}
-                  <span className="acrylic-preview-stand-test-circle-back-line" />
+                  {standPolygonPoints ? (
+                    <>
+                      <StandPolygonSurface
+                        className="acrylic-preview-stand-prism-surface acrylic-preview-stand-prism-bottom"
+                        points={standPolygonPoints}
+                      />
+                      {standPrismEdges.map((edge, index) => (
+                        <span
+                          key={`${standBaseShape}-${index}`}
+                          className="acrylic-preview-stand-prism-side"
+                          style={
+                            {
+                              '--stand-prism-side-angle': `${edge.angle}deg`,
+                              '--stand-prism-side-left': `${edge.left}%`,
+                              '--stand-prism-side-top': `${edge.top}%`,
+                              '--stand-prism-side-width': `${edge.width}%`,
+                            } as CSSProperties
+                          }
+                        />
+                      ))}
+                      <StandPolygonSurface
+                        className="acrylic-preview-stand-prism-surface acrylic-preview-stand-prism-back-line"
+                        points={standPolygonPoints}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <span className="acrylic-preview-stand-test-circle-bottom" />
+                      {STAND_CYLINDER_SIDE_PANELS.map((panel) => (
+                        <span
+                          key={panel.angle}
+                          className="acrylic-preview-stand-test-cylinder-side"
+                          style={
+                            {
+                              '--stand-cylinder-side-angle': `${panel.angle}deg`,
+                              '--stand-cylinder-side-width': `${panel.width}%`,
+                            } as CSSProperties
+                          }
+                        />
+                      ))}
+                      <span className="acrylic-preview-stand-test-circle-back-line" />
+                    </>
+                  )}
                 </span>
               </div>
             ) : null}
@@ -1623,11 +1751,27 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                   }
                   aria-hidden="true"
                 >
-                  <span className="acrylic-preview-stand-test-circle-front-line" />
-                  <span className="acrylic-preview-stand-test-circle-front" />
+                  {standPolygonPoints ? (
+                    <>
+                      <StandPolygonSurface
+                        className="acrylic-preview-stand-prism-surface acrylic-preview-stand-prism-front-line"
+                        points={standPolygonPoints}
+                      />
+                      <StandPolygonSurface
+                        className="acrylic-preview-stand-prism-surface acrylic-preview-stand-prism-front"
+                        points={standPolygonPoints}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <span className="acrylic-preview-stand-test-circle-front-line" />
+                      <span className="acrylic-preview-stand-test-circle-front" />
+                    </>
+                  )}
                 </span>
               </div>
             ) : null}
+            </div>
           </div>
         ) : (
           <div className="acrylic-preview-empty">
@@ -1809,9 +1953,28 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                         <img className="acrylic-stand-flat-margin-guide" src={activeFlatGuideSrc} alt="" aria-hidden="true" />
                       ) : null}
                       <span className="acrylic-stand-flat-claw" aria-hidden="true" />
-                      <span className="acrylic-stand-flat-base" aria-hidden="true" />
+                      <svg className="acrylic-stand-flat-base" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                        {standPolygonPoints ? (
+                          <polygon className="acrylic-stand-flat-base-shape" points={formatStandPolygonPoints(standPolygonPoints)} />
+                        ) : (
+                          <ellipse className="acrylic-stand-flat-base-shape" cx="50" cy="50" rx="48" ry="48" />
+                        )}
+                      </svg>
                     </div>
                   ) : null}
+                  <label className="acrylic-options-field">
+                    <span>台座の形</span>
+                    <select
+                      value={standBaseShape}
+                      onChange={(event) => setStandBaseShape(event.currentTarget.value as StandBaseShape)}
+                    >
+                      {STAND_BASE_SHAPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="acrylic-options-field acrylic-options-field-combo">
                     <span>キャラ余白</span>
                     <input
@@ -1876,6 +2039,7 @@ export function AcrylicKeychainTool({ mode = 'default', samples = [] }: AcrylicK
                   const initialOptions = createInitialGenerationOptions(isDemo);
                   generationOptionsRef.current = initialOptions;
                   setGenerationOptions(initialOptions);
+                  setStandBaseShape('circle');
                 }}
               >
                 初期値

@@ -3164,6 +3164,16 @@ html:has(.acrylic-demo-page) body {
   transform-style: preserve-3d;
 }
 
+.acrylic-preview-scene {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.acrylic-preview-scene.is-stand {
+  transform: rotateX(-8deg);
+}
+
 .acrylic-preview-stand-circle-object {
   position: absolute;
   inset: 0;
@@ -3303,6 +3313,79 @@ html:has(.acrylic-demo-page) body {
   content: "";
   background: rgba(116, 122, 138, 0.16);
   transform: translateX(-50%) rotateX(-90deg);
+  transform-origin: 50% 0;
+}
+
+.acrylic-preview-stand-prism-surface {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transform-origin: center;
+  backface-visibility: visible;
+  will-change: transform;
+}
+
+.acrylic-preview-stand-prism-surface polygon {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.acrylic-preview-stand-prism-bottom {
+  transform: translateZ(calc(var(--stand-circle-depth) * -1));
+}
+
+.acrylic-preview-stand-prism-bottom polygon {
+  stroke: rgba(116, 122, 138, 0.68);
+  stroke-width: 1.5px;
+}
+
+.acrylic-preview-stand-prism-back-line {
+  clip-path: inset(-8px -8px 50% -8px);
+}
+
+.acrylic-preview-stand-prism-front-line,
+.acrylic-preview-stand-prism-front {
+  clip-path: inset(50% -8px -8px -8px);
+}
+
+.acrylic-preview-stand-prism-back-line polygon,
+.acrylic-preview-stand-prism-front-line polygon {
+  stroke: #ffffff;
+  stroke-width: 2.4px;
+}
+
+.acrylic-preview-stand-prism-front {
+  transform: translateZ(0.4px);
+}
+
+.acrylic-preview-stand-prism-front polygon {
+  stroke: #ffffff;
+  stroke-width: 4.2px;
+}
+
+.acrylic-preview-stand-prism-side {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+}
+
+.acrylic-preview-stand-prism-side::before {
+  position: absolute;
+  top: var(--stand-prism-side-top);
+  left: var(--stand-prism-side-left);
+  display: block;
+  width: var(--stand-prism-side-width);
+  height: var(--stand-circle-depth);
+  content: "";
+  background: rgba(116, 122, 138, 0.16);
+  transform: translateX(-50%) rotateZ(var(--stand-prism-side-angle)) rotateX(-90deg);
   transform-origin: 50% 0;
 }
 
@@ -3676,14 +3759,15 @@ html:has(.acrylic-demo-page) body {
   z-index: 1;
   width: var(--acrylic-stand-flat-base-width);
   height: var(--acrylic-stand-flat-base-height);
-  background:
-    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.92) 0 42%, transparent 43%),
-    rgba(116, 122, 138, 0.16);
-  border: 2px solid rgba(116, 122, 138, 0.52);
-  border-radius: 50%;
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.72),
-    0 0 0 1px rgba(255, 255, 255, 0.88);
+  overflow: visible;
+}
+
+.acrylic-stand-flat-base-shape {
+  fill: rgba(116, 122, 138, 0.16);
+  stroke: rgba(116, 122, 138, 0.52);
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.88));
+  vector-effect: non-scaling-stroke;
 }
 
 .acrylic-stand-flat-claw {
@@ -3718,7 +3802,8 @@ html:has(.acrylic-demo-page) body {
   accent-color: var(--site-accent);
 }
 
-.acrylic-options-field input[type='number'] {
+.acrylic-options-field input[type='number'],
+.acrylic-options-field select {
   width: 100%;
   min-width: 0;
   padding: 6px 8px;

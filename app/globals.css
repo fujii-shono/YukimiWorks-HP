@@ -2271,6 +2271,12 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   text-align: center;
 }
 
+.about-catchphrase {
+  margin: 0 0 24px;
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
+  line-height: 1.5;
+}
+
 .why-body {
   display: grid;
   gap: 28px;
@@ -2867,6 +2873,55 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 
 .detail-body-strikethrough {
   text-decoration: line-through;
+}
+
+.diary-link-preview {
+  margin: 12px 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--site-border);
+  background: var(--site-surface-soft);
+  color: inherit;
+  text-decoration: none;
+}
+
+.diary-link-preview-image {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  object-fit: cover;
+}
+
+.diary-link-preview-body {
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.diary-link-preview-body strong,
+.diary-link-preview-body span,
+.diary-link-preview-body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diary-link-preview-body strong {
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+}
+
+.diary-link-preview-body span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.5;
+}
+
+.diary-link-preview-body small {
+  color: var(--site-text-muted);
 }
 
 .detail-body-center {
@@ -4940,6 +4995,15 @@ html:has(.acrylic-demo-page) body {
 
   .card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .diary-link-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .diary-link-preview-image {
+    aspect-ratio: 16 / 9;
+    min-height: 0;
   }
 
   .portfolio-modal-content {

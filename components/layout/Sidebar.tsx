@@ -7,6 +7,7 @@ import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { MessagePanel } from '@/components/ui/MessagePanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
+import { diaryEntries, getDiaryId, isDiaryPublished } from '@/data/diary';
 import { newsItems } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { cn } from '@/lib/format';
@@ -17,6 +18,7 @@ const navItems = [
   { href: '/why', label: 'Why YukimiWorks', icon: '❄', iconImage: null },
   { href: '/works', label: 'Works', icon: '❄', iconImage: null },
   { href: '/portfolio', label: 'Portfolio', icon: '❄', iconImage: null },
+  { href: '/diary', label: 'Diary', icon: '❄', iconImage: null },
   { href: '/news', label: 'News', icon: '❄', iconImage: null },
   { href: '/links', label: 'Link', icon: '❄', iconImage: null },
   { href: '/contact', label: 'Contact', icon: '❄', iconImage: null },
@@ -29,6 +31,28 @@ type CounterMilestone = {
   message: string;
   effect?: 'cracker';
 };
+
+type WhatsNewItem = {
+  id: string;
+  title: string;
+  date: string;
+  href: string;
+};
+
+function getLatestUpdates(now: Date | null) {
+  const diaryUpdates: WhatsNewItem[] = now
+    ? diaryEntries
+        .filter((entry) => isDiaryPublished(entry, now))
+        .map((entry) => ({
+          id: `diary-${getDiaryId(entry)}`,
+          title: `日記「${entry.title}」を追加しました`,
+          date: entry.publishedAt,
+          href: `/diary/${getDiaryId(entry)}`,
+        }))
+    : [];
+
+  return [...newsItems, ...diaryUpdates].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+}
 
 function formatCounterDisplay(value: number) {
   const minimumDigits = siteConfig.decorativeCounter.length;
@@ -54,11 +78,12 @@ export function Sidebar() {
   const [counterMessage, setCounterMessage] = useState<string | null>(null);
   const [counterMilestone, setCounterMilestone] = useState<CounterMilestone | null>(null);
   const [isCounterPressed, setIsCounterPressed] = useState(false);
+  const [now, setNow] = useState<Date | null>(null);
   const counterClickTimestamps = useRef<number[]>([]);
   const counterMessageTimer = useRef<number | null>(null);
   const counterAnimationTimer = useRef<number | null>(null);
   const { absent, event, sleepMode } = useTimeTheme();
-  const latestNews = newsItems.slice(0, 3);
+  const latestNews = getLatestUpdates(now);
   const counterCharacterSrc = sleepMode ? '/character/sleeping.png' : '/character/default.png';
   const counterCharacterMask = event === 'sleep-warning' ? '/effects/eyes.png' : counterCharacterSrc;
   const absentLabel = event === 'lunch' ? '食事中' : event === 'late-night-away' ? '....' : 'お出かけ中';
@@ -99,6 +124,13 @@ export function Sidebar() {
       counterMessageTimer.current = null;
     }, 2_500);
   }, [absent]);
+
+  useEffect(() => {
+    const updateNow = () => setNow(new Date());
+    updateNow();
+    const timer = window.setInterval(updateNow, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;

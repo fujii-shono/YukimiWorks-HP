@@ -53,7 +53,7 @@ export const works: Work[] = [
         href: 'https://apps.apple.com/app/sns%E3%81%AE%E3%81%84%E3%81%84%E3%81%AD%E6%95%B0%E3%82%92%E6%B6%88%E3%81%99%E3%82%84%E3%81%A4/id6808113264',
       },
     ],
-    category: 'apps',
+    category: 'tools',
     tags: ['拡張機能'],
     thumbnail: '/works/xnocount/hero.jpeg',
     media: [{ type: 'image', src: '/works/xnocount/hero.jpeg', alt: 'サービス紹介' }],

@@ -43,6 +43,29 @@ export const newsCategoryLabels: Record<NewsCategory, string> = {
 export const manualNews: News[] = [
   {
     id: 'announcement-bokinpage-launch',
+    title: 'リクありに決済機能を追加しました',
+    date: '2026-09-22',
+    category: 'release',
+    thumbnail: '/works/rikuari/hero.png',
+    summary: 'リクありに決済機能を追加しました',
+    body: [
+      {
+        type: 'text',
+        value:
+          'クリエイター向け見積もりサービスに、決済機能を追加いたしました。\nアカウント設定から銀行を登録していただくことで、見積もりから依頼者様に決済いただくことが可能です。\n\n手数料は0%で、見積もり時の金額がそのまま入金されます。\nなお今まで通り、銀行口座を伝えて直接入金いただく仕組みもお使いいただけます。',
+      },
+      {
+        type: 'link',
+        label: 'リクあり',
+        href: 'https://rikuari.com/',
+      },
+    ],
+    seoTitle: 'リクありに決済機能を追加しました | YukimiWorks',
+    seoDescription: 'リクありに決済機能を追加しました',
+    featured: true,
+  },
+  {
+    id: 'announcement-bokinpage-launch',
     title: '「天使の羽募金」を開始いたしました',
     date: '2026-07-31',
     category: 'announcement',

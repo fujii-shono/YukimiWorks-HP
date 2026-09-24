@@ -12,7 +12,7 @@ export default function AboutPage() {
   return (
     <SiteFrame>
       <RetroPanel title="About" contentClassName="single-panel-body about-body">
-        <h1 className="about-catchphrase">より便利に、より楽しく</h1>
+        <h1 className="about-catchphrase">もっと楽しく、もっと便利に</h1>
         <p>
           合同会社YukimiWorksは
           <br />

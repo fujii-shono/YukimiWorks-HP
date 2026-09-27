@@ -33,7 +33,7 @@ export default function SirokuroPrivacyPolicyPage() {
       >
         <hr className="content-rule" />
         <p>最終更新日：2026年9月27日</p>
-        <p>[運営者名]（以下「当方」）は、スマートフォンアプリ「シロクロ会計」（以下「本アプリ」）における利用者情報の取扱いについて、以下のとおり定めます。</p>
+        <p>YukimiWorks（以下「当方」）は、スマートフォンアプリ「シロクロ会計」（以下「本アプリ」）における利用者情報の取扱いについて、以下のとおり定めます。</p>
 
         <section>
           <h3>1. 本アプリについて</h3>

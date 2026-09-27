@@ -7,5 +7,6 @@ export const appServices: AppService[] = [
   { value: 'cocoa', label: 'Cocoa' },
   { value: 'rikuari', label: 'リクあり' },
   { value: 'rssmatome', label: 'RSSまとめ' },
-  { value: 'xnocount', label: 'Xのいいね数を消すやつ' }
+  { value: 'xnocount', label: 'Xのいいね数を消すやつ' },
+  { value: 'sirokuro', label: 'シロクロ会計' }
 ];

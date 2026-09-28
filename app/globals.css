@@ -2295,14 +2295,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   line-height: 1.95;
 }
 
-.why-kicker {
-  color: var(--site-accent);
-  font-family: var(--font-pixel);
-  font-size: 0.95rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
 .why-lead {
   color: var(--site-accent);
   font-family: var(--font-pixel);
@@ -2344,13 +2336,8 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   font-family: var(--font-pixel);
   font-size: clamp(1.12rem, 2vw, 1.35rem);
   font-weight: 400;
+  line-height: 1;
   letter-spacing: 0.06em;
-}
-
-.why-strength-subheading {
-  margin: 6px 0 0;
-  font-family: var(--font-pixel);
-  font-size: 0.94rem;
 }
 
 .why-strength-body {

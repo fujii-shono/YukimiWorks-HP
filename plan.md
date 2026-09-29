@@ -1,3 +1,67 @@
+## 追加調整: 管理画面導線とログイン完了後UI
+
+- Googleログインの認証状態が反映された時点でログインモーダルを閉じる
+- 管理画面は5種の管理項目から始め、メッセージだけ一覧・新規追加・編集・削除まで実装する
+- メッセージにはX投稿予定フラグを保存するが、Xの投稿処理は実装しない
+- 検証: lint、型チェック、production build
+
+### 追加調整: 管理画面の履歴
+
+- 管理項目、メッセージ一覧、新規追加、編集の状態を `/admin` のクエリパラメータで管理する
+- ブラウザの戻る・進む操作で、管理画面内の直前の画面へ移動できるようにする
+
+---
+
+## 追加対応: Firebase認証・会員表示・メッセージ管理
+
+### 対応する仕様
+
+- Google のみを使用する Firebase Authentication ログイン
+- Menu 上のログイン導線と、専用ページではないログインモーダル
+- Firestore でのユーザー別の名前、プラン、コイン、購入作品ID一覧、権限管理
+- Firebase Console / Emulator UI からの管理者指定
+- 管理者のみ操作できる `/admin` と、Firestore のメッセージ作成・編集・削除
+- 画面上の改行と絵文字を保存する本文エディター、1件あたり最大4枚の Firebase Storage 画像
+- 既存のコード内通常メッセージは移植せず、今後の通常メッセージを Firebase 管理にする
+
+### 実装方針
+
+- Firebase Web SDK を使用し、Authentication / Firestore / Storage を Local Emulator Suite と本番の両方に接続可能にする
+- 未設定のローカルでもデモプロジェクト値によりエミュレーター検証を可能にする
+- 初回ログイン時は `role: user`, `plan: none`, `coins: 10`, `purchasedWorkIds: []` でユーザー文書を作成する
+- 本人が更新できる値は表示名のみとし、権限・プラン・コイン・購入作品IDは Security Rules で保護する
+- `plan: none` はプラン名を表示しない。プラン変更とコイン購入は今後実装とし、今回は準備中UIを表示する
+- 募金メッセージは既存 Redis API を維持し、Firebase の通常メッセージと表示時に統合する
+
+### 変更予定のファイルと理由
+
+- `lib/firebase/**`, `components/auth/**`: Firebase 初期化、認証状態、ログイン/設定UI
+- `app/admin/**`, `components/admin/**`: 管理者専用ページとメッセージ編集UI
+- `components/layout/**`, `components/ui/MessagePanel.tsx`, `app/globals.css`: 共通UIとメッセージ表示の組み込み
+- `firestore.rules`, `storage.rules`, `firebase.json`, `.firebaserc`: アクセス制御とエミュレーター設定
+- `.env.example`, `README.md`, `SPEC.md`: 開発/本番手順と正式仕様
+
+### 影響範囲
+
+- 全ページのサイドバーと固定ユーザー表示
+- Message パネルの通常メッセージ取得元
+- 新規URL `/admin`
+- Firebase Authentication / Firestore / Storage の Security Rules
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- Local Emulator Suite で Google テストログイン、ユーザー初期化、管理者化、管理ページ制限、メッセージCRUD、画像4枚制限を確認する
+
+### 懸念点・制約
+
+- Firebase 本番プロジェクトの作成と Vercel への実値登録は README の手順で実施する
+- プラン変更とコイン購入の決済・残高更新は今回対象外
+
+---
+
 ## 対応する仕様
 
 - `SPEC.md` 全体

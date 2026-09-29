@@ -1943,6 +1943,47 @@ yukimiworks-hp/
 
 > `.env.local`は既存仕様どおりプロジェクトルートに作成し、Git管理対象外とする。メール送信・OGP用環境変数は変更しない。
 
+## Firebase認証・ユーザー・メッセージ管理
+
+### 認証と共通表示
+
+- ログインは Firebase Authentication の Google プロバイダーのみ使用する
+- Menu パネルの上に「ログイン」ボタンを表示し、案内とGoogleログインボタンはモーダルで表示する
+- ログイン後は画面右上に固定追従で「ようこそ ○○さん」、コイン枚数、設定ボタンを表示する
+- プランが `blue` の場合は「青チケ」、`night` の場合は「夜チケ」を表示する。`none` の場合はプラン名を表示しない
+- 通常ユーザーの設定モーダルには名前変更、プラン変更、コイン購入を表示する。後二者の決済・残高変更は今後実装とする
+- 管理者は「ようこそ 管理者○○さん」と表示し、設定モーダルには名前変更と「管理画面へ」を表示する
+
+### ユーザーデータ
+
+- Firestore の `users/{uid}` に `displayName`, `plan`, `coins`, `purchasedWorkIds`, `role`, 作成・更新日時を保存する
+- 初回ログイン時は `plan: none`, `coins: 10`, `purchasedWorkIds: []`, `role: user` とする
+- 本人がサイトから変更できる値は `displayName` のみとする
+- `role`, `plan`, `coins`, `purchasedWorkIds` は Firebase Console、ローカルでは Emulator UI から変更する
+- 管理者指定は対象文書の `role` を `admin` に変更して行う
+- Firestore Security Rules で保護値の本人更新を禁止する
+
+### 管理画面とメッセージ
+
+- `/admin` はログイン中の `role: admin` のユーザーだけに操作UIを表示する
+- 表示制御に加え、Firestore / Storage Security Rules で通常ユーザーの書き込みを拒否する
+- 管理画面からメッセージの新規作成、編集、削除を行える
+- 管理画面の初期表示は「メッセージ」「ポートフォリオ」「ワーク」「日記」「ニュース」の管理項目とする。現時点ではメッセージ以外は準備中とする
+- メッセージを選択した後に一覧を表示し、「新規追加」「編集」「削除」の導線を表示する
+- 管理項目、メッセージ一覧、新規追加、編集の画面状態はURLクエリに反映し、ブラウザ標準の戻る・進む操作を可能にする
+- 本文は改行と絵文字を含む Unicode 文字列として保存し、入力画面の改行を表示に反映する
+- メッセージ1件につき画像は最大4枚、1枚10MBまでとし、Firebase Storage の `messages/{messageId}/` へ保存する
+- 編集画面に「Xにも投稿する」チェックを置く。初期値はオフとし、値は保存するが、Xへの実際の投稿処理は未実装とする
+- 公開日時が未来のメッセージは、公開日時まで Message パネルに表示しない
+- コード内の既存通常メッセージは Firebase へ移植しない。今後の通常メッセージは Firestore を正式データ元とする
+- 募金時の色付きメッセージは従来の Redis 管理を維持し、管理画面で色は指定できない
+
+### 開発・本番設定
+
+- `.env.example` に Firebase Web SDK 用の環境変数テンプレートを置く
+- Firebase 未作成でも Local Emulator Suite で Authentication / Firestore / Storage を確認できるようにする
+- ローカルテスト、管理者化、本番プロジェクト作成、Security Rules デプロイの手順を `README.md` に記載する
+
 ## CSS変数（globals.css）
 
 ```css

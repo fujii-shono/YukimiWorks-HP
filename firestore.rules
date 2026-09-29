@@ -1,0 +1,90 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function validUser(data) {
+      return data.keys().hasOnly([
+          'displayName', 'plan', 'coins', 'purchasedWorkIds', 'role', 'createdAt', 'updatedAt'
+        ])
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 30
+        && data.plan in ['none', 'blue', 'night']
+        && data.coins is int
+        && data.coins >= 0
+        && data.purchasedWorkIds is list
+        && data.purchasedWorkIds.size() <= 1000
+        && data.role in ['user', 'admin']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validImage(image) {
+      return image is map
+        && image.keys().hasOnly(['url', 'path', 'alt'])
+        && image.url is string
+        && image.url.size() > 0
+        && image.path is string
+        && image.path.size() > 0
+        && image.alt is string
+        && image.alt.size() <= 120;
+    }
+
+    function validImages(images) {
+      return images is list
+        && images.size() <= 4
+        && (images.size() < 1 || validImage(images[0]))
+        && (images.size() < 2 || validImage(images[1]))
+        && (images.size() < 3 || validImage(images[2]))
+        && (images.size() < 4 || validImage(images[3]));
+    }
+
+    function validMessage(data) {
+      return data.keys().hasOnly(['body', 'images', 'postToX', 'publishedAt', 'createdAt', 'updatedAt'])
+        && data.body is string
+        && data.body.size() >= 1
+        && data.body.size() <= 4000
+        && validImages(data.images)
+        && data.postToX is bool
+        && data.publishedAt is timestamp
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && validUser(request.resource.data)
+        && request.resource.data.role == 'user'
+        && request.resource.data.plan == 'none'
+        && request.resource.data.coins == 10
+        && request.resource.data.purchasedWorkIds.size() == 0;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && validUser(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validMessage(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

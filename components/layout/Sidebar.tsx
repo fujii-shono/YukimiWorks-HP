@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
+import { LoginEntryButton } from '@/components/auth/AccountControls';
 import { MessagePanel } from '@/components/ui/MessagePanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
@@ -227,6 +228,7 @@ export function Sidebar() {
   return (
     <>
       <aside className="sidebar" aria-label="サイドメニュー">
+      <LoginEntryButton />
       <section className="window-panel menu-panel">
         <h2 className="window-title window-title-menu">
           <span className="title-deco" aria-hidden="true">

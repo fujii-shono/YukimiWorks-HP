@@ -9,3 +9,9 @@ yarn-error.log*
 .DS_Store
 .vercel
 .env*
+!.env.example
+.firebase-data
+.firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

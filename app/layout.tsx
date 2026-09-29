@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { DotGothic16 } from 'next/font/google';
 import './globals.css';
+import { AccountControls } from '@/components/auth/AccountControls';
+import { FirebaseAuthProvider } from '@/components/auth/FirebaseAuthProvider';
 import { siteConfig } from '@/data/siteConfig';
 
 const dotGothic = DotGothic16({
@@ -122,7 +124,10 @@ export default function RootLayout({
     <html lang="ja" data-theme="day" data-event="none">
       <body className={`${dotGothic.className} ${dotGothic.variable}`}>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
-        {children}
+        <FirebaseAuthProvider>
+          {children}
+          <AccountControls />
+        </FirebaseAuthProvider>
       </body>
     </html>
   );

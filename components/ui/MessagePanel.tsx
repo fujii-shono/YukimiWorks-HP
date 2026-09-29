@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import { messagePosts, type MessagePost } from '@/data/messages';
+import type { MessagePost } from '@/data/messages';
+import { subscribeToFirebaseMessages } from '@/lib/firebase/messages';
 import { cn } from '@/lib/format';
 
 const RAINBOW_SHINE_ACTIVE_MS = 1_800;
@@ -42,6 +43,20 @@ function parseJapaneseDateTime(value: string) {
   return new Date(`${normalized}:00+09:00`);
 }
 
+function formatFirebaseDate(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
+}
+
 function formatMessageDate(value: string, now: Date) {
   const publishedAt = parseJapaneseDateTime(value);
   const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - publishedAt.getTime()) / 60_000));
@@ -70,7 +85,8 @@ export function MessagePanel() {
   const postRefs = useRef<Array<HTMLElement | null>>([]);
   const [now, setNow] = useState<Date | null>(null);
   const [openPostIndex, setOpenPostIndex] = useState<number | null>(null);
-  const [dynamicPosts, setDynamicPosts] = useState<MessagePost[]>([]);
+  const [donationPosts, setDonationPosts] = useState<MessagePost[]>([]);
+  const [firebasePosts, setFirebasePosts] = useState<MessagePost[]>([]);
   const [rainbowShineActive, setRainbowShineActive] = useState(false);
   const [tooltipTop, setTooltipTop] = useState(58);
   const [tooltipEnabled, setTooltipEnabled] = useState(false);
@@ -89,7 +105,7 @@ export function MessagePanel() {
         const response = await fetch('/api/messages', { cache: 'no-store' });
         if (!response.ok) return;
         const json = (await response.json()) as { bokinMessages?: MessagePost[] };
-        if (!cancelled && Array.isArray(json.bokinMessages)) setDynamicPosts(json.bokinMessages);
+        if (!cancelled && Array.isArray(json.bokinMessages)) setDonationPosts(json.bokinMessages);
       } catch {
         return;
       }
@@ -101,6 +117,19 @@ export function MessagePanel() {
       cancelled = true;
       window.clearInterval(timer);
     };
+  }, []);
+
+  useEffect(() => {
+    return subscribeToFirebaseMessages((messages) => {
+      setFirebasePosts(
+        messages.map((message) => ({
+          publishedAt: formatFirebaseDate(message.publishedAt.toDate()),
+          body: message.body,
+          icon: { src: '/logo/yukimi_works_favicon.png', alt: 'YukimiWorks' },
+          images: message.images.map((image) => ({ src: image.url, alt: image.alt })),
+        })),
+      );
+    });
   }, []);
 
   useEffect(() => {
@@ -176,7 +205,7 @@ export function MessagePanel() {
     });
   };
 
-  const mergedPosts = [...dynamicPosts, ...messagePosts].sort(
+  const mergedPosts = [...donationPosts, ...firebasePosts].sort(
     (a, b) => parseJapaneseDateTime(b.publishedAt).getTime() - parseJapaneseDateTime(a.publishedAt).getTime(),
   );
   const visiblePosts = now ? mergedPosts.filter((post) => parseJapaneseDateTime(post.publishedAt).getTime() <= now.getTime()) : [];
@@ -204,6 +233,7 @@ export function MessagePanel() {
           const formattedDate = formatMessageDate(post.publishedAt, now);
           const dateTime = parseJapaneseDateTime(post.publishedAt).toISOString();
           const open = openPostIndex === index;
+          const previewImage = post.image ?? post.images?.[0];
 
           return (
             <article
@@ -241,15 +271,22 @@ export function MessagePanel() {
                     </span>
                     <span className="message-panel-body-row">
                       <span className="message-panel-body">{post.body}</span>
-                      {post.image ? (
-                        <Image
-                          src={post.image.src}
-                          alt={post.image.alt}
-                          width={220}
-                          height={140}
-                          className="message-panel-thumb"
-                          unoptimized
-                        />
+                      {post.images && post.images.length > 0 ? (
+                        <span className="message-panel-summary-images">
+                          {post.images.map((image) => (
+                            <Image
+                              key={image.src}
+                              src={image.src}
+                              alt={image.alt}
+                              width={220}
+                              height={140}
+                              className="message-panel-thumb"
+                              unoptimized
+                            />
+                          ))}
+                        </span>
+                      ) : previewImage ? (
+                        <Image src={previewImage.src} alt={previewImage.alt} width={220} height={140} className="message-panel-thumb" unoptimized />
                       ) : null}
                     </span>
                   </span>
@@ -290,15 +327,11 @@ export function MessagePanel() {
               {visibleOpenPost.body}
             </p>
             {visibleOpenPost.image ? (
-              <Image
-                src={visibleOpenPost.image.src}
-                alt={visibleOpenPost.image.alt}
-                width={220}
-                height={140}
-                className="message-panel-tooltip-image"
-                unoptimized
-              />
+              <Image src={visibleOpenPost.image.src} alt={visibleOpenPost.image.alt} width={220} height={140} className="message-panel-tooltip-image" unoptimized />
             ) : null}
+            {visibleOpenPost.images?.map((image) => (
+              <Image key={image.src} src={image.src} alt={image.alt} width={220} height={140} className="message-panel-tooltip-image" unoptimized />
+            ))}
           </div>
         </div>
       ) : null}

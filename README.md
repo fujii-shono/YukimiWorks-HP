@@ -37,6 +37,12 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=<project-id>
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=<project-id>.firebasestorage.app
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=<sender-id>
 NEXT_PUBLIC_FIREBASE_APP_ID=<app-id>
+FIREBASE_PROJECT_ID=<project-id>
+FIREBASE_CLIENT_EMAIL=<service-account-email>
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"
+X_CLIENT_ID=<X OAuth 2.0 Client ID>
+X_CLIENT_SECRET=<X OAuth 2.0 Client Secret>
+X_OAUTH_CALLBACK_URL=https://yukimiworks.com/api/x/callback
 UPSTASH_REDIS_REST_URL=https://<your-redis-endpoint>.upstash.io
 UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
 REDIS_KEY_PREFIX=dev
@@ -85,7 +91,7 @@ role: user
 ```
 
 5. ローカルで管理者にするには、Emulator UI の Firestore で対象文書の `role` を文字列 `admin` に変更します。画面はリアルタイムで更新され、「設定 > 管理画面へ」から `/admin` を開けるようになります。
-6. 管理画面では「メッセージ」「ポートフォリオ」「ワーク」「日記」「ニュース」から項目を選択します。現時点で編集できるのはメッセージだけです。メッセージ一覧から新規追加・編集・削除ができ、改行・絵文字を含む本文、公開日時、最大4枚の画像を登録できます。画像は1枚10MBまでです。「Xにも投稿する」は投稿予定を保存するだけで、実際のX投稿処理はまだ行いません。未来の公開日時を指定したメッセージは、その時刻まで公開画面に表示されません。
+6. 管理画面では「メッセージ」「ポートフォリオ」「ワーク」「日記」「ニュース」から項目を選択します。現時点で編集できるのはメッセージだけです。メッセージ一覧から新規追加・編集・削除ができ、改行・絵文字を含む本文、公開日時、最大4枚の画像を登録できます。画像は1枚10MBまでです。未来の公開日時を指定したメッセージは、その時刻まで公開画面に表示されません。
 
 `npm run firebase:emulators` は終了時のデータを `.firebase-data/` に保存し、次回起動時に読み込みます。このフォルダはGit管理されません。
 
@@ -118,6 +124,39 @@ npm run firebase:deploy:rules
 - `purchasedWorkIds`: 作品ID文字列の配列
 
 一般ユーザーが変更できるのは `displayName` だけです。`role`、`plan`、`coins`、`purchasedWorkIds` は Security Rules で本人からの更新を拒否します。メッセージと画像の作成・更新・削除も、`role: admin` のユーザーだけに許可されます。
+
+### Firebase Admin SDK（本番）
+
+X接続・投稿APIは、ブラウザ表示だけでなくサーバー側でもFirebase IDトークンと`role: admin`を検証します。Firebase Consoleの「プロジェクトの設定 > サービス アカウント」からサービスアカウントキーを発行し、JSON内の値をVercelのProduction環境へ登録してください。
+
+- `project_id` → `FIREBASE_PROJECT_ID`
+- `client_email` → `FIREBASE_CLIENT_EMAIL`
+- `private_key` → `FIREBASE_PRIVATE_KEY`（改行は`\\n`のまま登録可能）
+
+秘密鍵JSON本体やこれらの値はGitへ追加しません。Local Emulator Suiteでは上記3項目は不要です。
+
+## X投稿連携
+
+「Xにも投稿する」を選んだメッセージは、Firestoreへの保存成功直後にXへ投稿します。サイト上の公開日時が未来でも、X投稿は予約されず保存時に即時実行されます。同じメッセージにX投稿IDが記録済みの場合、編集保存しても重複投稿しません。投稿失敗時はメッセージ自体を残し、管理画面の編集画面でもう一度保存すると再試行します。
+
+本文はサイト上では最大300文字です。X投稿を選択した場合は、URLをXの短縮URLとして1件23文字に換算した投稿文字数も画面に表示します。280文字を超えると注意を表示し、保存してもX APIは呼び出しません。メッセージ一覧には「長文のため投稿しませんでした」と記録されます。URLを含まない日本語・絵文字も投稿文字数として換算します。
+
+1. X Developer Consoleで対象AppのOAuth 2.0を有効にし、App Typeを`Web App`にします。
+2. 権限に`tweet.read`、`tweet.write`、`users.read`、`offline.access`、`media.write`を許可します。
+3. Callback URIへローカル用の`http://localhost:3000/api/x/callback`を完全一致で登録します。本番では`https://yukimiworks.com/api/x/callback`も登録します。
+4. AppのKeys and tokensでOAuth 2.0 Client ID / Client Secretを確認し、ローカルの`.env.local`へ次を追加します。
+
+```env
+X_CLIENT_ID=<Development AppのClient ID>
+X_CLIENT_SECRET=<Development AppのClient Secret>
+X_OAUTH_CALLBACK_URL=http://localhost:3000/api/x/callback
+```
+
+5. Firebaseエミュレーターと`npm run dev`を再起動し、疑似Googleユーザーを`role: admin`にします。
+6. `/admin?section=messages`の「Xアカウントを接続」を押し、投稿テストに使う鍵付きXアカウントで認可します。Developer Consoleへログインしているアカウントではなく、この認可画面で選んだアカウントが投稿先です。
+7. 新規メッセージで「Xにも投稿する」にチェックして保存し、鍵付きアカウントのタイムラインと管理画面の「X投稿済み」を確認します。
+
+Firebaseでは画像を1枚10MBまで保存できますが、Xへ添付できる静止画は1枚5MBまでです。X投稿を選ぶ場合は5MB以下のJPG、PNG、GIF、WEBPを使用してください。APIキー、Client Secret、アクセストークン、更新トークンはブラウザへ返しません。
 
 `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` は、カウンターを Redis に保存するために使用します。
 既存の接続情報をそのまま使う場合は、`KV_REST_API_URL` と `KV_REST_API_TOKEN` も後方互換で読み込みます。
@@ -163,6 +202,12 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
 NEXT_PUBLIC_FIREBASE_APP_ID
+FIREBASE_PROJECT_ID
+FIREBASE_CLIENT_EMAIL
+FIREBASE_PRIVATE_KEY
+X_CLIENT_ID
+X_CLIENT_SECRET
+X_OAUTH_CALLBACK_URL
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 ```

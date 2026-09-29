@@ -701,6 +701,12 @@ textarea {
   text-align: right;
 }
 
+.admin-x-length-note {
+  margin: -2px 0 0;
+  color: var(--site-text-muted);
+  font-size: 0.8rem;
+}
+
 .admin-image-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -740,9 +746,52 @@ textarea {
   gap: 10px;
 }
 
+.admin-x-connection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  background: var(--site-surface-soft);
+  border: 1px dotted var(--site-dotted);
+}
+
+.admin-x-connection h3,
+.admin-x-connection p {
+  margin: 0;
+}
+
+.admin-x-connection h3 {
+  margin-bottom: 5px;
+  color: var(--site-accent);
+  font-weight: 400;
+}
+
+.admin-x-connection button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+}
+
 .admin-message-list article {
+  position: relative;
   padding: 12px;
   border: 1px dotted var(--site-dotted);
+}
+
+.admin-message-list article time {
+  display: block;
+  padding-right: 190px;
+}
+
+.admin-message-x-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  max-width: min(48%, 230px);
+  color: var(--site-accent);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .admin-message-list article p {
@@ -791,6 +840,22 @@ textarea {
 
 .window-title-menu {
   position: relative;
+}
+
+.window-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.window-title-link:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.window-title-link:focus-visible {
+  outline: 2px solid var(--site-accent);
+  outline-offset: 4px;
 }
 
 .panel-subtitle {
@@ -5855,5 +5920,14 @@ html:has(.acrylic-demo-page) body {
 
   .account-name-row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-x-connection {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-x-connection button {
+    width: 100%;
   }
 }

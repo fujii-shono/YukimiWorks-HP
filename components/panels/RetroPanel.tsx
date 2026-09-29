@@ -1,13 +1,16 @@
 import { cn } from '@/lib/format';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 
 export function RetroPanel({
   title,
+  titleHref,
   titleAside,
   children,
   className,
   contentClassName,
 }: {
   title: string;
+  titleHref?: string;
   titleAside?: string;
   children: React.ReactNode;
   className?: string;
@@ -19,7 +22,13 @@ export function RetroPanel({
         <span className="title-deco" aria-hidden="true">
           ❄
         </span>
-        <span>{title}</span>
+        {titleHref ? (
+          <Link href={titleHref} className="window-title-link">
+            {title}
+          </Link>
+        ) : (
+          <span>{title}</span>
+        )}
         {titleAside ? <span className="panel-subtitle">{titleAside}</span> : null}
         <span className="title-deco" aria-hidden="true">
           ❄

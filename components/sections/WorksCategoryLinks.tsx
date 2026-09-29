@@ -30,7 +30,7 @@ export function WorksCategoryLinks() {
   const { event } = useTimeTheme();
 
   return (
-    <RetroPanel title="Works" className="works-panel">
+    <RetroPanel title="Works" titleHref="/works" className="works-panel">
       <div className="service-list">
         {items.map((item) => {
           const iconPath = getIconPath(item.value, event);

@@ -7,11 +7,14 @@ import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import {
   deleteFirebaseMessage,
   deleteMessageImages,
+  MAX_MESSAGE_BODY_LENGTH,
   MAX_MESSAGE_IMAGES,
   saveFirebaseMessage,
   subscribeToFirebaseMessages,
 } from '@/lib/firebase/messages';
 import type { FirebaseMessage, FirebaseMessageImage } from '@/lib/firebase/types';
+import { disconnectX, getXStatus, postSavedMessageToX, startXConnection } from '@/lib/x/client';
+import { getXPostCharacterCount, isXPostTooLong, MAX_X_POST_CHARACTERS } from '@/lib/x/characters';
 
 const adminSections = [
   { id: 'messages', label: 'メッセージ' },
@@ -23,6 +26,7 @@ const adminSections = [
 
 type AdminSection = (typeof adminSections)[number]['id'];
 type MessageView = 'list' | 'new' | 'edit';
+type XConnectionStatus = { configured: boolean; connected: boolean; username?: string };
 
 function toTokyoDateTimeInput(date: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -42,6 +46,14 @@ function initialPublishedAt() {
   return toTokyoDateTimeInput(new Date());
 }
 
+function getXPostStatusLabel(message: FirebaseMessage) {
+  if (!message.postToX) return null;
+  if (message.xPostStatus === 'posted') return 'X投稿済み';
+  if (message.xPostStatus === 'skipped_too_long') return '長文のため投稿しませんでした';
+  if (message.xPostStatus === 'failed') return 'X投稿失敗';
+  return 'X投稿待ち';
+}
+
 export function AdminMessageManager() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,6 +68,8 @@ export function AdminMessageManager() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [xConnection, setXConnection] = useState<XConnectionStatus | null>(null);
+  const [xConnectionBusy, setXConnectionBusy] = useState(false);
   const hydratedFormKey = useRef<string | null>(null);
 
   const isAdmin = profile?.role === 'admin';
@@ -73,6 +87,9 @@ export function AdminMessageManager() {
         : 'list';
   const editingId = messageView === 'edit' ? requestedEditingId : null;
   const newFilePreviews = useMemo(() => newFiles.map((file) => ({ file, url: URL.createObjectURL(file) })), [newFiles]);
+  const xPostCharacterCount = useMemo(() => getXPostCharacterCount(body.trim()), [body]);
+  const xPostTooLong = postToX && isXPostTooLong(body.trim());
+  const editingMessage = editingId ? messages.find((message) => message.id === editingId) : undefined;
 
   useEffect(() => () => newFilePreviews.forEach(({ url }) => URL.revokeObjectURL(url)), [newFilePreviews]);
 
@@ -80,6 +97,27 @@ export function AdminMessageManager() {
     if (!isAdmin || activeSection !== 'messages') return;
     return subscribeToFirebaseMessages(setMessages, () => setError('メッセージ一覧を読み込めませんでした。'));
   }, [activeSection, isAdmin]);
+
+  useEffect(() => {
+    if (!firebaseUser || !isAdmin || activeSection !== 'messages') return;
+    let active = true;
+    void getXStatus(firebaseUser)
+      .then((status) => {
+        if (active) setXConnection(status);
+      })
+      .catch((statusError) => {
+        if (active) setError(statusError instanceof Error ? statusError.message : 'X接続状態を確認できませんでした。');
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeSection, firebaseUser, isAdmin, searchParams]);
+
+  useEffect(() => {
+    const xResult = searchParams.get('x');
+    if (xResult === 'connected') setNotice('Xアカウントを接続しました。');
+    if (xResult === 'error') setError('Xアカウントを接続できませんでした。設定を確認して再度お試しください。');
+  }, [searchParams]);
 
   useEffect(() => {
     if (loading || profileLoading) return;
@@ -167,22 +205,67 @@ export function AdminMessageManager() {
     setError(null);
     setNotice(null);
     try {
-      await saveFirebaseMessage({
+      if (postToX && !xPostTooLong && !xConnection?.connected) {
+        throw new Error('先にXアカウントを接続してください。');
+      }
+      const savedMessage = await saveFirebaseMessage({
         id: editingId || undefined,
         body,
         publishedAt: new Date(`${publishedAt}:00+09:00`),
         existingImages,
         newFiles,
         postToX,
+        skipXPostForLength: xPostTooLong,
+        retrySkippedXPost: Boolean(!xPostTooLong && editingMessage?.xPostStatus === 'skipped_too_long'),
       });
       if (removedImages.length > 0) await deleteMessageImages(removedImages);
-      setNotice(editingId ? 'メッセージを更新しました。' : 'メッセージを追加しました。');
+      let nextNotice = editingId ? 'メッセージを更新しました。' : 'メッセージを追加しました。';
+      let xPostError: string | null = null;
+      if (xPostTooLong) {
+        nextNotice += ' 長文のためXには投稿しませんでした。';
+      } else if (postToX && firebaseUser) {
+        try {
+          const result = await postSavedMessageToX(firebaseUser, savedMessage.id);
+          nextNotice += result.alreadyPosted ? ' Xには投稿済みです。' : ' Xにも投稿しました。';
+        } catch (postError) {
+          xPostError = postError instanceof Error ? postError.message : 'Xへの投稿に失敗しました。';
+        }
+      }
       resetForm();
+      setNotice(nextNotice);
+      if (xPostError) setError(`メッセージは保存しましたが、Xへ投稿できませんでした：${xPostError}`);
       router.push('/admin?section=messages');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'メッセージを保存できませんでした。');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const connectXAccount = async () => {
+    if (!firebaseUser) return;
+    setXConnectionBusy(true);
+    setError(null);
+    try {
+      await startXConnection(firebaseUser);
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : 'X接続を開始できませんでした。');
+      setXConnectionBusy(false);
+    }
+  };
+
+  const disconnectXAccount = async () => {
+    if (!firebaseUser || !window.confirm('Xアカウントの接続を解除しますか？')) return;
+    setXConnectionBusy(true);
+    setError(null);
+    try {
+      await disconnectX(firebaseUser);
+      setXConnection({ configured: true, connected: false });
+      setNotice('Xアカウントの接続を解除しました。');
+    } catch (disconnectError) {
+      setError(disconnectError instanceof Error ? disconnectError.message : 'Xアカウントの接続を解除できませんでした。');
+    } finally {
+      setXConnectionBusy(false);
     }
   };
 
@@ -249,6 +332,26 @@ export function AdminMessageManager() {
         <button type="button" onClick={backToDashboard} disabled={busy}>管理項目へ戻る</button>
       </div>
 
+      <section className="admin-x-connection" aria-label="Xアカウント接続">
+        <div>
+          <h3>X連携</h3>
+          {!xConnection ? <p>接続状態を確認しています…</p> : null}
+          {xConnection && !xConnection.configured ? <p>X APIの環境変数が未設定です。</p> : null}
+          {xConnection?.configured && xConnection.connected ? (
+            <p><strong>@{xConnection.username}</strong> に、チェックしたメッセージを保存時に投稿します。</p>
+          ) : null}
+          {xConnection?.configured && !xConnection.connected ? <p>Xアカウントは未接続です。</p> : null}
+        </div>
+        {xConnection?.configured && xConnection.connected ? (
+          <button type="button" onClick={() => void disconnectXAccount()} disabled={busy || xConnectionBusy}>接続解除</button>
+        ) : null}
+        {xConnection?.configured && !xConnection.connected ? (
+          <button type="button" className="pixel-button" onClick={() => void connectXAccount()} disabled={busy || xConnectionBusy}>
+            {xConnectionBusy ? '接続中…' : 'Xアカウントを接続'}
+          </button>
+        ) : null}
+      </section>
+
       {messageView === 'list' ? (
         <section className="admin-message-list" aria-label="登録済みメッセージ">
           <div className="admin-list-heading">
@@ -260,13 +363,13 @@ export function AdminMessageManager() {
           {messages.length === 0 ? <p>登録済みメッセージはありません。</p> : null}
           {messages.map((message) => (
             <article key={message.id}>
+              {getXPostStatusLabel(message) ? <span className="admin-message-x-status">{getXPostStatusLabel(message)}</span> : null}
               <time dateTime={message.publishedAt.toDate().toISOString()}>
                 {message.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               </time>
               <p>{message.body}</p>
               <span>
                 {message.images.length > 0 ? `画像 ${message.images.length}枚` : '画像なし'}
-                {message.postToX ? ' / X投稿予定' : ''}
               </span>
               <div>
                 <button type="button" onClick={() => editMessage(message)} disabled={busy}>編集</button>
@@ -286,12 +389,12 @@ export function AdminMessageManager() {
             id="admin-message-body"
             value={body}
             rows={9}
-            maxLength={4000}
+            maxLength={MAX_MESSAGE_BODY_LENGTH}
             required
             placeholder={'ここで改行できます。\n絵文字も使用できます ❄️'}
             onChange={(event) => setBody(event.target.value)}
           />
-          <span className="admin-character-count">{body.length} / 4000</span>
+          <span className="admin-character-count">{body.length} / {MAX_MESSAGE_BODY_LENGTH}</span>
 
           <label htmlFor="admin-message-published-at">公開日時（日本時間）</label>
           <input
@@ -319,8 +422,14 @@ export function AdminMessageManager() {
               checked={postToX}
               onChange={(event) => setPostToX(event.target.checked)}
             />
-            Xにも投稿する（投稿機能は準備中）
+            Xにも投稿する（保存時に即時投稿）
           </label>
+          {postToX ? (
+            <p className={xPostTooLong ? 'form-error admin-x-length-note' : 'admin-x-length-note'}>
+              X投稿換算: {xPostCharacterCount} / {MAX_X_POST_CHARACTERS}文字（URLは1件23文字として換算）
+              {xPostTooLong ? '。上限を超えるため、保存してもXには投稿しません。' : ''}
+            </p>
+          ) : null}
 
           {existingImages.length > 0 || newFilePreviews.length > 0 ? (
             <div className="admin-image-grid">

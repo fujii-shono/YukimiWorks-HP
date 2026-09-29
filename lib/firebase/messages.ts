@@ -16,10 +16,11 @@ import {
 } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getFirebaseServices } from '@/lib/firebase/client';
-import type { FirebaseMessage, FirebaseMessageImage } from '@/lib/firebase/types';
+import type { FirebaseMessage, FirebaseMessageImage, XPostStatus } from '@/lib/firebase/types';
 
 export const MAX_MESSAGE_IMAGES = 4;
 export const MAX_MESSAGE_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_MESSAGE_BODY_LENGTH = 300;
 
 function parseMessage(snapshot: QueryDocumentSnapshot<DocumentData>): FirebaseMessage | null {
   const data = snapshot.data();
@@ -38,12 +39,19 @@ function parseMessage(snapshot: QueryDocumentSnapshot<DocumentData>): FirebaseMe
           typeof image.alt === 'string',
       ),
   );
+  const validXStatuses: XPostStatus[] = ['not_requested', 'pending', 'posting', 'posted', 'failed', 'skipped_too_long'];
+  const xPostStatus = validXStatuses.includes(data.xPostStatus) ? data.xPostStatus : data.postToX === true ? 'pending' : 'not_requested';
 
   return {
     id: snapshot.id,
     body: data.body,
     images: images.slice(0, MAX_MESSAGE_IMAGES),
     postToX: data.postToX === true,
+    xPostStatus,
+    xPostId: typeof data.xPostId === 'string' ? data.xPostId : undefined,
+    xPostError: typeof data.xPostError === 'string' ? data.xPostError : undefined,
+    xPostAttemptedAt: data.xPostAttemptedAt instanceof Timestamp ? data.xPostAttemptedAt : undefined,
+    xPostedAt: data.xPostedAt instanceof Timestamp ? data.xPostedAt : undefined,
     publishedAt: data.publishedAt,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined,
     updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt : undefined,
@@ -102,6 +110,8 @@ export async function saveFirebaseMessage({
   existingImages,
   newFiles,
   postToX,
+  skipXPostForLength = false,
+  retrySkippedXPost = false,
 }: {
   id?: string;
   body: string;
@@ -109,12 +119,16 @@ export async function saveFirebaseMessage({
   existingImages: FirebaseMessageImage[];
   newFiles: File[];
   postToX: boolean;
+  skipXPostForLength?: boolean;
+  retrySkippedXPost?: boolean;
 }) {
   const services = getFirebaseServices();
   if (!services) throw new Error('Firebase が設定されていません。');
 
   const normalizedBody = body.trim();
-  if (!normalizedBody || normalizedBody.length > 4000) throw new Error('本文は1〜4000文字で入力してください。');
+  if (!normalizedBody || normalizedBody.length > MAX_MESSAGE_BODY_LENGTH) {
+    throw new Error(`本文は1〜${MAX_MESSAGE_BODY_LENGTH}文字で入力してください。`);
+  }
   if (Number.isNaN(publishedAt.getTime())) throw new Error('公開日時を入力してください。');
   validateFiles(newFiles, existingImages.length);
 
@@ -130,7 +144,18 @@ export async function saveFirebaseMessage({
         postToX,
         publishedAt: Timestamp.fromDate(publishedAt),
         updatedAt: serverTimestamp(),
-        ...(id ? {} : { createdAt: serverTimestamp() }),
+        ...(id
+          ? retrySkippedXPost
+            ? { xPostStatus: 'pending', xPostError: null, xPostAttemptedAt: null }
+            : {}
+          : {
+              createdAt: serverTimestamp(),
+              xPostStatus: postToX ? (skipXPostForLength ? 'skipped_too_long' : 'pending') : 'not_requested',
+              xPostId: null,
+              xPostError: null,
+              xPostAttemptedAt: null,
+              xPostedAt: null,
+            }),
       },
       { merge: Boolean(id) },
     );

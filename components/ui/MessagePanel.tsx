@@ -105,7 +105,9 @@ export function MessagePanel() {
         <span className="title-deco" aria-hidden="true">
           ❄
         </span>
-        <span>Message</span>
+        <Link href="/messages" className="window-title-link">
+          Message
+        </Link>
         <span className="title-deco" aria-hidden="true">
           ❄
         </span>

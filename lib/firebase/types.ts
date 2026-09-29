@@ -19,12 +19,18 @@ export type FirebaseMessageImage = {
   alt: string;
 };
 
+export type XPostStatus = 'not_requested' | 'pending' | 'posting' | 'posted' | 'failed' | 'skipped_too_long';
+
 export type FirebaseMessage = {
   id: string;
   body: string;
   images: FirebaseMessageImage[];
-  /** 将来のX投稿連携用の予約項目。投稿処理自体は未実装。 */
   postToX: boolean;
+  xPostStatus: XPostStatus;
+  xPostId?: string;
+  xPostError?: string;
+  xPostAttemptedAt?: Timestamp;
+  xPostedAt?: Timestamp;
   publishedAt: Timestamp;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

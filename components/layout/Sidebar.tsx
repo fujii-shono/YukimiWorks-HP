@@ -283,7 +283,9 @@ export function Sidebar() {
           <span className="title-deco" aria-hidden="true">
             ❄
           </span>
-          <span>What&apos;s New</span>
+          <Link href="/news" className="window-title-link">
+            What&apos;s New
+          </Link>
           <span className="title-deco" aria-hidden="true">
             ❄
           </span>

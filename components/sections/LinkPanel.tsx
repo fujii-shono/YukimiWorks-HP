@@ -21,7 +21,7 @@ export function LinkPanel() {
   };
 
   return (
-    <RetroPanel title="Link" className="link-panel">
+    <RetroPanel title="Link" titleHref="/links" className="link-panel">
       <div className="link-grid">
         {homeLinks.map((item) => {
           const iconPath = getLinkIconPath(item.icon);

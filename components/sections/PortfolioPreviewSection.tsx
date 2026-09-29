@@ -7,7 +7,7 @@ export function PortfolioPreviewSection() {
   const latestItems = portfolioItems.slice(0, 8);
 
   return (
-    <RetroPanel title="Portfolio" className="portfolio-preview-panel">
+    <RetroPanel title="Portfolio" titleHref="/portfolio" className="portfolio-preview-panel">
       <div className="portfolio-preview-list">
         {latestItems.map((item) => (
           <Link key={item.id} href={item.href} className="portfolio-preview-item">

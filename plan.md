@@ -1,3 +1,46 @@
+## 追加対応: メッセージ保存時のX自動投稿
+
+### 対応する仕様
+
+- ユーザー依頼: 「Xにも投稿する」を選んだメッセージは、Firestoreへの保存成功後にXへ自動投稿する
+- 管理者1名が所有するXアカウントをOAuth 2.0で接続し、テキストと最大4枚の画像を投稿する
+
+### 実装方針
+
+- Firebase IDトークンとFirestore上の`role: admin`をサーバー側でも検証し、X接続・投稿APIを管理者専用にする
+- OAuth 2.0 Authorization Code + PKCEでXアカウントを接続し、アクセストークンと更新トークンはクライアントへ返さずFirestoreの非公開領域へ保存する
+- メッセージ保存後にX投稿APIを呼び、メッセージ文書へ投稿状態・投稿ID・失敗理由を記録する
+- 投稿済みIDがあるメッセージは編集保存しても再投稿せず、失敗したメッセージだけ次回保存時に再試行可能にする
+- 画像はFirebase StorageのURLからサーバーで取得し、XのMedia Upload後にPostへ紐付ける
+
+### 変更予定のファイルと理由
+
+- `app/api/x/**`, `lib/firebase/admin.ts`, `lib/x/**`: 管理者検証、X OAuth、トークン更新、メディア・Post作成のため
+- `components/admin/AdminMessageManager.tsx`, `components/messages/QuickMessageComposer.tsx`: 接続状態表示と保存後の自動投稿を行うため
+- `lib/firebase/messages.ts`, `lib/firebase/types.ts`, `firestore.rules`: X投稿状態をメッセージへ保持するため
+- `.env.example`, `README.md`, `SPEC.md`: X ConsoleとFirebase Adminの設定・ローカルテスト手順を明記するため
+- `package.json`, `package-lock.json`: サーバー側Firebase認証にFirebase Admin SDKを使用するため
+
+### 影響範囲
+
+- 管理画面とMessage画面からのメッセージ新規作成・編集
+- Firebase本番・エミュレーターのサーバー側認証
+- X APIの投稿料金とXアカウントのタイムライン
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- X未設定・未接続・投稿済み・投稿失敗時の画面分岐を確認する
+
+### 懸念点・制約・未確定事項
+
+- Xへの実投稿検証は、ユーザー側でClient ID / Client SecretとCallback URLを設定し、鍵付きテストアカウントを認可した後に行う
+- X投稿は保存時に即時実行し、メッセージの未来の公開日時に合わせた予約投稿は行わない
+
+---
+
 ## 追加対応: AboutへのWhy YukimiWorks統合
 
 ### 対応する仕様
@@ -36,7 +79,7 @@
 
 - Googleログインの認証状態が反映された時点でログインモーダルを閉じる
 - 管理画面は5種の管理項目から始め、メッセージだけ一覧・新規追加・編集・削除まで実装する
-- メッセージにはX投稿予定フラグを保存するが、Xの投稿処理は実装しない
+- メッセージにはX投稿フラグと投稿結果を保存し、チェック時は保存後にXへ自動投稿する
 - 検証: lint、型チェック、production build
 
 ### 追加調整: 管理画面の履歴
@@ -1888,8 +1931,15 @@
 
 - 端末風エリアは高さを維持し、幅390pxに固定する
 - Firebaseプロファイルが `admin` の場合だけ、右下に投稿ボタンを表示する
-- 既存の `saveFirebaseMessage` を再利用し、本文、最大4枚の画像、X投稿予定を保存する
+- 既存の `saveFirebaseMessage` を再利用し、本文、最大4枚の画像、X投稿指定を保存する
 - 公開日時は入力させず、送信時の `new Date()` を使用する
 - 保存成功後はカスタムイベントで新規投稿を各Message表示に通知し、Firestore購読の反映を待たずに表示する
+
+### 追加調整: X投稿文字数と一覧状態
+
+- 本文の入力上限を300文字へ統一し、Firestore Rulesでも同じ上限を検証する
+- X投稿時はURLを23文字として換算し、280文字超過を管理画面とMessage追加モーダルの両方で警告する
+- 超過時はFirestoreへ「長文のため投稿しませんでした」状態を保存し、X APIを呼ばない。サーバー側も同じ判定を行い、直接APIが呼ばれても投稿しない
+- メッセージ一覧の右上に、投稿済み・待機・失敗・長文未投稿の状態を表示する
 
 ---

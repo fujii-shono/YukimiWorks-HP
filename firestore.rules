@@ -50,12 +50,20 @@ service cloud.firestore {
     }
 
     function validMessage(data) {
-      return data.keys().hasOnly(['body', 'images', 'postToX', 'publishedAt', 'createdAt', 'updatedAt'])
+      return data.keys().hasOnly([
+          'body', 'images', 'postToX', 'publishedAt', 'createdAt', 'updatedAt',
+          'xPostStatus', 'xPostId', 'xPostError', 'xPostAttemptedAt', 'xPostedAt'
+        ])
         && data.body is string
         && data.body.size() >= 1
-        && data.body.size() <= 4000
+        && data.body.size() <= 300
         && validImages(data.images)
         && data.postToX is bool
+        && (!('xPostStatus' in data) || data.xPostStatus in ['not_requested', 'pending', 'posting', 'posted', 'failed', 'skipped_too_long'])
+        && (!('xPostId' in data) || data.xPostId == null || data.xPostId is string)
+        && (!('xPostError' in data) || data.xPostError == null || (data.xPostError is string && data.xPostError.size() <= 500))
+        && (!('xPostAttemptedAt' in data) || data.xPostAttemptedAt == null || data.xPostAttemptedAt is timestamp)
+        && (!('xPostedAt' in data) || data.xPostedAt == null || data.xPostedAt is timestamp)
         && data.publishedAt is timestamp
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;

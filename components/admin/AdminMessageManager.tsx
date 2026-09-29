@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
+import { AdminTrafficAnalytics } from '@/components/admin/AdminTrafficAnalytics';
+import { TrackingLinkBuilder } from '@/components/admin/TrackingLinkBuilder';
 import {
   deleteFirebaseMessage,
   deleteMessageImages,
@@ -22,11 +24,12 @@ const adminSections = [
   { id: 'works', label: 'ワーク' },
   { id: 'diary', label: '日記' },
   { id: 'news', label: 'ニュース' },
+  { id: 'analytics', label: 'アクセス分析' },
 ] as const;
 
 type AdminSection = (typeof adminSections)[number]['id'];
 type MessageView = 'list' | 'new' | 'edit';
-type XConnectionStatus = { configured: boolean; connected: boolean; username?: string };
+type XConnectionStatus = { configured: boolean; connected: boolean; username?: string; dryRun?: boolean };
 
 function toTokyoDateTimeInput(date: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -71,6 +74,7 @@ export function AdminMessageManager() {
   const [xConnection, setXConnection] = useState<XConnectionStatus | null>(null);
   const [xConnectionBusy, setXConnectionBusy] = useState(false);
   const hydratedFormKey = useRef<string | null>(null);
+  const bodyInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const isAdmin = profile?.role === 'admin';
   const sectionValue = searchParams.get('section');
@@ -199,6 +203,26 @@ export function AdminMessageManager() {
     setRemovedImages((current) => [...current, image]);
   };
 
+  const insertTrackingLink = (trackingUrl: string) => {
+    const input = bodyInputRef.current;
+    const start = input?.selectionStart ?? body.length;
+    const end = input?.selectionEnd ?? body.length;
+    const before = body.slice(0, start);
+    const after = body.slice(end);
+    const leadingSpace = before && !/\s$/.test(before) ? ' ' : '';
+    const trailingSpace = after && !/^\s/.test(after) ? ' ' : '';
+    const insertion = `${leadingSpace}${trackingUrl}${trailingSpace}`;
+    const nextBody = `${before}${insertion}${after}`;
+    if (nextBody.length > MAX_MESSAGE_BODY_LENGTH) return `本文が${MAX_MESSAGE_BODY_LENGTH}文字を超えるため挿入できません。`;
+    setBody(nextBody);
+    requestAnimationFrame(() => {
+      input?.focus();
+      const nextCursor = start + insertion.length;
+      input?.setSelectionRange(nextCursor, nextCursor);
+    });
+    return null;
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
@@ -226,7 +250,7 @@ export function AdminMessageManager() {
       } else if (postToX && firebaseUser) {
         try {
           const result = await postSavedMessageToX(firebaseUser, savedMessage.id);
-          nextNotice += result.alreadyPosted ? ' Xには投稿済みです。' : ' Xにも投稿しました。';
+          nextNotice += result.alreadyPosted ? ' Xには投稿済みです。' : result.dryRun ? ' テスト設定によりX投稿済みとして記録しました。' : ' Xにも投稿しました。';
         } catch (postError) {
           xPostError = postError instanceof Error ? postError.message : 'Xへの投稿に失敗しました。';
         }
@@ -312,6 +336,10 @@ export function AdminMessageManager() {
     );
   }
 
+  if (activeSection === 'analytics') {
+    return <AdminTrafficAnalytics onBack={backToDashboard} />;
+  }
+
   if (activeSection !== 'messages') {
     const section = adminSections.find((item) => item.id === activeSection);
     return (
@@ -337,12 +365,13 @@ export function AdminMessageManager() {
           <h3>X連携</h3>
           {!xConnection ? <p>接続状態を確認しています…</p> : null}
           {xConnection && !xConnection.configured ? <p>X APIの環境変数が未設定です。</p> : null}
-          {xConnection?.configured && xConnection.connected ? (
+          {xConnection?.dryRun ? <p><strong>ドライラン中</strong> — X APIを呼ばず投稿済みとして記録します。</p> : null}
+          {xConnection?.configured && xConnection.connected && !xConnection.dryRun ? (
             <p><strong>@{xConnection.username}</strong> に、チェックしたメッセージを保存時に投稿します。</p>
           ) : null}
           {xConnection?.configured && !xConnection.connected ? <p>Xアカウントは未接続です。</p> : null}
         </div>
-        {xConnection?.configured && xConnection.connected ? (
+        {xConnection?.configured && xConnection.connected && !xConnection.dryRun ? (
           <button type="button" onClick={() => void disconnectXAccount()} disabled={busy || xConnectionBusy}>接続解除</button>
         ) : null}
         {xConnection?.configured && !xConnection.connected ? (
@@ -387,6 +416,7 @@ export function AdminMessageManager() {
           <label htmlFor="admin-message-body">本文</label>
           <textarea
             id="admin-message-body"
+            ref={bodyInputRef}
             value={body}
             rows={9}
             maxLength={MAX_MESSAGE_BODY_LENGTH}
@@ -395,6 +425,8 @@ export function AdminMessageManager() {
             onChange={(event) => setBody(event.target.value)}
           />
           <span className="admin-character-count">{body.length} / {MAX_MESSAGE_BODY_LENGTH}</span>
+
+          <TrackingLinkBuilder onInsert={insertTrackingLink} disabled={busy} />
 
           <label htmlFor="admin-message-published-at">公開日時（日本時間）</label>
           <input

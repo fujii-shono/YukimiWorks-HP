@@ -485,7 +485,8 @@ textarea {
 
 .account-settings-button,
 .account-modal button,
-.admin-message-manager button {
+.admin-message-manager button,
+.admin-traffic-analytics button {
   color: var(--site-text);
   background: var(--site-surface-soft);
   border: 1px solid var(--site-border);
@@ -810,6 +811,297 @@ textarea {
   padding: 4px 10px;
 }
 
+.tracking-link-builder {
+  display: grid;
+  gap: 7px;
+  margin: 5px 0;
+  padding: 12px;
+  background: var(--site-surface);
+  border: 1px dotted var(--site-dotted);
+}
+
+.tracking-link-builder h4,
+.tracking-link-builder p {
+  margin: 0;
+}
+
+.tracking-link-builder h4 {
+  color: var(--site-accent);
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.tracking-link-builder > p,
+.tracking-link-controls label {
+  color: var(--site-text-muted);
+  font-size: 0.78rem;
+}
+
+.tracking-link-controls,
+.tracking-link-controls > div {
+  display: grid;
+  gap: 6px;
+}
+
+.tracking-link-controls > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.tracking-link-controls input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  color: var(--site-text);
+  background: var(--site-bg);
+  border: 1px solid var(--site-border);
+  font: inherit;
+}
+
+.tracking-link-controls button {
+  padding: 7px 10px;
+}
+
+.admin-traffic-analytics {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.traffic-analytics-note {
+  margin: 0;
+  color: var(--site-text-muted);
+  font-size: 0.82rem;
+}
+
+.traffic-link-list {
+  display: grid;
+  gap: 14px;
+}
+
+.traffic-link-card {
+  padding: 14px;
+  border: 1px dotted var(--site-dotted);
+}
+
+.traffic-link-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.traffic-link-card > header > div {
+  min-width: 0;
+}
+
+.traffic-link-message {
+  display: -webkit-box;
+  margin: 0 0 5px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.traffic-link-card a {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--site-accent);
+  font-size: 0.8rem;
+}
+
+.traffic-tracking-url {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--site-text-muted);
+  font-size: 0.72rem;
+}
+
+.traffic-total {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--site-accent);
+  text-align: center;
+}
+
+.traffic-total strong,
+.traffic-total span {
+  display: block;
+}
+
+.traffic-total strong {
+  font-size: clamp(1.8rem, 5vw, 2.7rem);
+  line-height: 1;
+}
+
+.traffic-total span {
+  margin-top: 4px;
+  font-size: 0.78rem;
+}
+
+.traffic-details-button {
+  margin-top: 12px;
+  padding: 5px 10px;
+}
+
+.traffic-trend {
+  margin: 0;
+}
+
+.traffic-trend {
+  margin-top: 4px;
+  color: var(--site-text-muted);
+  font-size: 0.78rem;
+}
+
+.traffic-chart-wrap {
+  width: 100%;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.traffic-chart {
+  display: block;
+  width: 100%;
+  min-width: 560px;
+  height: auto;
+  background: var(--site-surface-soft);
+  border: 1px solid var(--site-border);
+}
+
+.traffic-chart-axis {
+  stroke: var(--site-border);
+  stroke-width: 1;
+}
+
+.traffic-chart-bar {
+  fill: var(--site-accent-soft);
+}
+
+.traffic-chart-label {
+  fill: var(--site-text-muted);
+  font-size: 10px;
+}
+
+.traffic-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 20, 45, 0.76);
+}
+
+.traffic-modal {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 20px;
+  color: var(--site-text);
+  background: var(--site-surface);
+  border: 1px solid var(--site-border);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.traffic-modal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.traffic-modal-heading h2,
+.traffic-modal-chart h3,
+.traffic-modal-chart p,
+.traffic-modal-link {
+  margin: 0;
+}
+
+.traffic-modal-heading h2,
+.traffic-modal-chart h3 {
+  color: var(--site-accent);
+  font-size: 1.05rem;
+  font-weight: 400;
+}
+
+.traffic-modal-close {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--site-accent) !important;
+  background: var(--site-surface) !important;
+  border-radius: 50%;
+  font: 1.3rem/1 var(--font-pixel);
+}
+
+.traffic-modal-link {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+  color: var(--site-text-muted);
+  font-size: 0.8rem;
+}
+
+.traffic-granularity-toggle,
+.traffic-period-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.traffic-granularity-toggle button {
+  padding: 6px 14px;
+}
+
+.traffic-granularity-toggle button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--site-accent);
+}
+
+.traffic-period-controls > button {
+  width: 38px;
+  height: 36px;
+  padding: 0;
+}
+
+.traffic-period-controls label {
+  display: grid;
+  gap: 4px;
+  color: var(--site-text-muted);
+  font-size: 0.78rem;
+}
+
+.traffic-period-controls input {
+  min-height: 36px;
+  padding: 5px 8px;
+  color: var(--site-text);
+  background: var(--site-bg);
+  border: 1px solid var(--site-border);
+  font: inherit;
+}
+
+.traffic-modal-chart {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dotted var(--site-dotted);
+}
+
+.traffic-modal-chart > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.traffic-modal-chart > div p {
+  color: var(--site-text-muted);
+  font-size: 0.8rem;
+}
+
 .standalone-main {
   width: min(100%, 826px);
   margin: 14px auto 0;
@@ -1123,6 +1415,11 @@ textarea {
 .pixel-tint-frame-icon {
   width: max-content;
   height: max-content;
+}
+
+.pixel-tint-frame-banner {
+  display: flex;
+  width: 100%;
 }
 
 .tinted-pixel-art {
@@ -4425,6 +4722,20 @@ html:has(.acrylic-demo-page) body {
   border: 1px solid var(--site-border);
 }
 
+.contact-form select {
+  appearance: none;
+  padding-right: 48px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--site-accent) 50%),
+    linear-gradient(135deg, var(--site-accent) 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) 50%,
+    calc(100% - 14px) 50%;
+  background-repeat: no-repeat;
+  background-size: 8px 8px;
+  cursor: pointer;
+}
+
 .field-error,
 .form-global-error {
   color: #b00020;
@@ -4936,6 +5247,23 @@ html:has(.acrylic-demo-page) body {
 .message-panel-body {
   display: block;
   white-space: pre-wrap;
+}
+
+.message-inline-link {
+  color: var(--site-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  -webkit-text-fill-color: currentColor;
+}
+
+a.message-inline-link:hover {
+  color: var(--site-focus);
+}
+
+a.message-inline-link:focus-visible {
+  outline: 2px solid var(--site-focus);
+  outline-offset: 2px;
 }
 
 .message-panel-post-blue .message-panel-body,
@@ -5917,7 +6245,8 @@ html:has(.acrylic-demo-page) body {
   }
 
   .account-modal,
-  .admin-message-manager {
+  .admin-message-manager,
+  .admin-traffic-analytics {
     padding-left: 14px;
     padding-right: 14px;
   }
@@ -5933,5 +6262,28 @@ html:has(.acrylic-demo-page) body {
 
   .admin-x-connection button {
     width: 100%;
+  }
+
+  .tracking-link-controls > div {
+    grid-template-columns: 1fr;
+  }
+
+  .traffic-link-card > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .traffic-total {
+    align-self: flex-start;
+    text-align: left;
+  }
+
+  .traffic-modal-backdrop {
+    padding: 12px;
+  }
+
+  .traffic-modal {
+    max-height: calc(100vh - 24px);
+    padding: 16px;
   }
 }

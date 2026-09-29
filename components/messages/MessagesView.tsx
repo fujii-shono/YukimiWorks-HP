@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
+import { MessageBody } from '@/components/messages/MessageBody';
 import { QuickMessageComposer } from '@/components/messages/QuickMessageComposer';
 import { formatMessageDate, getMessageImages, parseJapaneseDateTime, usePublicMessages } from '@/components/messages/usePublicMessages';
 import type { MessagePost } from '@/data/messages';
@@ -40,7 +41,7 @@ function MessageFeed({ posts, now, onSelectImage }: { posts: MessagePost[]; now:
               <time dateTime={parseJapaneseDateTime(post.publishedAt).toISOString()}>{formatMessageDate(post.publishedAt, now)}</time>
             </header>
             <div className="messages-feed-body-row">
-              <p className={cn('message-panel-body', post.tone && `message-panel-body-${post.tone}`)}>{post.body}</p>
+              <p className={cn('message-panel-body', post.tone && `message-panel-body-${post.tone}`)}><MessageBody body={post.body} /></p>
               {singleImage ? (
                 <button
                   type="button"
@@ -231,7 +232,7 @@ export function MessagesView() {
               ×
             </button>
             <Image src={selectedImage.src} alt={selectedImage.alt} width={1200} height={900} className="messages-image-modal-image" unoptimized />
-            <p>{selectedImage.body}</p>
+            <p><MessageBody body={selectedImage.body} /></p>
           </section>
         </div>
       ) : null}

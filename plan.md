@@ -1,3 +1,30 @@
+## 追加対応: メッセージ内リンク表示
+
+### 対応する仕様
+
+- Message本文中のHTTP(S) URLはリンク色で表示する
+- 通常のMessage画面と画像拡大表示ではリンクを操作可能にする
+- 左サイドバーのMessage一覧では本文クリックで拡大表示を開き、拡大表示内のみリンクを操作可能にする
+
+### 実装方針
+
+- URL分割と表示を共通コンポーネントに集約する
+- button内のネストされたリンクを避けるため、サイドバーの要約では`span`とし、ツールチップ内で`a`として表示する
+
+### 変更予定のファイルと理由
+
+- `components/messages/MessageBody.tsx`: URL検出とリンク表示を共通化するため
+- `components/ui/MessagePanel.tsx`, `components/messages/MessagesView.tsx`: 各表示形態へ適用するため
+- `app/globals.css`, `SPEC.md`: リンクの表示と仕様を揃えるため
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+
+---
+
 ## 追加対応: メッセージ保存時のX自動投稿
 
 ### 対応する仕様
@@ -1941,5 +1968,50 @@
 - X投稿時はURLを23文字として換算し、280文字超過を管理画面とMessage追加モーダルの両方で警告する
 - 超過時はFirestoreへ「長文のため投稿しませんでした」状態を保存し、X APIを呼ばない。サーバー側も同じ判定を行い、直接APIが呼ばれても投稿しない
 - メッセージ一覧の右上に、投稿済み・待機・失敗・長文未投稿の状態を表示する
+
+---
+## 追加対応: X投稿リンクの訪問分析
+
+### 対応する仕様
+
+- X投稿フォームでサイト内URLから識別付きURLを生成し、本文へ挿入する
+- 識別付きURLから訪問したブラウザ数を投稿・リンクごとに集計する
+- 管理画面に合計訪問者数と日別・月別の推移グラフを表示する
+- `X_POST_DRY_RUN=true` の場合はX APIを呼ばず、投稿済みとして記録する
+
+### 実装方針
+
+- Firebase管理者認証済みAPIで同一サイト内URLのみを `/go/{token}` へ変換し、生成時点でFirestoreへ保存する
+- X投稿処理時にメッセージIDと識別リンクを関連付ける
+- HttpOnly Cookieの匿名識別子をハッシュ化し、リンク全体・日別・月別で重複を除外する
+- IPアドレスやUser-Agentは保存せず、主要なBotとリンクプレビュを集計対象外にする
+- 日別は直近30日、月別は直近12ヶ月をゼロ件の期間も含めて表示する
+- 詳細はモーダルで表示し、日別・月別の切り替え、前後期間移動、終了日・終了月の直接指定に対応する
+
+### 変更予定のファイルと理由
+
+- `app/api/analytics/**`, `app/go/[token]/route.ts`, `lib/analytics/**`: リンク生成、訪問記録、指定期間の集計取得のため
+- `components/admin/**`, `components/messages/QuickMessageComposer.tsx`: リンク生成UIと分析画面のため
+- `lib/x/server.ts`, `app/api/x/status/route.ts`: X投稿のドライランとリンク関連付けのため
+- `firestore.rules`, `.env.example`, `.env.local`, `README.md`, `SPEC.md`: データ保護と設定・仕様の同期のため
+
+### 影響範囲
+
+- 管理画面とMessage画面の投稿フォーム
+- X自動投稿フローと文字数表示
+- Firestoreの追跡リンク・匿名集計データ
+- 公開URL `/go/{token}`
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- 識別リンク生成、転送、同一ブラウザの重複除外、日・月集計、ドライラン表示を確認する
+
+### 懸念点・制約
+
+- 訪問者数はCookie単位の近似値であり、Cookie削除や別端末は別人として数えられる
+- ローカルのドライランでは実際のXタイムラインへの投稿は確認しない
 
 ---

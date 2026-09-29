@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { TrackingLinkBuilder } from '@/components/admin/TrackingLinkBuilder';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { formatFirebaseDate, publishSavedMessage } from '@/components/messages/usePublicMessages';
 import { MAX_MESSAGE_BODY_LENGTH, MAX_MESSAGE_IMAGES, saveFirebaseMessage } from '@/lib/firebase/messages';
@@ -15,6 +16,7 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedWithXError, setSavedWithXError] = useState(false);
+  const bodyInputRef = useRef<HTMLTextAreaElement | null>(null);
   const previews = useMemo(() => files.map((file) => ({ file, url: URL.createObjectURL(file) })), [files]);
   const xPostCharacterCount = useMemo(() => getXPostCharacterCount(body.trim()), [body]);
   const xPostTooLong = postToX && isXPostTooLong(body.trim());
@@ -38,6 +40,24 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
     }
     setFiles(selected);
     setError(null);
+  };
+
+  const insertTrackingLink = (trackingUrl: string) => {
+    const input = bodyInputRef.current;
+    const start = input?.selectionStart ?? body.length;
+    const end = input?.selectionEnd ?? body.length;
+    const before = body.slice(0, start);
+    const after = body.slice(end);
+    const insertion = `${before && !/\s$/.test(before) ? ' ' : ''}${trackingUrl}${after && !/^\s/.test(after) ? ' ' : ''}`;
+    const nextBody = `${before}${insertion}${after}`;
+    if (nextBody.length > MAX_MESSAGE_BODY_LENGTH) return `本文が${MAX_MESSAGE_BODY_LENGTH}文字を超えるため挿入できません。`;
+    setBody(nextBody);
+    requestAnimationFrame(() => {
+      input?.focus();
+      const nextCursor = start + insertion.length;
+      input?.setSelectionRange(nextCursor, nextCursor);
+    });
+    return null;
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -104,6 +124,7 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
           <label htmlFor="quick-message-body">メッセージ</label>
           <textarea
             id="quick-message-body"
+            ref={bodyInputRef}
             value={body}
             rows={7}
             maxLength={MAX_MESSAGE_BODY_LENGTH}
@@ -113,6 +134,8 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
             onChange={(event) => setBody(event.target.value)}
           />
           <span className="admin-character-count">{body.length} / {MAX_MESSAGE_BODY_LENGTH}</span>
+
+          <TrackingLinkBuilder onInsert={insertTrackingLink} disabled={busy || savedWithXError} />
 
           <label htmlFor="quick-message-images">画像（最大4枚・1枚10MBまで）</label>
           <input id="quick-message-images" type="file" accept="image/*" multiple onChange={selectFiles} disabled={busy || savedWithXError} />

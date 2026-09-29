@@ -43,6 +43,7 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY--
 X_CLIENT_ID=<X OAuth 2.0 Client ID>
 X_CLIENT_SECRET=<X OAuth 2.0 Client Secret>
 X_OAUTH_CALLBACK_URL=https://yukimiworks.com/api/x/callback
+X_POST_DRY_RUN=false
 UPSTASH_REDIS_REST_URL=https://<your-redis-endpoint>.upstash.io
 UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
 REDIS_KEY_PREFIX=dev
@@ -158,6 +159,16 @@ X_OAUTH_CALLBACK_URL=http://localhost:3000/api/x/callback
 
 Firebaseでは画像を1枚10MBまで保存できますが、Xへ添付できる静止画は1枚5MBまでです。X投稿を選ぶ場合は5MB以下のJPG、PNG、GIF、WEBPを使用してください。APIキー、Client Secret、アクセストークン、更新トークンはブラウザへ返しません。
 
+### X投稿ドライラン
+
+`.env.local` で `X_POST_DRY_RUN=true` にすると、X APIや画像アップロードを呼ばず、Firestore上ではX投稿済みとして記録します。管理画面には「ドライラン中」と表示されます。実際にXへ投稿する環境では `false` へ変更してください。
+
+### X投稿リンクの訪問分析
+
+投稿フォームの「アクセス計測リンク」に同一サイト内のURLを入力すると、`NEXT_PUBLIC_SITE_URL/go/{token}` 形式のリンクが本文へ挿入されます。送信時にURLは変更されないため、表示されるX投稿文字数で事前に確認できます。
+
+識別リンク経由の訪問者数は、管理画面の「アクセス分析」で確認できます。合計は同一ブラウザを1人として数え、詳細に直近30日と直近12ヶ月の推移を表示します。Cookieを削除した場合や別端末は別人として扱われます。IPアドレスとUser-Agentは保存しません。
+
 `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` は、カウンターを Redis に保存するために使用します。
 既存の接続情報をそのまま使う場合は、`KV_REST_API_URL` と `KV_REST_API_TOKEN` も後方互換で読み込みます。
 Vercel の Redis integration が `UPSTASH_REDIS_REST_KV_REST_API_URL` のような長い名前を作っても、コード側で読み込めるようにしてあります。
@@ -208,6 +219,7 @@ FIREBASE_PRIVATE_KEY
 X_CLIENT_ID
 X_CLIENT_SECRET
 X_OAUTH_CALLBACK_URL
+X_POST_DRY_RUN
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 ```

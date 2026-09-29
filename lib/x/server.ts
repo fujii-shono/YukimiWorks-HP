@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getFirebaseAdminServices } from '@/lib/firebase/admin';
+import { associateTrackingLinks } from '@/lib/analytics/tracking';
 import { isXPostTooLong } from '@/lib/x/characters';
 
 const X_API_ORIGIN = 'https://api.x.com';
@@ -70,6 +71,10 @@ export function getXConfig(): XConfig | null {
   const callbackUrl = process.env.X_OAUTH_CALLBACK_URL;
   if (!clientId || !clientSecret || !callbackUrl) return null;
   return { clientId, clientSecret, callbackUrl };
+}
+
+export function isXPostDryRun() {
+  return process.env.X_POST_DRY_RUN === 'true';
 }
 
 export function createXAuthorization(config: XConfig) {
@@ -280,6 +285,17 @@ export async function postFirebaseMessageToX(messageId: string) {
   if (claimed === 'skipped_too_long') return { alreadyPosted: false, skippedTooLong: true };
 
   try {
+    await associateTrackingLinks(messageId, claimed.body);
+    if (isXPostDryRun()) {
+      const postId = `dry-run-${messageId}`;
+      await messageRef.update({
+        xPostStatus: 'posted',
+        xPostId: postId,
+        xPostError: null,
+        xPostedAt: Timestamp.now(),
+      });
+      return { alreadyPosted: false, postId, dryRun: true };
+    }
     const accessToken = await getValidXAccessToken();
     const postId = await createXPost(accessToken, claimed.body, claimed.images);
     await messageRef.update({

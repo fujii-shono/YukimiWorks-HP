@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireFirebaseAdmin } from '@/lib/firebase/admin';
-import { disconnectXAccount, getXConfig, getXConnectionStatus } from '@/lib/x/server';
+import { disconnectXAccount, getXConfig, getXConnectionStatus, isXPostDryRun } from '@/lib/x/server';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +14,7 @@ function authError(error: unknown) {
 export async function GET(request: Request) {
   try {
     await requireFirebaseAdmin(request);
+    if (isXPostDryRun()) return NextResponse.json({ configured: true, connected: true, username: 'dry-run', dryRun: true });
     if (!getXConfig()) return NextResponse.json({ configured: false, connected: false });
     const status = await getXConnectionStatus();
     return NextResponse.json({ configured: true, ...status });

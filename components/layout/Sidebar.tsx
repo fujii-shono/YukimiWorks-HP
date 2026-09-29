@@ -311,14 +311,19 @@ export function Sidebar() {
 
       {pathname !== '/bokin' ? (
         <Link className="donation-sidebar-banner" href="/bokin" aria-label="募金ページへ移動する">
-          <Image
-            src="/bokin/header.png"
-            alt=""
-            width={4000}
-            height={1000}
-            className="donation-sidebar-banner-image"
-            unoptimized
-          />
+          <span
+            className="pixel-tint-frame pixel-tint-frame-banner"
+            style={{ '--pixel-mask': 'url("/bokin/header.png")' } as CSSProperties}
+          >
+            <Image
+              src="/bokin/header.png"
+              alt=""
+              width={4000}
+              height={1000}
+              className="donation-sidebar-banner-image"
+              unoptimized
+            />
+          </span>
         </Link>
       ) : null}
      

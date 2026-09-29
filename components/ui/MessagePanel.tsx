@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
+import { MessageBody } from '@/components/messages/MessageBody';
 import { formatMessageDate, getMessageImages, parseJapaneseDateTime, usePublicMessages } from '@/components/messages/usePublicMessages';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { cn } from '@/lib/format';
@@ -157,7 +158,7 @@ export function MessagePanel() {
                       <time dateTime={dateTime}>{formattedDate}</time>
                     </span>
                     <span className="message-panel-body-row">
-                      <span className="message-panel-body">{post.body}</span>
+                      <span className="message-panel-body"><MessageBody body={post.body} interactive={false} /></span>
                       {postImages.length > 0 ? (
                         <span className="message-panel-summary-images">
                           {postImages.map((image) => (
@@ -214,7 +215,7 @@ export function MessagePanel() {
                 visibleOpenPost.tone === 'rainbow' && rainbowShineActive && 'is-rainbow-shining',
               )}
             >
-              {visibleOpenPost.body}
+              <MessageBody body={visibleOpenPost.body} />
             </p>
             {getMessageImages(visibleOpenPost).map((image) => (
               <Image key={image.src} src={image.src} alt={image.alt} width={220} height={140} className="message-panel-tooltip-image" unoptimized />

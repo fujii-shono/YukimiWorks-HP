@@ -19,6 +19,7 @@ export async function getXStatus(user: User) {
     configured: boolean;
     connected: boolean;
     username?: string;
+    dryRun?: boolean;
   }>;
 }
 
@@ -37,5 +38,5 @@ export async function postSavedMessageToX(user: User, messageId: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messageId }),
-  }) as Promise<{ postId: string; alreadyPosted: boolean }>;
+  }) as Promise<{ postId: string; alreadyPosted: boolean; dryRun?: boolean }>;
 }

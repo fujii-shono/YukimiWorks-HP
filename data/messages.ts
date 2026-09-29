@@ -1,6 +1,8 @@
 export type MessageTone = 'blue' | 'purple' | 'red' | 'rainbow';
 
 export type MessagePost = {
+  /** Firestore由来の投稿を識別するためのID */
+  id?: string;
   icon?: {
     src: string;
     alt: string;

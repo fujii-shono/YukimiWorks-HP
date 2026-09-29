@@ -83,8 +83,8 @@ export function AccountControls() {
           <span className="account-welcome">
             ようこそ {isAdmin ? '管理者' : ''}{profile.displayName}さん
           </span>
-          {planLabel ? <span className="account-plan">{planLabel}</span> : null}
-          <span className="account-coins">コイン枚数：{profile.coins}</span>
+          {!isAdmin && planLabel ? <span className="account-plan">{planLabel}</span> : null}
+          {!isAdmin ? <span className="account-coins">コイン枚数：{profile.coins}</span> : null}
           <button type="button" className="account-settings-button" onClick={() => setModal('settings')}>
             設定
           </button>

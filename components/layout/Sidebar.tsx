@@ -16,11 +16,11 @@ import { cn } from '@/lib/format';
 const navItems = [
   { href: '/', label: 'Top', icon: '⌂', iconImage: '/icons/default/top.png' },
   { href: '/about', label: 'About', icon: '❄', iconImage: null },
-  { href: '/why', label: 'Why YukimiWorks', icon: '❄', iconImage: null },
   { href: '/works', label: 'Works', icon: '❄', iconImage: null },
   { href: '/portfolio', label: 'Portfolio', icon: '❄', iconImage: null },
   { href: '/diary', label: 'Diary', icon: '❄', iconImage: null },
   { href: '/news', label: 'News', icon: '❄', iconImage: null },
+  { href: '/messages', label: 'Message', icon: '❄', iconImage: null },
   { href: '/links', label: 'Link', icon: '❄', iconImage: null },
   { href: '/contact', label: 'Contact', icon: '❄', iconImage: null },
 ] as const;

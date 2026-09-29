@@ -1,3 +1,37 @@
+## 追加対応: AboutへのWhy YukimiWorks統合
+
+### 対応する仕様
+
+- ユーザー依頼: Why YukimiWorksの内容をAboutへ統合し、旧`/why`は`/about`へ転送する
+
+### 実装方針
+
+- Aboutパネルに会社紹介、3つの強み、締めのメッセージ、所在地・代表者を指定順で表示する
+- サイドメニューの重複したWhy導線を削除し、`/why`へのアクセスはNext.jsのリダイレクトで`/about`へ送る
+
+### 変更予定のファイルと理由
+
+- `app/about/page.tsx`、`app/globals.css`: 統合後の文章とレイアウトを表示するため
+- `app/why/page.tsx`、`components/layout/Sidebar.tsx`: 旧URL転送と重複導線の解消のため
+- `SPEC.md`: 正式なAbout本文と転送仕様を更新するため
+
+### 影響範囲
+
+- Aboutの本文、サイドメニュー、旧Why URL
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- `/about`の表示および`/why`から`/about`への転送を確認する
+
+### 懸念点・制約・未確定事項
+
+- 既存のWhyページ固有メタデータは、リダイレクト後は使用しない
+
+---
+
 ## 追加調整: 管理画面導線とログイン完了後UI
 
 - Googleログインの認証状態が反映された時点でログインモーダルを閉じる
@@ -1812,3 +1846,50 @@
 - アクキーとアクスタの両方でホログラムを選択できることを確認する
 - 「通常」に戻すとホログラムが消えることを確認する
 - デモページの既存の加工設定が変わっていないことを確認する
+## 追加対応: Message一覧画面
+
+### 対応する仕様
+
+- ユーザー依頼: Menuから開ける Message 画面と、メッセージ・メディア・支援の表示切り替えを追加する
+- ユーザー依頼: 左の Message パネルを最新10件と詳細画面への導線にする
+
+### 実装方針
+
+- Firestoreの通常メッセージとRedis APIの支援メッセージの取得・統合ロジックを共通hookに切り出す
+- `/messages` はタブをクライアント側で切り替え、メッセージと支援は10件ずつ段階表示する
+- Intersection Observer で一覧下端を検知し、過去分を追加表示する
+- 画像はメッセージと紐付けた共通モーダルで拡大し、Escキーと背景クリックで閉じられるようにする
+
+### 変更予定のファイルと理由
+
+- `components/messages/usePublicMessages.ts`: 公開メッセージ取得と日付変換の共通化
+- `components/messages/MessagesView.tsx`, `app/messages/page.tsx`: 一覧、タブ、画像拡大表示
+- `components/ui/MessagePanel.tsx`: 共通取得処理の利用、最新10件化、詳細導線
+- `components/layout/Sidebar.tsx`, `app/globals.css`: Menu導線と各表示のスタイル
+- `SPEC.md`: 公開Message画面の正式仕様
+
+### 影響範囲
+
+- 全ページの左Messageパネル、Menu、新設の`/messages`
+- Firestore・Redis APIからの公開メッセージ読み込み
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- タブ切り替え、追加読み込み、画像モーダル、キーボード操作、PC/モバイル幅を手動確認する
+
+### 懸念点・制約・未確定事項
+
+- データ元は現行どおりFirestoreとRedisを維持し、追加読み込みは取得済みデータの段階描画とする
+
+### 追加調整: Message画面からの管理者投稿
+
+- 端末風エリアは高さを維持し、幅390pxに固定する
+- Firebaseプロファイルが `admin` の場合だけ、右下に投稿ボタンを表示する
+- 既存の `saveFirebaseMessage` を再利用し、本文、最大4枚の画像、X投稿予定を保存する
+- 公開日時は入力させず、送信時の `new Date()` を使用する
+- 保存成功後はカスタムイベントで新規投稿を各Message表示に通知し、Firestore購読の反映を待たずに表示する
+
+---

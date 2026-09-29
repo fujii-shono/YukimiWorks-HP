@@ -2,135 +2,23 @@
 
 import Image from 'next/image';
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import type { MessagePost } from '@/data/messages';
-import { subscribeToFirebaseMessages } from '@/lib/firebase/messages';
+import { formatMessageDate, getMessageImages, parseJapaneseDateTime, usePublicMessages } from '@/components/messages/usePublicMessages';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { cn } from '@/lib/format';
 
 const RAINBOW_SHINE_ACTIVE_MS = 1_800;
 const RAINBOW_SHINE_WAIT_MS = 1_000;
 
-function getTokyoDateKey(date: Date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-}
-
-function getTokyoDateParts(date: Date) {
-  const [year = '0', month = '0', day = '0'] = getTokyoDateKey(date).split('-');
-  return {
-    year: Number(year),
-    month: Number(month),
-    day: Number(day),
-  };
-}
-
-function getCalendarDayDiff(from: ReturnType<typeof getTokyoDateParts>, to: ReturnType<typeof getTokyoDateParts>) {
-  const fromDate = Date.UTC(from.year, from.month - 1, from.day);
-  const toDate = Date.UTC(to.year, to.month - 1, to.day);
-  return Math.max(0, Math.floor((toDate - fromDate) / 86_400_000));
-}
-
-function getCalendarMonthDiff(from: ReturnType<typeof getTokyoDateParts>, to: ReturnType<typeof getTokyoDateParts>) {
-  const monthDiff = (to.year - from.year) * 12 + to.month - from.month;
-  return to.day < from.day ? monthDiff - 1 : monthDiff;
-}
-
-function parseJapaneseDateTime(value: string) {
-  const normalized = value.trim().replace(' ', 'T');
-  return new Date(`${normalized}:00+09:00`);
-}
-
-function formatFirebaseDate(date: Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
-}
-
-function formatMessageDate(value: string, now: Date) {
-  const publishedAt = parseJapaneseDateTime(value);
-  const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - publishedAt.getTime()) / 60_000));
-
-  if (elapsedMinutes < 60) return `${elapsedMinutes}分前`;
-  if (elapsedMinutes < 1_440) return `${Math.floor(elapsedMinutes / 60)}時間前`;
-
-  const publishedDateKey = getTokyoDateKey(publishedAt);
-  const currentDateKey = getTokyoDateKey(now);
-
-  if (publishedDateKey === currentDateKey) return `${Math.floor(elapsedMinutes / 60)}時間前`;
-
-  const publishedDateParts = getTokyoDateParts(publishedAt);
-  const currentDateParts = getTokyoDateParts(now);
-  const elapsedMonths = getCalendarMonthDiff(publishedDateParts, currentDateParts);
-
-  if (elapsedMonths >= 12) return `${Math.floor(elapsedMonths / 12)}年前`;
-  if (elapsedMonths >= 1) return `${elapsedMonths}ヶ月前`;
-
-  return `${getCalendarDayDiff(publishedDateParts, currentDateParts)}日前`;
-}
-
 export function MessagePanel() {
   const tooltipBaseId = useId();
   const panelRef = useRef<HTMLElement>(null);
   const postRefs = useRef<Array<HTMLElement | null>>([]);
-  const [now, setNow] = useState<Date | null>(null);
   const [openPostIndex, setOpenPostIndex] = useState<number | null>(null);
-  const [donationPosts, setDonationPosts] = useState<MessagePost[]>([]);
-  const [firebasePosts, setFirebasePosts] = useState<MessagePost[]>([]);
   const [rainbowShineActive, setRainbowShineActive] = useState(false);
   const [tooltipTop, setTooltipTop] = useState(58);
   const [tooltipEnabled, setTooltipEnabled] = useState(false);
 
-  useEffect(() => {
-    setNow(new Date());
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadMessages = async () => {
-      try {
-        const response = await fetch('/api/messages', { cache: 'no-store' });
-        if (!response.ok) return;
-        const json = (await response.json()) as { bokinMessages?: MessagePost[] };
-        if (!cancelled && Array.isArray(json.bokinMessages)) setDonationPosts(json.bokinMessages);
-      } catch {
-        return;
-      }
-    };
-
-    void loadMessages();
-    const timer = window.setInterval(loadMessages, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    return subscribeToFirebaseMessages((messages) => {
-      setFirebasePosts(
-        messages.map((message) => ({
-          publishedAt: formatFirebaseDate(message.publishedAt.toDate()),
-          body: message.body,
-          icon: { src: '/logo/yukimi_works_favicon.png', alt: 'YukimiWorks' },
-          images: message.images.map((image) => ({ src: image.url, alt: image.alt })),
-        })),
-      );
-    });
-  }, []);
+  const { now, posts } = usePublicMessages();
 
   useEffect(() => {
     let activeTimer: number | null = null;
@@ -205,10 +93,7 @@ export function MessagePanel() {
     });
   };
 
-  const mergedPosts = [...donationPosts, ...firebasePosts].sort(
-    (a, b) => parseJapaneseDateTime(b.publishedAt).getTime() - parseJapaneseDateTime(a.publishedAt).getTime(),
-  );
-  const visiblePosts = now ? mergedPosts.filter((post) => parseJapaneseDateTime(post.publishedAt).getTime() <= now.getTime()) : [];
+  const visiblePosts = posts.slice(0, 10);
   const openPost = openPostIndex !== null ? visiblePosts[openPostIndex] : null;
   const visibleOpenPost = openPost && now && parseJapaneseDateTime(openPost.publishedAt).getTime() <= now.getTime() ? openPost : null;
   const openPostFormattedDate = visibleOpenPost && now ? formatMessageDate(visibleOpenPost.publishedAt, now) : '\u00a0';
@@ -233,7 +118,7 @@ export function MessagePanel() {
           const formattedDate = formatMessageDate(post.publishedAt, now);
           const dateTime = parseJapaneseDateTime(post.publishedAt).toISOString();
           const open = openPostIndex === index;
-          const previewImage = post.image ?? post.images?.[0];
+          const postImages = getMessageImages(post);
 
           return (
             <article
@@ -271,9 +156,9 @@ export function MessagePanel() {
                     </span>
                     <span className="message-panel-body-row">
                       <span className="message-panel-body">{post.body}</span>
-                      {post.images && post.images.length > 0 ? (
+                      {postImages.length > 0 ? (
                         <span className="message-panel-summary-images">
-                          {post.images.map((image) => (
+                          {postImages.map((image) => (
                             <Image
                               key={image.src}
                               src={image.src}
@@ -285,8 +170,6 @@ export function MessagePanel() {
                             />
                           ))}
                         </span>
-                      ) : previewImage ? (
-                        <Image src={previewImage.src} alt={previewImage.alt} width={220} height={140} className="message-panel-thumb" unoptimized />
                       ) : null}
                     </span>
                   </span>
@@ -295,6 +178,11 @@ export function MessagePanel() {
             </article>
           );
         })}
+        {posts.length > 10 ? (
+          <div className="message-panel-more">
+            <Link href="/messages">もっとメッセージを見る &raquo;</Link>
+          </div>
+        ) : null}
       </div>
 
       {tooltipEnabled && visibleOpenPost && openPostIndex !== null ? (
@@ -326,10 +214,7 @@ export function MessagePanel() {
             >
               {visibleOpenPost.body}
             </p>
-            {visibleOpenPost.image ? (
-              <Image src={visibleOpenPost.image.src} alt={visibleOpenPost.image.alt} width={220} height={140} className="message-panel-tooltip-image" unoptimized />
-            ) : null}
-            {visibleOpenPost.images?.map((image) => (
+            {getMessageImages(visibleOpenPost).map((image) => (
               <Image key={image.src} src={image.src} alt={image.alt} width={220} height={140} className="message-panel-tooltip-image" unoptimized />
             ))}
           </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { MessagePost } from '@/data/messages';
+import { messagePosts, type MessagePost } from '@/data/messages';
 import { subscribeToFirebaseMessages } from '@/lib/firebase/messages';
 
 function getTokyoDateKey(date: Date) {
@@ -137,7 +137,7 @@ export function usePublicMessages() {
 
   const posts = useMemo(() => {
     if (!now) return [];
-    return [...donationPosts, ...firebasePosts]
+    return [...messagePosts, ...donationPosts, ...firebasePosts]
       .filter((post) => parseJapaneseDateTime(post.publishedAt).getTime() <= now.getTime())
       .sort((a, b) => parseJapaneseDateTime(b.publishedAt).getTime() - parseJapaneseDateTime(a.publishedAt).getTime());
   }, [donationPosts, firebasePosts, now]);

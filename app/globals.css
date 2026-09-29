@@ -5679,6 +5679,10 @@ html:has(.acrylic-demo-page) body {
     padding: 14px 10px 18px;
   }
 
+  .messages-phone-frame {
+    width: min(390px, calc(100% - 20px));
+  }
+
   .messages-phone-shell {
     height: min(740px, calc(100vh - 125px));
     min-height: 520px;

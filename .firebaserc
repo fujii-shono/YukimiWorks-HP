@@ -1,6 +1,8 @@
 {
   "projects": {
-    "default": "demo-yukimiworks"
-  }
+    "default": "demo-yukimiworks",
+    "prod": "yukimiworks-prod"
+  },
+  "targets": {},
+  "etags": {}
 }
-

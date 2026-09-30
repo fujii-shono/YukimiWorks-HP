@@ -7,7 +7,8 @@ export type WorkMedia = {
 export type WorkBodySegment =
   | { type: 'text'; value: string }
   | { type: 'strikethrough'; value: string }
-  | { type: 'link'; label: string; href: string };
+  | { type: 'link'; label: string; href: string }
+  | { type: 'media'; src: string; mediaType: 'image' | 'video'; alt?: string };
 
 export type WorkCategory = 'contents' | 'tools' | 'apps';
 
@@ -23,6 +24,10 @@ export type Work = {
   date?: string;
   url?: string;
   featured?: boolean;
+  publishedAt?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  noIndex?: boolean;
 };
 
 export const workCategoryLabels: Record<WorkCategory, string> = {

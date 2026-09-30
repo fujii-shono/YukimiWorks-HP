@@ -7,13 +7,21 @@ import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 const OPEN_ACCOUNT_EVENT = 'yukimi:open-account';
 
 export function LoginEntryButton() {
-  const { firebaseUser, loading } = useFirebaseAuth();
+  const { firebaseUser, profile, loading, profileLoading } = useFirebaseAuth();
+
+  if (!loading && firebaseUser && profile?.role === 'admin') {
+    return (
+      <Link href="/admin" className="sidebar-login-button">
+        管理画面
+      </Link>
+    );
+  }
 
   return (
     <button
       type="button"
       className="sidebar-login-button"
-      disabled={loading}
+      disabled={loading || profileLoading}
       onClick={() => window.dispatchEvent(new CustomEvent(OPEN_ACCOUNT_EVENT, { detail: firebaseUser ? 'settings' : 'login' }))}
     >
       {firebaseUser ? 'アカウント' : 'ログイン'}

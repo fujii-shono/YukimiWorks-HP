@@ -2015,3 +2015,113 @@
 - ローカルのドライランでは実際のXタイムラインへの投稿は確認しない
 
 ---
+
+## 追加対応: Firebaseコンテンツ管理
+
+### 対応する仕様
+
+- コード内の既存データを維持したまま、Firebaseで追加したPortfolio・Works・Diary・Newsを公開画面へ統合する
+- 管理画面から追加・編集・削除、画像・動画アップロード、未来日時の公開予約を行えるようにする
+- Firebase追加分を一覧・詳細・トップ・What's New・SEOへ反映する
+
+### 実装方針
+
+- Firestoreへコンテンツ別コレクションを追加し、コード内データと公開済みFirebaseデータをサーバー側で統合する
+- ID重複時はコード内データを優先し、Firebase未設定・障害時はコード内データだけへフォールバックする
+- PortfolioのFirebase追加分は通常画像のみ、Works・Newsは画像と動画、Diaryはアイキャッチ画像に対応する
+- 未来の`publishedAt`は管理画面には予約として表示し、公開ページでは時刻到達まで除外する
+
+### 変更予定のファイルと理由
+
+- `lib/firebase/content*.ts`, `lib/firebase/types.ts`: コンテンツCRUD、Storage、公開データ変換のため
+- `components/admin/**`: 4種類の管理フォームを追加するため
+- `app/{works,portfolio,diary,news}/**`, `app/page.tsx`, `components/layout/Sidebar.tsx`: 公開データ統合とSEO反映のため
+- `firestore.rules`, `storage.rules`: 管理者操作とアップロード制限のため
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+- Firebase EmulatorでFirestore・Storageルールの読み込みを確認する
+
+### 懸念点・制約
+
+- コード内の既存データは管理画面の編集・削除対象外とする
+- 本番反映には更新したFirestore RulesとStorage Rulesのデプロイが必要
+
+---
+
+## 追加対応: 成果物の本文ブロックと日付表示
+
+### 対応する仕様
+
+- `/news`の手動ニュース・成果物・ポートフォリオ由来の公開日を`yyyy/mm/dd`形式で表示する
+- 管理画面の「ワーク」表記を「成果物」へ変更する
+- 成果物本文のURLをリンクとして扱い、取得可能な外部URLには日記と同じOGPカードを表示する
+- リンク文字列とURLを別々に指定したリンクを複数登録できるようにする
+- 画像・動画を本文中の任意位置へ挿入できるようにする
+
+### 実装方針
+
+- Works・NewsのFirebase本文を、文章・リンク・メディアからなる順序付きブロックとして保存する
+- 既存の文字列本文と旧`media`配列は後方互換で読み込み、編集時に本文ブロックへ変換する
+- 本文ブロックは上下移動と削除に対応し、管理画面で表示順を確定できるようにする
+- URLとOGPの描画を日記・成果物・ニュースで共通化する
+- 日付表示用の共通フォーマッターを追加し、`/news`の一覧カードとサイドバーのWhat's Newで利用する
+
+### 変更予定のファイルと理由
+
+- `components/admin/AdminContentManager.tsx`: 順序付き本文ブロック編集UI
+- `lib/firebase/content.ts`, `lib/firebase/content.server.ts`, `lib/firebase/types.ts`: 本文ブロックの保存・検証・変換
+- `components/ui/DiaryBody.tsx`, `components/ui/RichBody.tsx`: リンク化とOGP表示の共通化
+- `app/works/[id]/page.tsx`, `app/news/[id]/page.tsx`: 本文ブロック描画
+- `components/ui/NewsCard.tsx`, `app/api/content/updates/route.ts`, `components/layout/Sidebar.tsx`: What's Newの日付表示統一
+- `firestore.rules`, `SPEC.md`, `README.md`: データ構造・画面仕様・ルールの同期
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Firebase EmulatorでSecurity Rulesを読み込む
+
+### 懸念点・制約
+
+- OGP取得に失敗したURLは通常のリンクとして表示する
+- コード内の既存メディア表示順は変更せず、Firebase本文ブロックのみ任意位置挿入の対象とする
+
+---
+
+## 追加対応: 日記の本文ブロック化
+
+### 実装方針
+
+- 日記にも文章・表示テキスト付きリンク・画像・動画の順序付き本文ブロックを適用する
+- 既存の文字列本文とアイキャッチは従来どおり読み込める後方互換を維持する
+- 本文の文章を従来の`body`にも保持し、SEO説明の自動生成に利用する
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Firebase EmulatorでSecurity Rulesを読み込む
+
+---
+
+## 追加対応: Firebase Emulatorの孤立プロセス
+
+### 実装方針
+
+- 起動前にFirebaseの各ポートを確認し、親プロセスが終了したFirebase Emulatorだけを自動終了する。
+- 他アプリがポートを使っている場合は停止せず、PIDとコマンドを表示する。
+
+---
+
+## 追加対応: 一覧カードの補足表示
+
+### 実装方針
+
+- 管理画面のポートフォリオ一覧に、登録済み画像の小さなプレビューを表示する。
+- 管理画面の日記一覧に本文の先頭100文字を抜粋として表示する。本文ブロックのメディアとリンクは抽出対象外とする。

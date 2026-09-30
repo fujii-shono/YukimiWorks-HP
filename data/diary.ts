@@ -1,9 +1,15 @@
+export type DiaryBodySegment =
+  | { type: 'text'; value: string }
+  | { type: 'link'; label: string; href: string }
+  | { type: 'media'; src: string; mediaType: 'image' | 'video'; alt?: string };
+
 export type DiaryEntry = {
+  id?: string;
   title: string;
   /** 日本時間で `YYYY-MM-DD HH:mm` の形式で指定する。URL用IDもこの値から自動生成する。 */
   publishedAt: string;
   category: DiaryCategory;
-  body: string;
+  body: DiaryBodySegment[] | string;
   eyecatch?: string;
   eyecatchAlt?: string;
   seoTitle?: string;
@@ -11,6 +17,11 @@ export type DiaryEntry = {
   ogImage?: string;
   noIndex?: boolean;
 };
+
+export function getDiaryPlainText(entry: DiaryEntry) {
+  if (typeof entry.body === 'string') return entry.body;
+  return entry.body.flatMap((segment) => segment.type === 'text' ? [segment.value] : []).join('\n\n');
+}
 
 export type DiaryCategory = 'chat' | 'report' | 'development' | 'behind-the-scenes' | 'content-creation-tips';
 
@@ -27,6 +38,7 @@ export const defaultDiaryEyecatch = '/logo/open_graph.png';
 const PUBLISHED_AT_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
 
 export function getDiaryId(entry: DiaryEntry) {
+  if (entry.id) return entry.id;
   const match = PUBLISHED_AT_PATTERN.exec(entry.publishedAt);
   if (!match) throw new Error(`日記のpublishedAtはYYYY-MM-DD HH:mm形式で指定してください: ${entry.publishedAt}`);
 

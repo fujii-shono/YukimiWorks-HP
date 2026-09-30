@@ -49,6 +49,43 @@ service cloud.firestore {
         && (images.size() < 4 || validImage(images[3]));
     }
 
+    function validContentMedia(media) {
+      return media is map
+        && media.keys().hasOnly(['type', 'url', 'path', 'alt'])
+        && media.type in ['image', 'video']
+        && media.url is string
+        && media.url.size() > 0
+        && media.path is string
+        && media.path.size() > 0
+        && media.alt is string
+        && media.alt.size() <= 160;
+    }
+
+    function validContentMediaList(media) {
+      return media is list
+        && media.size() <= 8
+        && (media.size() < 1 || validContentMedia(media[0]))
+        && (media.size() < 2 || validContentMedia(media[1]))
+        && (media.size() < 3 || validContentMedia(media[2]))
+        && (media.size() < 4 || validContentMedia(media[3]))
+        && (media.size() < 5 || validContentMedia(media[4]))
+        && (media.size() < 6 || validContentMedia(media[5]))
+        && (media.size() < 7 || validContentMedia(media[6]))
+        && (media.size() < 8 || validContentMedia(media[7]));
+    }
+
+    function validContentCommon(data) {
+      return data.title is string
+        && data.title.size() >= 1
+        && data.title.size() <= 120
+        && data.publishedAt is timestamp
+        && data.noIndex is bool
+        && (data.seoTitle == null || (data.seoTitle is string && data.seoTitle.size() <= 160))
+        && (data.seoDescription == null || (data.seoDescription is string && data.seoDescription.size() <= 300))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     function validMessage(data) {
       return data.keys().hasOnly([
           'body', 'images', 'postToX', 'publishedAt', 'createdAt', 'updatedAt',
@@ -88,6 +125,74 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow read: if true;
       allow create, update: if isAdmin() && validMessage(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /portfolioItems/{itemId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['title', 'description', 'tags', 'image', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && validContentCommon(request.resource.data)
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 5000
+        && request.resource.data.tags is list
+        && request.resource.data.tags.size() <= 30
+        && validContentMedia(request.resource.data.image)
+        && request.resource.data.image.type == 'image'
+        && request.resource.data.featured is bool;
+      allow delete: if isAdmin();
+    }
+
+    match /works/{itemId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['title', 'description', 'body', 'bodySegments', 'category', 'tags', 'thumbnail', 'media', 'publishedAt', 'url', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && validContentCommon(request.resource.data)
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 5000
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 50000
+        && request.resource.data.bodySegments is list
+        && request.resource.data.bodySegments.size() <= 50
+        && request.resource.data.category in ['contents', 'tools', 'apps']
+        && request.resource.data.tags is list
+        && request.resource.data.tags.size() <= 30
+        && (request.resource.data.thumbnail == null || validContentMedia(request.resource.data.thumbnail))
+        && validContentMediaList(request.resource.data.media)
+        && (request.resource.data.url == null || (request.resource.data.url is string && request.resource.data.url.size() <= 2048))
+        && request.resource.data.featured is bool;
+      allow delete: if isAdmin();
+    }
+
+    match /diaryEntries/{itemId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['title', 'body', 'bodySegments', 'category', 'eyecatch', 'publishedAt', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && validContentCommon(request.resource.data)
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 100000
+        && request.resource.data.bodySegments is list
+        && request.resource.data.bodySegments.size() <= 50
+        && request.resource.data.category in ['chat', 'report', 'development', 'behind-the-scenes', 'content-creation-tips']
+        && (request.resource.data.eyecatch == null || validContentMedia(request.resource.data.eyecatch));
+      allow delete: if isAdmin();
+    }
+
+    match /news/{itemId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['title', 'summary', 'body', 'bodySegments', 'category', 'thumbnail', 'media', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && validContentCommon(request.resource.data)
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() <= 5000
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 100000
+        && request.resource.data.bodySegments is list
+        && request.resource.data.bodySegments.size() <= 50
+        && request.resource.data.category in ['event', 'announcement', 'release', 'other']
+        && (request.resource.data.thumbnail == null || validContentMedia(request.resource.data.thumbnail))
+        && validContentMediaList(request.resource.data.media)
+        && request.resource.data.featured is bool;
       allow delete: if isAdmin();
     }
 

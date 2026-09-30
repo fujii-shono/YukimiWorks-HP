@@ -12,6 +12,11 @@ export function formatJapaneseDate(date: string) {
     .replace(/(\d{2})$/, '$1日');
 }
 
+export function formatSlashDate(date: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  return match ? `${match[1]}/${match[2]}/${match[3]}` : date.replaceAll('-', '/');
+}
+
 export function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
@@ -24,4 +29,14 @@ export function escapeHtml(value: string) {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
     .replaceAll('\n', '<br>');
+}
+
+export function isSafeLinkHref(value: string) {
+  if (value.startsWith('/') && !value.startsWith('//')) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }

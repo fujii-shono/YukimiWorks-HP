@@ -92,9 +92,11 @@ role: user
 ```
 
 5. ローカルで管理者にするには、Emulator UI の Firestore で対象文書の `role` を文字列 `admin` に変更します。画面はリアルタイムで更新され、「設定 > 管理画面へ」から `/admin` を開けるようになります。
-6. 管理画面では「メッセージ」「ポートフォリオ」「ワーク」「日記」「ニュース」から項目を選択します。現時点で編集できるのはメッセージだけです。メッセージ一覧から新規追加・編集・削除ができ、改行・絵文字を含む本文、公開日時、最大4枚の画像を登録できます。画像は1枚10MBまでです。未来の公開日時を指定したメッセージは、その時刻まで公開画面に表示されません。
+6. 管理画面では「メッセージ」「ポートフォリオ」「成果物」「日記」「ニュース」から項目を選択します。各一覧からFirebase追加分の新規追加・編集・削除ができます。コード内の既存データは管理画面には表示されず、そのまま公開表示を維持します。成果物・日記・ニュースの本文は文章・表示テキスト付きリンク・メディアを複数追加し、上下移動で表示順を指定できます。コンテンツ画像は1枚10MB、動画は1本100MB、本文メディアは最大8件です。未来の公開日時を指定した項目は「公開予約」となり、その時刻まで公開画面に表示されません。
 
 `npm run firebase:emulators` は終了時のデータを `.firebase-data/` に保存し、次回起動時に読み込みます。このフォルダはGit管理されません。
+
+終了済みのFirestore Emulatorが孤立プロセスとして8080番ポートに残った場合、`npm run firebase:emulators`は起動前にそのプロセスだけを自動終了します。手動で孤立プロセスだけを回収する場合は`npm run firebase:cleanup`を使用してください。他の実行中プロセスが同じポートを使用している場合は、誤終了を避けるため自動終了せず、PIDとコマンドを表示します。
 
 ## Firebase 本番プロジェクト設定
 
@@ -124,11 +126,11 @@ npm run firebase:deploy:rules
 - `coins`: 0以上の整数
 - `purchasedWorkIds`: 作品ID文字列の配列
 
-一般ユーザーが変更できるのは `displayName` だけです。`role`、`plan`、`coins`、`purchasedWorkIds` は Security Rules で本人からの更新を拒否します。メッセージと画像の作成・更新・削除も、`role: admin` のユーザーだけに許可されます。
+一般ユーザーが変更できるのは `displayName` だけです。`role`、`plan`、`coins`、`purchasedWorkIds` は Security Rules で本人からの更新を拒否します。メッセージ、各コンテンツ、画像・動画の作成・更新・削除も、`role: admin` のユーザーだけに許可されます。
 
 ### Firebase Admin SDK（本番）
 
-X接続・投稿APIは、ブラウザ表示だけでなくサーバー側でもFirebase IDトークンと`role: admin`を検証します。Firebase Consoleの「プロジェクトの設定 > サービス アカウント」からサービスアカウントキーを発行し、JSON内の値をVercelのProduction環境へ登録してください。
+公開ページのFirebaseコンテンツ取得とX接続・投稿APIではFirebase Admin SDKを使用します。X関連APIはFirebase IDトークンと`role: admin`もサーバー側で検証します。Firebase Consoleの「プロジェクトの設定 > サービス アカウント」からサービスアカウントキーを発行し、JSON内の値をVercelのProduction環境へ登録してください。
 
 - `project_id` → `FIREBASE_PROJECT_ID`
 - `client_email` → `FIREBASE_CLIENT_EMAIL`

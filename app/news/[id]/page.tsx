@@ -1,19 +1,22 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
+import { RichBody } from '@/components/ui/RichBody';
 import { formatJapaneseDate } from '@/lib/format';
 import { manualNews, newsCategoryLabels } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
+import { getAllManualNews } from '@/lib/firebase/content.server';
+
+export const dynamic = 'force-dynamic';
 
 export function generateStaticParams() {
   return manualNews.map((article) => ({ id: article.id }));
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const article = manualNews.find((entry) => entry.id === params.id);
+  const article = (await getAllManualNews()).find((entry) => entry.id === params.id);
   if (!article) return {};
 
   const title = article.seoTitle ?? `${article.title} | YukimiWorks`;
@@ -47,8 +50,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default function NewsDetailPage({ params }: { params: { id: string } }) {
-  const article = manualNews.find((entry) => entry.id === params.id);
+export default async function NewsDetailPage({ params }: { params: { id: string } }) {
+  const article = (await getAllManualNews()).find((entry) => entry.id === params.id);
   if (!article) notFound();
 
   const ogImage = article.ogImage
@@ -86,30 +89,7 @@ export default function NewsDetailPage({ params }: { params: { id: string } }) {
         {article.thumbnail.trim() ? (
           <SleepWarningImage src={article.thumbnail} alt={`${article.title}のサムネイル`} width={800} height={450} className="detail-media" />
         ) : null}
-        <div className="detail-body">
-          {typeof article.body === 'string' || !article.body ? (
-            <p>{article.body ?? article.summary}</p>
-          ) : (
-            article.body.map((segment, index) => {
-              if (segment.type === 'text') return <p key={index}>{segment.value}</p>;
-              if (segment.type === 'strikethrough') return <p key={index} className="detail-body-strikethrough">{segment.value}</p>;
-              if (segment.type === 'link') {
-                return (
-                  <p key={index}>
-                    <Link href={segment.href} target="_blank" rel="noopener noreferrer">
-                      {segment.label}
-                    </Link>
-                  </p>
-                );
-              }
-              return segment.mediaType === 'image' ? (
-                <Image key={index} src={segment.src} alt={segment.alt ?? ''} width={800} height={450} className="detail-media" />
-              ) : (
-                <video key={index} src={segment.src} controls className="detail-media" />
-              );
-            })
-          )}
-        </div>
+        <RichBody body={article.body ?? article.summary} />
       </section>
     </SiteFrame>
   );

@@ -16,9 +16,19 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    match /content/{contentType}/{itemId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && (
+          (request.resource.contentType.matches('image/.*') && request.resource.size <= 10 * 1024 * 1024)
+          || (request.resource.contentType.matches('video/.*') && request.resource.size <= 100 * 1024 * 1024)
+        )
+        && (contentType != 'portfolio' || request.resource.contentType.matches('image/.*'));
+      allow delete: if isAdmin();
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
   }
 }
-

@@ -2,15 +2,19 @@ import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { PortfolioGallery } from '@/components/ui/PortfolioGallery';
-import { portfolioCategoryLabels, portfolioItems, type PortfolioCategory } from '@/data/portfolio';
+import { portfolioCategoryLabels, type PortfolioCategory } from '@/data/portfolio';
+import { getAllPortfolioItems } from '@/lib/firebase/content.server';
 
 const allCategories: PortfolioCategory[] = ['illustration', 'html-art', 'game'];
 
-export default function PortfolioPage({
+export const dynamic = 'force-dynamic';
+
+export default async function PortfolioPage({
   searchParams,
 }: {
   searchParams?: { category?: string };
 }) {
+  const portfolioItems = await getAllPortfolioItems();
   const validCategory = allCategories.includes(searchParams?.category as PortfolioCategory)
     ? (searchParams?.category as PortfolioCategory)
     : null;

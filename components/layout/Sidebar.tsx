@@ -8,7 +8,7 @@ import { LoginEntryButton } from '@/components/auth/AccountControls';
 import { MessagePanel } from '@/components/ui/MessagePanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
-import { diaryEntries, getDiaryId, isDiaryPublished } from '@/data/diary';
+import { diaryEntries, getDiaryDate, getDiaryId, isDiaryPublished } from '@/data/diary';
 import { newsItems } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { cn } from '@/lib/format';
@@ -47,7 +47,7 @@ function getLatestUpdates(now: Date | null) {
         .map((entry) => ({
           id: `diary-${getDiaryId(entry)}`,
           title: `日記「${entry.title}」を追加しました`,
-          date: entry.publishedAt,
+          date: getDiaryDate(entry),
           href: `/diary/${getDiaryId(entry)}`,
         }))
     : [];
@@ -80,11 +80,12 @@ export function Sidebar() {
   const [counterMilestone, setCounterMilestone] = useState<CounterMilestone | null>(null);
   const [isCounterPressed, setIsCounterPressed] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
+  const [firebaseUpdates, setFirebaseUpdates] = useState<WhatsNewItem[] | null>(null);
   const counterClickTimestamps = useRef<number[]>([]);
   const counterMessageTimer = useRef<number | null>(null);
   const counterAnimationTimer = useRef<number | null>(null);
   const { absent, event, sleepMode } = useTimeTheme();
-  const latestNews = getLatestUpdates(now);
+  const latestNews = firebaseUpdates ?? getLatestUpdates(now);
   const counterCharacterSrc = sleepMode ? '/character/sleeping.png' : '/character/default.png';
   const counterCharacterMask = event === 'sleep-warning' ? '/effects/eyes.png' : counterCharacterSrc;
   const absentLabel = event === 'lunch' ? '食事中' : event === 'late-night-away' ? '....' : 'お出かけ中';
@@ -131,6 +132,22 @@ export function Sidebar() {
     updateNow();
     const timer = window.setInterval(updateNow, 60_000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadUpdates = async () => {
+      const response = await fetch('/api/content/updates', { cache: 'no-store' });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { updates?: WhatsNewItem[] };
+      if (active && Array.isArray(payload.updates)) setFirebaseUpdates(payload.updates);
+    };
+    void loadUpdates();
+    const timer = window.setInterval(() => void loadUpdates(), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {

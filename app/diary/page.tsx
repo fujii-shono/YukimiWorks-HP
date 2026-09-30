@@ -5,23 +5,22 @@ import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import {
   defaultDiaryEyecatch,
   diaryCategoryLabels,
-  diaryEntries,
   getDiaryDate,
   getDiaryId,
   getDiaryTime,
-  isDiaryPublished,
   type DiaryCategory,
 } from '@/data/diary';
 import { formatJapaneseDate } from '@/lib/format';
+import { getAllDiaryEntries } from '@/lib/firebase/content.server';
 
 const allCategories: DiaryCategory[] = ['chat', 'report', 'development', 'behind-the-scenes', 'content-creation-tips'];
 export const dynamic = 'force-dynamic';
 
-export default function DiaryPage({ searchParams }: { searchParams?: { category?: string } }) {
+export default async function DiaryPage({ searchParams }: { searchParams?: { category?: string } }) {
   const validCategory = allCategories.includes(searchParams?.category as DiaryCategory)
     ? (searchParams?.category as DiaryCategory)
     : null;
-  const publishedEntries = diaryEntries.filter((entry) => isDiaryPublished(entry));
+  const publishedEntries = await getAllDiaryEntries();
   const filteredEntries = validCategory ? publishedEntries.filter((entry) => entry.category === validCategory) : publishedEntries;
 
   return (

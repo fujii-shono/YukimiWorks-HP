@@ -433,6 +433,10 @@ textarea {
 }
 
 .sidebar-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   width: 100%;
   min-height: 42px;
   padding: 7px 14px;
@@ -441,6 +445,7 @@ textarea {
   border: 1px solid var(--site-border);
   font-family: var(--font-pixel);
   font-size: 1rem;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -561,13 +566,88 @@ textarea {
 
 .account-name-row input,
 .admin-message-form input,
-.admin-message-form textarea {
+.admin-message-form textarea,
+.admin-message-form select {
   width: 100%;
   min-width: 0;
   padding: 8px 10px;
   color: var(--site-text);
   background: var(--site-surface);
   border: 1px solid var(--site-border);
+}
+
+.admin-content-form details {
+  border: 1px solid var(--border-color);
+  padding: 0.75rem;
+}
+
+.admin-content-form summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.admin-content-seo {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.admin-media-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--border-color);
+  padding: 0.5rem;
+}
+
+.admin-body-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 4px 0;
+  border: 1px solid var(--site-border);
+  padding: 12px;
+}
+
+.admin-body-editor legend {
+  padding: 0 6px;
+  color: var(--site-accent);
+}
+
+.admin-body-block {
+  display: grid;
+  gap: 8px;
+  border: 1px dotted var(--site-dotted);
+  padding: 10px;
+  background: var(--site-surface-soft);
+}
+
+.admin-body-block-heading,
+.admin-body-block-heading > div,
+.admin-body-add-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-body-block-heading {
+  justify-content: space-between;
+}
+
+.admin-body-block-heading button,
+.admin-body-add-actions button {
+  padding: 5px 9px;
+}
+
+.admin-body-link-fields,
+.admin-body-media-field {
+  display: grid;
+  gap: 7px;
+}
+
+.admin-body-add-actions {
+  flex-wrap: wrap;
 }
 
 .account-name-row button,
@@ -809,6 +889,33 @@ textarea {
 
 .admin-message-list article button {
   padding: 4px 10px;
+}
+
+.admin-portfolio-list-item {
+  min-height: 80px;
+}
+
+.admin-portfolio-list-image {
+  float: left;
+  width: 56px;
+  height: 56px;
+  margin: 0 10px 6px 0;
+  object-fit: cover;
+  border: 1px solid var(--site-border);
+}
+
+.admin-portfolio-list-item > div {
+  clear: both;
+}
+
+.admin-message-list article .admin-content-list-summary {
+  display: -webkit-box;
+  margin: 4px 0 8px;
+  overflow: hidden;
+  color: var(--site-text-muted);
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .tracking-link-builder {

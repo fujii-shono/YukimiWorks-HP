@@ -2,15 +2,19 @@ import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { NewsCard } from '@/components/ui/NewsCard';
-import { newsCategoryLabels, newsItems, type NewsCategory } from '@/data/news';
+import { newsCategoryLabels, type NewsCategory } from '@/data/news';
+import { getAllNewsItems } from '@/lib/firebase/content.server';
 
 const allCategories: NewsCategory[] = ['event', 'announcement', 'release', 'other'];
 
-export default function NewsPage({
+export const dynamic = 'force-dynamic';
+
+export default async function NewsPage({
   searchParams,
 }: {
   searchParams?: { category?: string };
 }) {
+  const newsItems = await getAllNewsItems();
   const validCategory = allCategories.includes(searchParams?.category as NewsCategory)
     ? (searchParams?.category as NewsCategory)
     : null;

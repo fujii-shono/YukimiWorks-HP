@@ -31,6 +31,7 @@ export type News = {
   seoDescription?: string;
   ogImage?: string;
   noIndex?: boolean;
+  publishedAt?: string;
 };
 
 export const newsCategoryLabels: Record<NewsCategory, string> = {
@@ -197,7 +198,8 @@ const sourceRank: Record<NewsSource, number> = {
   portfolio: 2,
 };
 
-const generatedWorkNews: News[] = works
+function createWorkNews(items: typeof works): News[] {
+  return items
   .filter((work) => Boolean(work.date))
   .map((work) => ({
     id: `work-${work.id}`,
@@ -208,14 +210,17 @@ const generatedWorkNews: News[] = works
     summary: work.description,
     href: `/works/${work.id}`,
     source: 'work',
+    publishedAt: work.publishedAt,
   }));
+}
 
 const getPortfolioThumbnail = (item: (typeof portfolioItems)[number]) => {
   if (item.content.kind === 'image') return item.content.src;
   return item.content.thumbnail ?? '';
 };
 
-const generatedPortfolioNews: News[] = portfolioItems
+function createPortfolioNews(items: typeof portfolioItems): News[] {
+  return items
   .filter((item) => Boolean(item.date))
   .map((item) => ({
     id: `portfolio-${item.id}`,
@@ -226,17 +231,23 @@ const generatedPortfolioNews: News[] = portfolioItems
     summary: item.description ?? item.title,
     href: item.href,
     source: 'portfolio',
+    publishedAt: item.publishedAt,
   }));
+}
 
 export const news: News[] = manualNews;
 
-export const newsItems: News[] = [
-  ...manualNews.map((item) => ({ ...item, source: item.source ?? 'manual' })),
-  ...generatedWorkNews,
-  ...generatedPortfolioNews,
-].sort((a, b) => {
-  const dateOrder = b.date.localeCompare(a.date);
+export function buildNewsItems(manualItems: News[], workItems = works, portfolio = portfolioItems): News[] {
+  return [
+    ...manualItems.map((item) => ({ ...item, source: item.source ?? 'manual' as const })),
+    ...createWorkNews(workItems),
+    ...createPortfolioNews(portfolio),
+  ].sort((a, b) => {
+  const dateOrder = (b.publishedAt ?? b.date).localeCompare(a.publishedAt ?? a.date);
   if (dateOrder !== 0) return dateOrder;
 
   return sourceRank[a.source ?? 'manual'] - sourceRank[b.source ?? 'manual'];
-});
+  });
+}
+
+export const newsItems: News[] = buildNewsItems(manualNews);

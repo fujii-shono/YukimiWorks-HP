@@ -14,3 +14,5 @@ export default function HomePage() {
     </SiteFrame>
   );
 }
+
+export const dynamic = 'force-dynamic';

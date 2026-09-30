@@ -41,6 +41,10 @@ export type PortfolioItem = {
   year?: number;
   tags?: string[];
   featured?: boolean;
+  publishedAt?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  noIndex?: boolean;
 };
 
 export const portfolioCategoryLabels: Record<PortfolioCategory, string> = {

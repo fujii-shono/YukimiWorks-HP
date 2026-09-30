@@ -3,20 +3,24 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
+import { RichBody } from '@/components/ui/RichBody';
 import { AcrylicKeychainTool } from '@/components/works/AcrylicKeychainTool';
 import { siteConfig } from '@/data/siteConfig';
 import { works } from '@/data/works';
+import { getAllWorks } from '@/lib/firebase/content.server';
+
+export const dynamic = 'force-dynamic';
 
 export function generateStaticParams() {
   return works.map((work) => ({ id: work.id }));
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const work = works.find((item) => item.id === params.id);
+  const work = (await getAllWorks()).find((item) => item.id === params.id);
   if (!work) return {};
 
-  const title = `${work.title} | YukimiWorks`;
-  const description = work.description;
+  const title = work.seoTitle ?? `${work.title} | YukimiWorks`;
+  const description = work.seoDescription ?? work.description;
   const ogImage = work.thumbnail.trim()
     ? (work.thumbnail.startsWith('http') ? work.thumbnail : `${siteConfig.siteUrl}${work.thumbnail}`)
     : undefined;
@@ -27,6 +31,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     alternates: {
       canonical: `${siteConfig.siteUrl}/works/${work.id}`,
     },
+    ...(work.noIndex ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       title,
       description,
@@ -52,8 +57,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default function WorkDetailPage({ params }: { params: { id: string } }) {
-  const work = works.find((item) => item.id === params.id);
+export default async function WorkDetailPage({ params }: { params: { id: string } }) {
+  const work = (await getAllWorks()).find((item) => item.id === params.id);
   if (!work) notFound();
 
   return (
@@ -82,23 +87,7 @@ export default function WorkDetailPage({ params }: { params: { id: string } }) {
             ),
           )}
         </div>
-        <div className="detail-body detail-body-center">
-          {typeof work.body === 'string' || !work.body ? (
-            <p>{work.body ?? work.description}</p>
-          ) : (
-            work.body.map((segment, index) => {
-              if (segment.type === 'text') return <p key={index}>{segment.value}</p>;
-              if (segment.type === 'strikethrough') return <p key={index} className="detail-body-strikethrough">{segment.value}</p>;
-              return (
-                <p key={index}>
-                  <Link href={segment.href} target="_blank" rel="noopener noreferrer">
-                    {segment.label}
-                  </Link>
-                </p>
-              );
-            })
-          )}
-        </div>
+        <RichBody body={work.body ?? work.description} className="detail-body-center" />
         <div className="tag-list tag-list-center">
           {work.tags.map((tag) => (
             <span key={tag} className="tag-badge">
@@ -106,6 +95,13 @@ export default function WorkDetailPage({ params }: { params: { id: string } }) {
             </span>
           ))}
         </div>
+        {work.url ? (
+          <p className="detail-body detail-body-center">
+            <Link href={work.url} target="_blank" rel="noopener noreferrer" className="pixel-button">
+              サービスを見る
+            </Link>
+          </p>
+        ) : null}
         {work.id === 'acrylic-keychain-tool' ? <AcrylicKeychainTool /> : null}
       </section>
     </SiteFrame>

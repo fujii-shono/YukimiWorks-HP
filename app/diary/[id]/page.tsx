@@ -10,12 +10,14 @@ import {
   diaryEntries,
   getDiaryDate,
   getDiaryId,
+  getDiaryPlainText,
   getDiaryPublishedTime,
   getDiaryTime,
   isDiaryPublished,
 } from '@/data/diary';
 import { siteConfig } from '@/data/siteConfig';
 import { formatJapaneseDate } from '@/lib/format';
+import { getAllDiaryEntries } from '@/lib/firebase/content.server';
 
 function getDiaryEyecatch(entry: (typeof diaryEntries)[number]) {
   return entry.eyecatch?.trim() || defaultDiaryEyecatch;
@@ -32,11 +34,11 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const entry = diaryEntries.find((item) => getDiaryId(item) === params.id);
+  const entry = (await getAllDiaryEntries()).find((item) => getDiaryId(item) === params.id);
   if (!entry || !isDiaryPublished(entry)) return {};
 
   const title = entry.seoTitle ?? `${entry.title} | YukimiWorks`;
-  const description = entry.seoDescription ?? entry.body.replaceAll('\n', ' ').slice(0, 160);
+  const description = entry.seoDescription ?? getDiaryPlainText(entry).replaceAll('\n', ' ').slice(0, 160);
   const ogImage = toAbsoluteUrl(entry.ogImage ?? getDiaryEyecatch(entry));
 
   return {
@@ -64,7 +66,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function DiaryDetailPage({ params }: { params: { id: string } }) {
-  const entry = diaryEntries.find((item) => getDiaryId(item) === params.id);
+  const entry = (await getAllDiaryEntries()).find((item) => getDiaryId(item) === params.id);
   if (!entry || !isDiaryPublished(entry)) notFound();
 
   const eyecatch = getDiaryEyecatch(entry);

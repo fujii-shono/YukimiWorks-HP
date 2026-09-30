@@ -1,10 +1,11 @@
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
-import { portfolioItems } from '@/data/portfolio';
+import { getAllPortfolioItems } from '@/lib/firebase/content.server';
 
-export function PortfolioPreviewSection() {
-  const latestItems = portfolioItems.slice(0, 8);
+export async function PortfolioPreviewSection() {
+  const portfolioItems = await getAllPortfolioItems();
+  const latestItems = portfolioItems.filter((item) => item.featured).slice(0, 8);
 
   return (
     <RetroPanel title="Portfolio" titleHref="/portfolio" className="portfolio-preview-panel">

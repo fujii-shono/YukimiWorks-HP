@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { AdminTrafficAnalytics } from '@/components/admin/AdminTrafficAnalytics';
+import { AdminContentManager } from '@/components/admin/AdminContentManager';
 import { TrackingLinkBuilder } from '@/components/admin/TrackingLinkBuilder';
 import {
   deleteFirebaseMessage,
@@ -21,7 +22,7 @@ import { getXPostCharacterCount, isXPostTooLong, MAX_X_POST_CHARACTERS } from '@
 const adminSections = [
   { id: 'messages', label: 'メッセージ' },
   { id: 'portfolio', label: 'ポートフォリオ' },
-  { id: 'works', label: 'ワーク' },
+  { id: 'works', label: '成果物' },
   { id: 'diary', label: '日記' },
   { id: 'news', label: 'ニュース' },
   { id: 'analytics', label: 'アクセス分析' },
@@ -341,16 +342,7 @@ export function AdminMessageManager() {
   }
 
   if (activeSection !== 'messages') {
-    const section = adminSections.find((item) => item.id === activeSection);
-    return (
-      <div className="admin-placeholder">
-        <div className="admin-subpage-header">
-          <h2>{section?.label}</h2>
-          <button type="button" onClick={backToDashboard}>管理項目へ戻る</button>
-        </div>
-        <p>この項目は準備中です。</p>
-      </div>
-    );
+    return <AdminContentManager kind={activeSection} onBack={backToDashboard} />;
   }
 
   return (

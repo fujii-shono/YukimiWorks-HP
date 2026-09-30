@@ -3,20 +3,23 @@ import { notFound } from 'next/navigation';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
-import { getPortfolioItemById, portfolioItems } from '@/data/portfolio';
+import { portfolioItems } from '@/data/portfolio';
 import { siteConfig } from '@/data/siteConfig';
 import { formatJapaneseDate } from '@/lib/format';
+import { getAllPortfolioItems } from '@/lib/firebase/content.server';
+
+export const dynamic = 'force-dynamic';
 
 export function generateStaticParams() {
   return portfolioItems.map((item) => ({ id: item.id }));
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const item = getPortfolioItemById(params.id);
+  const item = (await getAllPortfolioItems()).find((entry) => entry.id === params.id);
   if (!item) return {};
 
-  const title = `${item.title} | YukimiWorks`;
-  const description = item.description ?? `${item.title} のポートフォリオ詳細ページです。`;
+  const title = item.seoTitle ?? `${item.title} | YukimiWorks`;
+  const description = item.seoDescription ?? item.description ?? `${item.title} のポートフォリオ詳細ページです。`;
   const thumbnail = item.content.kind === 'image' ? item.content.src : item.content.thumbnail;
   const ogImage = item.content.kind === 'html' ? item.content.thumbnail : (item.ogImage ?? thumbnail);
   const ogImageWidth = item.ogImageWidth;
@@ -31,6 +34,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     alternates: {
       canonical: `${siteConfig.siteUrl}/portfolio/${item.id}`,
     },
+    ...(item.noIndex ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       title,
       description,
@@ -58,8 +62,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default function PortfolioDetailPage({ params }: { params: { id: string } }) {
-  const item = getPortfolioItemById(params.id);
+export default async function PortfolioDetailPage({ params }: { params: { id: string } }) {
+  const item = (await getAllPortfolioItems()).find((entry) => entry.id === params.id);
   if (!item) notFound();
 
   return (

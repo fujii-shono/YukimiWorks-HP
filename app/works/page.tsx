@@ -2,15 +2,19 @@ import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { WorkCard } from '@/components/ui/WorkCard';
-import { workCategoryLabels, works, type WorkCategory } from '@/data/works';
+import { workCategoryLabels, type WorkCategory } from '@/data/works';
+import { getAllWorks } from '@/lib/firebase/content.server';
 
 const allCategories: WorkCategory[] = ['contents', 'tools', 'apps'];
 
-export default function WorksPage({
+export const dynamic = 'force-dynamic';
+
+export default async function WorksPage({
   searchParams,
 }: {
   searchParams?: { category?: string };
 }) {
+  const works = await getAllWorks();
   const validCategory = allCategories.includes(searchParams?.category as WorkCategory)
     ? (searchParams?.category as WorkCategory)
     : null;

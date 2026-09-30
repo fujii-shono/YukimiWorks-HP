@@ -3,6 +3,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   orderBy,
@@ -103,9 +104,9 @@ function parseContent<K extends ContentKind>(kind: K, snapshot: QueryDocumentSna
     const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
     return { ...base, body: data.body, bodySegments, category: data.category, eyecatch: isMedia(data.eyecatch) && data.eyecatch.type === 'image' ? data.eyecatch : undefined } as FirebaseContentByKind[K];
   }
-  if (typeof data.summary !== 'string' || typeof data.body !== 'string' || !['event', 'announcement', 'release', 'other'].includes(data.category) || !Array.isArray(data.media)) return null;
+  if (typeof data.body !== 'string' || !['event', 'announcement', 'release', 'other'].includes(data.category) || !Array.isArray(data.media)) return null;
   const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
-  return { ...base, summary: data.summary, body: data.body, bodySegments, category: data.category, thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), featured: data.featured === true } as FirebaseContentByKind[K];
+  return { ...base, body: data.body, bodySegments, category: data.category, thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), featured: data.featured === true } as FirebaseContentByKind[K];
 }
 
 export function subscribeToFirebaseContent<K extends ContentKind>(kind: K, onItems: (items: FirebaseContentByKind[K][]) => void, onError?: () => void): Unsubscribe {
@@ -154,7 +155,7 @@ export async function saveFirebaseContent(kind: ContentKind, id: string | undefi
   if (!services) throw new Error('Firebase が設定されていません。');
   if (!value.title.trim() || Number.isNaN(value.publishedAt.getTime())) throw new Error('タイトルと公開日時を入力してください。');
   const recordRef = id ? doc(services.db, contentCollectionNames[kind], id) : doc(collection(services.db, contentCollectionNames[kind]));
-  await setDoc(recordRef, { ...value, title: value.title.trim(), publishedAt: Timestamp.fromDate(value.publishedAt), updatedAt: serverTimestamp(), ...(creating ? { createdAt: serverTimestamp() } : {}) }, { merge: !creating });
+  await setDoc(recordRef, { ...value, title: value.title.trim(), publishedAt: Timestamp.fromDate(value.publishedAt), updatedAt: serverTimestamp(), ...(kind === 'news' && !creating ? { summary: deleteField() } : {}), ...(creating ? { createdAt: serverTimestamp() } : {}) }, { merge: !creating });
   return recordRef.id;
 }
 

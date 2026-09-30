@@ -22,7 +22,6 @@ export type News = {
   date: string;
   category: NewsCategory;
   thumbnail: string;
-  summary: string;
   href?: string;
   source?: NewsSource;
   body?: NewsBodySegment[] | string;
@@ -33,6 +32,28 @@ export type News = {
   noIndex?: boolean;
   publishedAt?: string;
 };
+
+export const defaultNewsThumbnail = '/logo/open_graph.png';
+
+export function getNewsThumbnail(article: Pick<News, 'thumbnail'>) {
+  return article.thumbnail.trim() || defaultNewsThumbnail;
+}
+
+export function getNewsPlainText(article: Pick<News, 'title' | 'body'>) {
+  if (typeof article.body === 'string') return article.body.trim() || article.title;
+  if (Array.isArray(article.body)) {
+    const text = article.body
+      .flatMap((segment) => segment.type === 'text' || segment.type === 'strikethrough' ? [segment.value] : [])
+      .join('\n\n')
+      .trim();
+    return text || article.title;
+  }
+  return article.title;
+}
+
+export function getNewsDescription(article: Pick<News, 'title' | 'body'>) {
+  return getNewsPlainText(article).replace(/\s+/g, ' ').slice(0, 160);
+}
 
 export const newsCategoryLabels: Record<NewsCategory, string> = {
   event: 'イベント',
@@ -48,7 +69,6 @@ export const manualNews: News[] = [
     date: '2026-09-22',
     category: 'release',
     thumbnail: '/works/rikuari/hero.png',
-    summary: 'リクありに決済機能を追加しました',
     body: [
       {
         type: 'text',
@@ -71,7 +91,6 @@ export const manualNews: News[] = [
     date: '2026-07-31',
     category: 'announcement',
     thumbnail: '/bokin/header.png',
-    summary: '募金ページを追加しました',
     body: [
       {
         type: 'text',
@@ -99,7 +118,6 @@ export const manualNews: News[] = [
     date: '2026-07-27',
     category: 'release',
     thumbnail: '/news/20260727-171550.png',
-    summary: 'アクキーシミュレーターにSVG作成機能を追加しました',
     body: [
       {
         type: 'text',
@@ -132,7 +150,6 @@ export const manualNews: News[] = [
     date: '2026-07-19',
     category: 'announcement',
     thumbnail: '',
-    summary: 'HPにGamesページを追加しました',
     body: [
       {
         type: 'strikethrough',
@@ -160,7 +177,6 @@ export const manualNews: News[] = [
   //   date: '2026-07-14',
   //   category: 'release',
   //   thumbnail: '/tarif/hero.png',
-  //   summary: 'オンライン料金表サービスTarifを公開しました。',
   //   body: [
   //     {
   //       type: 'text',
@@ -183,7 +199,6 @@ export const manualNews: News[] = [
     date: '2026-07-13',
     category: 'announcement',
     thumbnail: '',
-    summary: 'YukimiWorksの公式コーポレートサイトを本日公開しました。制作実績や会社情報をご覧いただけます。',
     body:
       'YukimiWorksのコーポレートサイトを本日公開しました。\n\n制作実績・会社概要・お問い合わせフォームなどをご用意しています。\nご不明な点やご依頼はお問い合わせフォームよりお気軽にご連絡ください。',
     seoTitle: 'コーポレートサイト公開のお知らせ | YukimiWorks',
@@ -207,7 +222,6 @@ function createWorkNews(items: typeof works): News[] {
     date: work.date as string,
     category: 'other',
     thumbnail: work.thumbnail,
-    summary: work.description,
     href: `/works/${work.id}`,
     source: 'work',
     publishedAt: work.publishedAt,
@@ -228,7 +242,6 @@ function createPortfolioNews(items: typeof portfolioItems): News[] {
     date: item.date as string,
     category: 'other',
     thumbnail: getPortfolioThumbnail(item),
-    summary: item.description ?? item.title,
     href: item.href,
     source: 'portfolio',
     publishedAt: item.publishedAt,

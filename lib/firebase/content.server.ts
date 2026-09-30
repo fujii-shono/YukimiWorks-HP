@@ -127,14 +127,14 @@ export async function getAllManualNews(): Promise<News[]> {
   const firebaseItems = documents.flatMap((document): News[] => {
     const data = document.data();
     const publishedAt = timestampDate(data.publishedAt);
-    if (!publishedAt || typeof data.title !== 'string' || typeof data.summary !== 'string' || typeof data.body !== 'string' || !['event', 'announcement', 'release', 'other'].includes(String(data.category))) return [];
+    if (!publishedAt || typeof data.title !== 'string' || typeof data.body !== 'string' || !['event', 'announcement', 'release', 'other'].includes(String(data.category))) return [];
     const storedSegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, 50) : [];
     const mediaSegments: NewsBodySegment[] = Array.isArray(data.media) ? data.media.filter(isMedia).map((item) => ({ type: 'media', src: item.url, mediaType: item.type, alt: item.alt || undefined })) : [];
     const body: NewsBodySegment[] | string = storedSegments.length
       ? storedSegments.map(toPublicBodySegment)
       : mediaSegments.length ? [{ type: 'text', value: data.body }, ...mediaSegments] : data.body;
     const thumbnail = isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail.url : '';
-    return [{ id: document.id, title: data.title, summary: data.summary, body, category: data.category as News['category'], thumbnail, date: tokyoDate(publishedAt), publishedAt: publishedAt.toISOString(), featured: data.featured === true, seoTitle: optionalString(data.seoTitle), seoDescription: optionalString(data.seoDescription), ogImage: thumbnail || undefined, noIndex: data.noIndex === true, source: 'manual' }];
+    return [{ id: document.id, title: data.title, body, category: data.category as News['category'], thumbnail, date: tokyoDate(publishedAt), publishedAt: publishedAt.toISOString(), featured: data.featured === true, seoTitle: optionalString(data.seoTitle), seoDescription: optionalString(data.seoDescription), ogImage: thumbnail || undefined, noIndex: data.noIndex === true, source: 'manual' }];
   });
   return mergeById(manualNews, firebaseItems, (item) => item.publishedAt ?? item.date);
 }

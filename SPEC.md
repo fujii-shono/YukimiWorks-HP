@@ -1071,8 +1071,7 @@ export type News = {
   title: string;
   date: string;                           // 表示用日付（例: '2026-04-01'）
   category: NewsCategory;
-  thumbnail: string;                      // /public/news/xxx.png（一覧カード・メインページプレビュー用サムネイル）
-  summary: string;                        // 一覧カード用の短い概要（1〜2行）。meta description のフォールバックにも使用する
+  thumbnail: string;                      // 未設定時は共通デフォルト画像を使用
   href?: string;                           // 自動追加分の遷移先。手動ニュースは省略時 `/news/{id}`
   source?: 'manual' | 'work' | 'portfolio';
   body?: NewsBodySegment[] | string;      // 個別ページ用の本文
@@ -1080,9 +1079,9 @@ export type News = {
                                           // NewsBodySegment[] の場合はセグメントを順に描画する
   featured?: boolean;                     // true のものがルートページのプレビューに表示される
 
-  // --- SEO 用オプションフィールド（省略時はタイトル・summary・thumbnail で自動生成） ---
+  // --- SEO 用オプションフィールド（省略時はタイトル・本文・thumbnail で自動生成） ---
   seoTitle?: string;                      // <title> タグ上書き用。省略時は `${title} | YukimiWorks`
-  seoDescription?: string;               // meta description 上書き用。省略時は summary（最大160文字）
+  seoDescription?: string;               // meta description 上書き用。省略時は本文の先頭（最大160文字）
   ogImage?: string;                       // OGP画像URL上書き用。省略時は thumbnail の絶対URL
                                           // Cloudinary URL 推奨（例: https://res.cloudinary.com/...）
   noIndex?: boolean;                      // true にすると <meta name="robots" content="noindex"> を付与
@@ -1096,7 +1095,6 @@ export const news: News[] = [
     date: '2026-04-01',
     category: 'release',
     thumbnail: '/news/placeholder.svg',
-    summary: 'YukimiWorksの新作アプリ「〇〇」がApp Store・Google Playにて本日より配信開始しました。',
     body: [
       {
         type: 'text',
@@ -1130,7 +1128,6 @@ export const news: News[] = [
     date: '2026-03-20',
     category: 'event',
     thumbnail: '/news/placeholder.svg',
-    summary: '2026年春に開催されるイベント「〇〇」にYukimiWorksが出展します。新作グッズ・デジタルコンテンツの先行販売も予定しています。',
     body: [
       {
         type: 'text',
@@ -1149,7 +1146,6 @@ export const news: News[] = [
     date: '2026-03-04',
     category: 'announcement',
     thumbnail: '/news/placeholder.svg',
-    summary: 'YukimiWorksの公式コーポレートサイトを本日公開しました。制作実績や会社情報をご覧いただけます。',
     body: 'YukimiWorksのコーポレートサイトを本日公開しました。\n\n制作実績・会社概要・お問い合わせフォームなどをご用意しています。\nご不明な点やご依頼はお問い合わせフォームよりお気軽にご連絡ください。',
     seoTitle: 'コーポレートサイト公開のお知らせ | YukimiWorks',
     seoDescription: 'YukimiWorksの公式コーポレートサイトを公開しました。制作実績・会社情報・お問い合わせはこちらから。',
@@ -1158,7 +1154,7 @@ export const news: News[] = [
 ];
 ```
 
-> **NOTE**: 初期状態では上記の3件のサンプルエントリーを登録する。いずれも `thumbnail` は `/public/news/placeholder.svg` のダミー画像を使用しており、後から実際のファイルに差し替える。`body` 内 `media` セグメントの `src` は **Cloudinary URL** を指定する。新しい記事を追加する際は `news` 配列にオブジェクトを追記するだけでよく、大規模な変更は不要。データ追加・変更は **エンジニアのみが行い、git でバージョン管理する**（`works.ts` と同じ運用）。`seoTitle`・`seoDescription`・`ogImage` は省略可能で、省略時は `title`・`summary`・`thumbnail` から自動生成される。
+> **NOTE**: 初期状態では上記の3件のサンプルエントリーを登録する。いずれも `thumbnail` は `/public/news/placeholder.svg` のダミー画像を使用しており、後から実際のファイルに差し替える。`body` 内 `media` セグメントの `src` は **Cloudinary URL** を指定する。新しい記事を追加する際は `news` 配列にオブジェクトを追記するだけでよく、大規模な変更は不要。データ追加・変更は **エンジニアのみが行い、git でバージョン管理する**（`works.ts` と同じ運用）。`seoTitle`・`seoDescription`・`ogImage` は省略可能で、省略時は `title`・本文・`thumbnail` から自動生成される。
 
 ### データ追加手順
 
@@ -1225,7 +1221,7 @@ export const news: News[] = [
 
 #### 本文テキスト
 
-- `News.body` を表示する（未定義の場合は `News.summary` を代替表示）
+- `News.body` を表示する（未定義の場合はタイトルを代替表示）
 - **テキストは左揃え**（`text-align: left`）
 - 最大幅: `800px`、中央配置（`mx-auto`）のコンテナ内で左揃えとする
 - **改行対応**: テキスト内の改行文字（`\n`）は視覚的な改行として描画する（`whitespace-pre-wrap` またはセグメントごとに `<br>` を挿入）
@@ -1253,7 +1249,7 @@ export async function generateMetadata(
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://yukimiworks.com';
   const title       = article.seoTitle       ?? `${article.title} | YukimiWorks`;
-  const description = article.seoDescription ?? article.summary.slice(0, 160);
+  const description = article.seoDescription ?? getNewsDescription(article);
   // thumbnail が相対パス（/news/...）の場合は絶対 URL に変換
   const ogImage = article.ogImage
     ?? (article.thumbnail.startsWith('http')
@@ -1296,7 +1292,7 @@ export async function generateMetadata(
 | タグ | 生成ルール |
 |------|-----------|
 | `<title>` | `seoTitle` → 省略時 `{title} \| YukimiWorks` |
-| `<meta name="description">` | `seoDescription` → 省略時 `summary`（最大160文字） |
+| `<meta name="description">` | `seoDescription` → 省略時は本文先頭（最大160文字） |
 | `<meta name="robots">` | `noIndex: true` のときのみ `noindex,nofollow` を付与 |
 | `og:title` | `<title>` と同値 |
 | `og:description` | `<meta description>` と同値 |
@@ -1317,7 +1313,7 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Article',
   headline: article.title,
-  description: article.seoDescription ?? article.summary,
+  description: article.seoDescription ?? getNewsDescription(article),
   datePublished: article.date,
   image: ogImage,  // generateMetadata と同じロジックで生成した絶対 URL
   publisher: {
@@ -2005,6 +2001,7 @@ yukimiworks-hp/
 - 管理画面のポートフォリオ一覧は、登録済み画像を小さなプレビューとして各項目に表示する
 - 管理画面の日記一覧は、本文の文章ブロックから先頭100文字までを抜粋表示する
 - 成果物、日記、ニュースは本文用の画像・動画を登録できる。本文は文章・表示テキスト付きリンク・メディアの順序付きブロックとし、ブロックを上下移動してメディアを本文途中へ配置できる。成果物とニュースはサムネイル画像、日記は任意のアイキャッチ画像も登録できる
+- 管理画面から登録する成果物・ニュースのサムネイルと日記のアイキャッチは、一覧カードと同じ16:9比率へ中央トリミングして保存し、ニュース・日記の詳細でも一覧カードと同じ最大幅で表示する。ポートフォリオの作品画像と本文メディアはトリミングせず、本文メディアは詳細で通常どおり表示する
 - コンテンツ用画像は1件10MB、動画は1件100MB、本文メディアは最大8件とし、Firebase Storageの `content/{contentType}/{itemId}/` へ保存する
 - Firebase Admin SDKが未設定、またはFirestoreを取得できない場合は、コード内の既存データのみを表示する
 - メッセージを選択した後に一覧を表示し、「新規追加」「編集」「削除」の導線を表示する

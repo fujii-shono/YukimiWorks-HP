@@ -3627,6 +3627,16 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   margin: 0 auto;
 }
 
+.detail-eyecatch {
+  display: block;
+  width: min(100%, 320px);
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin: 0 auto;
+  object-fit: cover;
+  object-position: center;
+}
+
 .detail-body {
   max-width: 800px;
   margin: 24px auto 0;

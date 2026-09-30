@@ -5,7 +5,7 @@ import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { RichBody } from '@/components/ui/RichBody';
 import { formatJapaneseDate } from '@/lib/format';
-import { manualNews, newsCategoryLabels } from '@/data/news';
+import { getNewsDescription, getNewsPlainText, getNewsThumbnail, manualNews, newsCategoryLabels } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { getAllManualNews } from '@/lib/firebase/content.server';
 
@@ -20,11 +20,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   if (!article) return {};
 
   const title = article.seoTitle ?? `${article.title} | YukimiWorks`;
-  const description = article.seoDescription ?? article.summary.slice(0, 160);
+  const description = article.seoDescription ?? getNewsDescription(article);
   const ogImage = article.ogImage
-    ?? (article.thumbnail.trim()
-      ? (article.thumbnail.startsWith('http') ? article.thumbnail : `${siteConfig.siteUrl}${article.thumbnail}`)
-      : undefined);
+    ?? (getNewsThumbnail(article).startsWith('http') ? getNewsThumbnail(article) : `${siteConfig.siteUrl}${getNewsThumbnail(article)}`);
 
   return {
     title,
@@ -55,14 +53,12 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
   if (!article) notFound();
 
   const ogImage = article.ogImage
-    ?? (article.thumbnail.trim()
-      ? (article.thumbnail.startsWith('http') ? article.thumbnail : `${siteConfig.siteUrl}${article.thumbnail}`)
-      : undefined);
+    ?? (getNewsThumbnail(article).startsWith('http') ? getNewsThumbnail(article) : `${siteConfig.siteUrl}${getNewsThumbnail(article)}`);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: article.title,
-    description: article.seoDescription ?? article.summary,
+    description: article.seoDescription ?? getNewsDescription(article),
     datePublished: article.date,
     ...(ogImage ? { image: ogImage } : {}),
     publisher: {
@@ -86,10 +82,8 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
           </p>
           <hr />
         </div>
-        {article.thumbnail.trim() ? (
-          <SleepWarningImage src={article.thumbnail} alt={`${article.title}のサムネイル`} width={800} height={450} className="detail-media" />
-        ) : null}
-        <RichBody body={article.body ?? article.summary} />
+        <SleepWarningImage src={getNewsThumbnail(article)} alt={`${article.title}のサムネイル`} width={560} height={315} className="detail-eyecatch" />
+        <RichBody body={article.body ?? getNewsPlainText(article)} />
       </section>
     </SiteFrame>
   );

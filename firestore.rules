@@ -181,10 +181,8 @@ service cloud.firestore {
     match /news/{itemId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['title', 'summary', 'body', 'bodySegments', 'category', 'thumbnail', 'media', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['title', 'body', 'bodySegments', 'category', 'thumbnail', 'media', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
         && validContentCommon(request.resource.data)
-        && request.resource.data.summary is string
-        && request.resource.data.summary.size() <= 5000
         && request.resource.data.body is string
         && request.resource.data.body.size() <= 100000
         && request.resource.data.bodySegments is list

@@ -101,7 +101,6 @@ export type FirebaseDiaryEntry = {
 export type FirebaseNews = {
   id: string;
   title: string;
-  summary: string;
   body: string;
   bodySegments: FirebaseContentBodySegment[];
   category: 'event' | 'announcement' | 'release' | 'other';

@@ -90,9 +90,9 @@ export default async function DiaryDetailPage({ params }: { params: { id: string
         <SleepWarningImage
           src={eyecatch}
           alt={entry.eyecatchAlt ?? `${entry.title}のアイキャッチ`}
-          width={800}
-          height={450}
-          className="detail-media"
+          width={560}
+          height={315}
+          className="detail-eyecatch"
         />
         <DiaryBody body={entry.body} />
       </section>

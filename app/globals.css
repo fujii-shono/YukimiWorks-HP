@@ -477,14 +477,16 @@ textarea {
   overflow-wrap: anywhere;
 }
 
-.account-plan {
-  padding: 2px 6px;
-  color: var(--site-accent);
-  background: var(--site-surface-soft);
-  border: 1px solid var(--site-dotted);
+.account-item-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
 }
 
 .account-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
 }
 
@@ -655,22 +657,48 @@ textarea {
   padding: 7px 12px;
 }
 
-.account-coming-soon {
+.account-purchases {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 20px;
 }
 
-.account-coming-soon section {
+.account-purchases section {
   padding: 12px;
   background: var(--site-surface-soft);
   border: 1px dotted var(--site-dotted);
 }
 
-.account-coming-soon h3,
-.account-coming-soon p {
+.account-purchases h3,
+.account-purchases p {
   margin: 0 0 8px;
+}
+
+.account-purchase-note {
+  font-size: 0.78rem;
+}
+
+.account-purchase-list {
+  display: grid;
+  gap: 8px;
+}
+
+.account-purchase-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-purchase-row button {
+  min-width: 64px;
+  padding: 5px 8px;
+}
+
+.account-portal-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 7px 10px;
 }
 
 .account-signout-button {
@@ -6355,7 +6383,6 @@ a.message-inline-link:focus-visible {
     font-size: 0.7rem;
   }
 
-  .account-coming-soon,
   .admin-image-grid,
   .admin-section-grid {
     grid-template-columns: 1fr 1fr;
@@ -6370,6 +6397,15 @@ a.message-inline-link:focus-visible {
 
   .account-name-row {
     grid-template-columns: 1fr;
+  }
+
+  .account-purchase-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .account-purchase-row button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .admin-x-connection {

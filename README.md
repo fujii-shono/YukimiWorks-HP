@@ -49,6 +49,12 @@ UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
 REDIS_KEY_PREFIX=dev
 STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
+NEXT_PUBLIC_STRIPE_PURCHASE_DEBUG=false
+STRIPE_PRICE_COIN_10=price_xxxxxxxxxxxx
+STRIPE_PRICE_COIN_110=price_xxxxxxxxxxxx
+STRIPE_PRICE_BLUE_TICKET=price_xxxxxxxxxxxx
+STRIPE_PRICE_NIGHT_TICKET=price_xxxxxxxxxxxx
+STRIPE_PURCHASE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
 ```
 
 Firebase のブラウザ用設定値は Firebase Console の「プロジェクトの設定 > マイアプリ > SDK の設定と構成」で確認できます。Firebase Web API key はブラウザへ配布される識別情報であり、管理者権限を与える秘密鍵ではありません。データの保護は、このリポジトリの `firestore.rules` と `storage.rules` で行います。
@@ -123,10 +129,11 @@ npm run firebase:deploy:rules
 管理者のプランやコインを直接調整する場合も、同じユーザー文書で次の値を変更します。
 
 - `plan`: `none` / `blue` / `night`
+- `tickets`: `blue` / `night` を含む配列（両方所持可）
 - `coins`: 0以上の整数
 - `purchasedWorkIds`: 作品ID文字列の配列
 
-一般ユーザーが変更できるのは `displayName` だけです。`role`、`plan`、`coins`、`purchasedWorkIds` は Security Rules で本人からの更新を拒否します。メッセージ、各コンテンツ、画像・動画の作成・更新・削除も、`role: admin` のユーザーだけに許可されます。
+一般ユーザーがクライアントから直接変更できるのは `displayName` だけです。`tickets`、`coins`、Stripe関連値は認証済みの購入APIまたはWebhookからのみ更新します。`role`、`plan`、`purchasedWorkIds` も Security Rules で本人からの更新を拒否します。メッセージ、各コンテンツ、画像・動画の作成・更新・削除も、`role: admin` のユーザーだけに許可されます。
 
 ### Firebase Admin SDK（本番）
 
@@ -181,8 +188,21 @@ Vercel の Redis integration が `UPSTASH_REDIS_REST_KV_REST_API_URL` のよう�
 本番環境では未設定、または `REDIS_KEY_PREFIX=prod` のままにすると従来の本番キーを使います。
 
 募金機能では `STRIPE_SECRET_KEY` で Checkout Session の作成と決済済みセッション確認を行い、`STRIPE_WEBHOOK_SECRET` で Stripe Webhook の署名検証を行います。
-Stripe 側の Webhook endpoint は `/api/bokin/webhook` に設定し、イベントは `checkout.session.completed` を送信してください。
+Stripe 側の募金用Webhook endpointは `/api/bokin/webhook` に設定し、`checkout.session.completed` を送信してください。
 本番公開時は `sk_test_...` ではなく本番用の `sk_live_...` と、本番 endpoint 用の `whsec_...` を Vercel の Production 環境に設定します。
+
+アカウントのコイン・チケット購入は `/api/account/checkout` でCheckout Sessionを作成します。コイン2商品は単発決済、青・夜チケットはサブスクリプションのPrice IDを設定してください。
+
+Stripe 側の購入用Webhook endpointは `/api/account/webhook` に設定し、次のイベントを送信してください。
+
+- `checkout.session.completed`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
+
+`NEXT_PUBLIC_STRIPE_PURCHASE_DEBUG=true` の間はStripeへ接続せず、サーバー側で即時に購入状態を反映します。Stripeサンドボックスを試すときはPrice IDと `STRIPE_PURCHASE_WEBHOOK_SECRET` を設定し、このフラグを `false` にします。
+StripeのCustomer Portalも有効化してください。チケット契約中は設定モーダルの「契約内容・解約を管理」からStripeの管理画面を開けます。
 
 ## カウンターの仕組み
 
@@ -226,9 +246,15 @@ X_OAUTH_CALLBACK_URL
 X_POST_DRY_RUN
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
+NEXT_PUBLIC_STRIPE_PURCHASE_DEBUG
+STRIPE_PRICE_COIN_10
+STRIPE_PRICE_COIN_110
+STRIPE_PRICE_BLUE_TICKET
+STRIPE_PRICE_NIGHT_TICKET
+STRIPE_PURCHASE_WEBHOOK_SECRET
 ```
 
-6. Stripe ダッシュボードで Webhook endpoint `https://<本番ドメイン>/api/bokin/webhook` を追加し、`checkout.session.completed` を選択します。
+6. Stripe ダッシュボードで募金用 `/api/bokin/webhook` と購入用 `/api/account/webhook` の2つのWebhook endpointを設定します。
 7. 必要なら `siteConfig.decorativeCounter` を開始値として調整します。
 8. 再デプロイすると、初回アクセス時に Redis へ `site:counter:total` が作成されます。
 

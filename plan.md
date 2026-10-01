@@ -298,6 +298,39 @@
 
 ---
 
+## 追加対応: Stripe Webhook分離（最終方針）
+
+### 対応する仕様
+
+- ユーザー依頼: 募金とアカウント購入のStripe Webhookを別々にする
+
+### 実装方針
+
+- 募金用 `/api/bokin/webhook` は `STRIPE_WEBHOOK_SECRET` で署名検証する
+- 購入用 `/api/account/webhook` は `STRIPE_PURCHASE_WEBHOOK_SECRET` で署名検証する
+- 共通の署名検証処理は再利用しつつ、受信イベントと障害範囲を分離する
+
+### 変更予定のファイルと理由
+
+- `app/api/bokin/webhook/route.ts`: 募金イベントだけを処理する
+- `app/api/account/webhook/route.ts`: 購入・サブスクリプションイベントを処理する
+- `.env.example`, `README.md`: 2 endpointと個別シークレットの設定を案内する
+- `SPEC.md`: 購入専用Webhook endpointを正式仕様に反映する
+
+### 影響範囲
+
+- Stripeダッシュボードの2つのWebhook endpointと送信イベント設定
+- 募金メッセージ、コイン付与、チケット契約状態の反映
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- 募金用と購入用で別の環境変数を参照することを確認する
+
+---
+
 ## 追加対応: カウンター実装
 
 ### 対応する仕様
@@ -2181,3 +2214,70 @@
 
 - lint、TypeScript型チェック、production build
 - クローラーUAのHTML応答、通常UAの307転送、404先の標準OGPフォールバックを確認する
+
+---
+
+## 追加対応: コイン・チケットのダミー購入
+
+### 対応する仕様
+
+- 設定から4種類のコイン・チケット商品をダミー購入できるようにする
+- 青と夜のチケットを併用でき、所持分の画像をようこそ表示の右に並べる
+- コイン枚数は `coin.png` の横に表示する
+
+### 実装方針
+
+- `tickets` 配列で複数チケットを保存し、旧 `plan` 値は読み取り互換として統合する
+- Firestore transactionで購入状態を更新し、Security Rulesは4商品と同じ増分だけを許可する
+- 16px画像はテキストの高さに合わせた等倍表示とし、既存の `pixel-image` と `unoptimized` を適用する
+
+### 変更予定のファイルと理由
+
+- `components/auth/FirebaseAuthProvider.tsx`, `lib/firebase/types.ts`: 購入操作と複数チケット状態のため
+- `components/auth/AccountControls.tsx`, `app/globals.css`: アカウント表示と購入UIのため
+- `firestore.rules`: ダミー商品に一致する更新のみ許可するため
+- `SPEC.md`, `README.md`: データ構造と運用仕様を同期するため
+
+### 影響範囲
+
+- 通常ユーザーの固定アカウント表示、設定モーダル、Firestoreユーザー文書
+- 管理者表示と旧 `plan` データの表示互換は維持する
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Firebase Emulatorで各4商品の購入、両チケット併用、再読み込み後の保持、未定義の残高変更拒否を確認する
+
+---
+
+## 追加対応: Stripeコイン・チケット決済
+
+### 対応する仕様
+
+- コイン2商品をStripe単発決済、青・夜チケットを個別のStripeサブスクリプションとする
+- Webhookで決済、更新、支払い失敗、契約終了をFirestoreへ反映する
+- 環境変数のデバッグフラグでStripeを呼ばない購入を残す
+
+### 実装方針
+
+- Firebase IDトークンをサーバーで検証し、Price IDはサーバー環境変数からのみ参照する
+- Stripeが返すCheckout URLへブラウザを遷移させ、クライアントで残高を更新しない
+- Webhook署名を検証し、StripeイベントID単位で冪等に処理する
+- 青チケットは初回契約と定期更新ごとに30コインを付与する
+
+### 変更予定のファイル
+
+- `app/api/account/{checkout,webhook,portal}/route.ts`: Checkout Session作成、購入Webhook受信、Customer Portal遷移
+- `lib/accountPurchaseProducts.ts`, `lib/accountPurchases.server.ts`, `lib/stripeWebhook.ts`: 商品定義、Firestore反映、署名検証
+- `components/auth/**`: 購入API呼び出しとCheckout遷移
+- `.env.example`, `.env.local`, `README.md`, `SPEC.md`, `firestore.rules`: 設定・仕様・データ保護の同期
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Firebase Emulatorでデバッグ購入とクライアント直接更新の拒否を確認する
+- Stripeサンドボックスで単発決済、両サブスク、Webhook再送、支払い失敗、解約を確認する

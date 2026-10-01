@@ -1,14 +1,25 @@
 import type { Timestamp } from 'firebase/firestore';
 
 export type UserPlan = 'none' | 'blue' | 'night';
+export type UserTicket = 'blue' | 'night';
 export type UserRole = 'user' | 'admin';
+
+export type StripeSubscriptionState = {
+  subscriptionId: string | null;
+  customerId: string | null;
+  status: string;
+  currentPeriodEnd?: number | null;
+};
 
 export type SiteUser = {
   displayName: string;
   plan: UserPlan;
+  tickets: UserTicket[];
   coins: number;
   purchasedWorkIds: string[];
   role: UserRole;
+  stripeCustomerId?: string;
+  stripeSubscriptions?: Partial<Record<UserTicket, StripeSubscriptionState>>;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };

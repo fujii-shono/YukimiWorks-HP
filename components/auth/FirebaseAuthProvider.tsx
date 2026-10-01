@@ -9,8 +9,9 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { AccountPurchaseProduct } from '@/lib/accountPurchaseProducts';
 import { getFirebaseServices, isFirebaseConfigured } from '@/lib/firebase/client';
-import type { SiteUser } from '@/lib/firebase/types';
+import type { SiteUser, UserTicket } from '@/lib/firebase/types';
 
 type AuthContextValue = {
   firebaseUser: User | null;
@@ -22,20 +23,30 @@ type AuthContextValue = {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
+  purchaseProduct: (product: AccountPurchaseProduct) => Promise<'debug' | 'redirect'>;
+  openBillingPortal: () => Promise<void>;
 };
 
 const FirebaseAuthContext = createContext<AuthContextValue | null>(null);
 
-function isSiteUser(value: unknown): value is SiteUser {
-  if (!value || typeof value !== 'object') return false;
+function parseSiteUser(value: unknown): SiteUser | null {
+  if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<SiteUser>;
-  return (
+  const valid =
     typeof candidate.displayName === 'string' &&
     (candidate.plan === 'none' || candidate.plan === 'blue' || candidate.plan === 'night') &&
     typeof candidate.coins === 'number' &&
     Array.isArray(candidate.purchasedWorkIds) &&
-    (candidate.role === 'user' || candidate.role === 'admin')
-  );
+    (candidate.role === 'user' || candidate.role === 'admin') &&
+    (candidate.tickets === undefined ||
+      (Array.isArray(candidate.tickets) && candidate.tickets.every((ticket) => ticket === 'blue' || ticket === 'night')));
+  if (!valid) return null;
+
+  const tickets = new Set<UserTicket>(candidate.tickets || []);
+  // 既存ユーザーの plan は移行せず、表示時だけチケット所持状態として引き継ぐ。
+  if (candidate.plan === 'blue' || candidate.plan === 'night') tickets.add(candidate.plan);
+
+  return { ...candidate, tickets: [...tickets] } as SiteUser;
 }
 
 async function ensureUserProfile(user: User) {
@@ -49,6 +60,7 @@ async function ensureUserProfile(user: User) {
   await setDoc(userRef, {
     displayName: (user.displayName || 'ゲスト').trim().slice(0, 30),
     plan: 'none',
+    tickets: [],
     coins: 10,
     purchasedWorkIds: [],
     role: 'user',
@@ -99,7 +111,7 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
           doc(services.db, 'users', firebaseUser.uid),
           (snapshot) => {
             const data = snapshot.data();
-            setProfile(isSiteUser(data) ? data : null);
+            setProfile(parseSiteUser(data));
             setProfileLoading(false);
           },
           () => {
@@ -160,6 +172,41 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     [firebaseUser],
   );
 
+  const purchaseProduct = useCallback(
+    async (product: AccountPurchaseProduct) => {
+      const services = getFirebaseServices();
+      if (!services || !firebaseUser) throw new Error('ログインが必要です。');
+
+      const response = await fetch('/api/account/checkout', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${await firebaseUser.getIdToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ product }),
+      });
+      const result = (await response.json()) as { debug?: boolean; url?: string; error?: string };
+      if (!response.ok) throw new Error(result.error || '購入処理に失敗しました。');
+      if (result.debug) return 'debug';
+      if (!result.url) throw new Error('Stripeの購入画面URLを取得できませんでした。');
+
+      window.location.assign(result.url);
+      return 'redirect';
+    },
+    [firebaseUser],
+  );
+
+  const openBillingPortal = useCallback(async () => {
+    if (!firebaseUser) throw new Error('ログインが必要です。');
+    const response = await fetch('/api/account/portal', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await firebaseUser.getIdToken()}` },
+    });
+    const result = (await response.json()) as { url?: string; error?: string };
+    if (!response.ok || !result.url) throw new Error(result.error || '契約管理画面を開けませんでした。');
+    window.location.assign(result.url);
+  }, [firebaseUser]);
+
   const value = useMemo(
     () => ({
       firebaseUser,
@@ -171,8 +218,10 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       signIn,
       signOut,
       updateDisplayName,
+      purchaseProduct,
+      openBillingPortal,
     }),
-    [configured, error, firebaseUser, loading, profile, profileLoading, signIn, signOut, updateDisplayName],
+    [configured, error, firebaseUser, loading, openBillingPortal, profile, profileLoading, purchaseProduct, signIn, signOut, updateDisplayName],
   );
 
   return <FirebaseAuthContext.Provider value={value}>{children}</FirebaseAuthContext.Provider>;
@@ -183,4 +232,3 @@ export function useFirebaseAuth() {
   if (!context) throw new Error('useFirebaseAuth must be used inside FirebaseAuthProvider.');
   return context;
 }
-

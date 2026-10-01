@@ -55,7 +55,7 @@ export function getFirebaseAdminServices() {
   return { auth: getAuth(app), db: getFirestore(app) };
 }
 
-export async function requireFirebaseAdmin(request: Request) {
+export async function requireFirebaseUser(request: Request) {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) throw new Error('AUTH_REQUIRED');
 
@@ -64,6 +64,12 @@ export async function requireFirebaseAdmin(request: Request) {
 
   const { auth, db } = getFirebaseAdminServices();
   const decodedToken = await auth.verifyIdToken(idToken);
+  return decodedToken;
+}
+
+export async function requireFirebaseAdmin(request: Request) {
+  const decodedToken = await requireFirebaseUser(request);
+  const { db } = getFirebaseAdminServices();
   const userSnapshot = await db.collection('users').doc(decodedToken.uid).get();
   if (userSnapshot.data()?.role !== 'admin') throw new Error('ADMIN_REQUIRED');
 

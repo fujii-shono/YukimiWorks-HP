@@ -1970,18 +1970,28 @@ yukimiworks-hp/
 
 - ログインは Firebase Authentication の Google プロバイダーのみ使用する
 - Menu パネルの上に「ログイン」ボタンを表示し、案内とGoogleログインボタンはモーダルで表示する
-- ログイン後は画面右上に固定追従で「ようこそ ○○さん」、コイン枚数、設定ボタンを表示する
-- プランが `blue` の場合は「青チケ」、`night` の場合は「夜チケ」を表示する。`none` の場合はプラン名を表示しない
-- 通常ユーザーの設定モーダルには名前変更、プラン変更、コイン購入を表示する。後二者の決済・残高変更は今後実装とする
+- ログイン後は画面右上に固定追従で「ようこそ ○○さん」、購入済みチケットのドット絵、コインのドット絵と枚数、設定ボタンを表示する
+- チケットは青と夜を併用購入でき、両方を所持する場合は2つの画像を「ようこそ」の右側に表示する
+- ユーザーアイコンはテキストの高さに合わせて16pxで表示し、`pixel-image`によるピクセル表示を適用する
+- 通常ユーザーの設定モーダルには名前変更、コイン購入、チケット購入を表示する
+- 商品は「コイン10枚 100円」「コイン100+10枚 1000円」「青チケット（有料作品見放題+コイン30枚） 500円」「夜チケット（夜の作品見放題） 1000円」とする
+- コインはStripe Checkoutの単発決済、青・夜チケットは個別のサブスクリプション決済とする
+- 購入処理はFirebase IDトークンを検証するサーバーAPIからCheckout Sessionを作成し、決済結果は購入専用の `/api/account/webhook` で署名検証してFirestoreへ反映する
+- Stripe Webhookの再送でコインが重複付与されないよう、処理済みイベントIDを保存する
+- 青チケットの30コインは初回決済完了時と、以後の定期課金成功時に付与する
+- チケットは契約が `active` / `trialing` の間だけ有効とし、支払い失敗・契約終了時は所持表示から除外する
+- チケット契約中はStripe Customer Portalへの導線を表示し、契約内容の確認と解約を可能にする
+- `NEXT_PUBLIC_STRIPE_PURCHASE_DEBUG=true` の間はStripeを呼ばず、同じサーバーAPIからデバッグ購入状態を即時反映する
 - 管理者は「ようこそ 管理者○○さん」と表示し、設定モーダルには名前変更と「管理画面へ」を表示する
 - 管理者の固定アカウント表示には、プラン名とコイン枚数を表示しない
 
 ### ユーザーデータ
 
-- Firestore の `users/{uid}` に `displayName`, `plan`, `coins`, `purchasedWorkIds`, `role`, 作成・更新日時を保存する
-- 初回ログイン時は `plan: none`, `coins: 10`, `purchasedWorkIds: []`, `role: user` とする
-- 本人がサイトから変更できる値は `displayName` のみとする
-- `role`, `plan`, `coins`, `purchasedWorkIds` は Firebase Console、ローカルでは Emulator UI から変更する
+- Firestore の `users/{uid}` に `displayName`, `plan`, `tickets`, `coins`, `purchasedWorkIds`, `role`, `stripeCustomerId`, `stripeSubscriptions`, 作成・更新日時を保存する
+- `tickets` は `blue` / `night` の配列とする。旧 `plan` に格納済みのチケットは読み取り時に所持状態へ統合する
+- 初回ログイン時は `plan: none`, `tickets: []`, `coins: 10`, `purchasedWorkIds: []`, `role: user` とする
+- 本人がクライアントから直接変更できる値は `displayName` のみとする。`tickets`, `coins`, Stripe関連値はサーバー処理だけが更新する
+- `role`, `plan`, `purchasedWorkIds` は Firebase Console、ローカルでは Emulator UI から変更する
 - 管理者指定は対象文書の `role` を `admin` に変更して行う
 - Firestore Security Rules で保護値の本人更新を禁止する
 

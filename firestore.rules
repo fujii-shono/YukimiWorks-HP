@@ -14,12 +14,16 @@ service cloud.firestore {
 
     function validUser(data) {
       return data.keys().hasOnly([
-          'displayName', 'plan', 'coins', 'purchasedWorkIds', 'role', 'createdAt', 'updatedAt'
+          'displayName', 'plan', 'tickets', 'coins', 'purchasedWorkIds', 'role',
+          'stripeCustomerId', 'stripeSubscriptions', 'createdAt', 'updatedAt'
         ])
         && data.displayName is string
         && data.displayName.size() >= 1
         && data.displayName.size() <= 30
         && data.plan in ['none', 'blue', 'night']
+        && (!('tickets' in data) || validTickets(data.tickets))
+        && (!('stripeCustomerId' in data) || data.stripeCustomerId is string)
+        && (!('stripeSubscriptions' in data) || data.stripeSubscriptions is map)
         && data.coins is int
         && data.coins >= 0
         && data.purchasedWorkIds is list
@@ -27,6 +31,13 @@ service cloud.firestore {
         && data.role in ['user', 'admin']
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
+    }
+
+    function validTickets(tickets) {
+      return tickets is list
+        && tickets.size() <= 2
+        && (tickets.size() < 1 || tickets[0] in ['blue', 'night'])
+        && (tickets.size() < 2 || tickets[1] in ['blue', 'night']);
     }
 
     function validImage(image) {
@@ -113,6 +124,9 @@ service cloud.firestore {
         && validUser(request.resource.data)
         && request.resource.data.role == 'user'
         && request.resource.data.plan == 'none'
+        && request.resource.data.tickets.size() == 0
+        && !('stripeCustomerId' in request.resource.data)
+        && !('stripeSubscriptions' in request.resource.data)
         && request.resource.data.coins == 10
         && request.resource.data.purchasedWorkIds.size() == 0;
       allow update: if signedIn()

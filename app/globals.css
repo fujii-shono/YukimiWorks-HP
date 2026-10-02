@@ -5504,6 +5504,45 @@ a.message-inline-link:focus-visible {
   display: none;
 }
 
+.message-panel-support-reply {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0 18px;
+  padding: 8px 10px;
+  color: var(--site-text);
+  background: var(--site-surface);
+  border: 1px solid color-mix(in srgb, var(--site-dotted) 70%, white);
+  border-radius: 0;
+}
+
+.message-panel-support-reply-meta {
+  margin: 0;
+}
+
+.message-panel-support-reply-author {
+  color: var(--site-accent);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.message-panel-support-reply-body {
+  display: block;
+  color: var(--site-text);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-text-fill-color: currentColor;
+}
+
+.message-panel-tooltip-reply {
+  margin-top: 4px;
+}
+
+.message-panel-tooltip-reply p {
+  margin: 0;
+}
+
 .message-panel-tooltip {
   position: absolute;
   left: calc(100% + 14px);
@@ -5555,6 +5594,100 @@ a.message-inline-link:focus-visible {
   min-height: 520px;
   padding: 24px;
   background: var(--site-surface);
+}
+
+.messages-support-area {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.messages-support-open {
+  min-width: 150px;
+  margin-top: 0;
+  border-radius: 999px;
+  pointer-events: auto;
+}
+
+.messages-support-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(10, 20, 45, 0.76);
+  pointer-events: auto;
+}
+
+.messages-support-modal {
+  width: min(390px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  padding: 20px;
+  color: var(--site-text);
+  background: var(--site-surface);
+  border: 1px solid var(--site-border);
+  border-radius: 16px;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.messages-support-modal form {
+  display: grid;
+  gap: 10px;
+}
+
+.messages-support-modal form > label {
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+}
+
+.messages-support-modal input[type='number'],
+.messages-support-modal input[type='text'] {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  color: #000;
+  caret-color: #000;
+  background: #fff;
+  border: 1px solid var(--site-border);
+  border-radius: 2px;
+  font: inherit;
+}
+
+.messages-support-modal input:focus {
+  outline: 2px solid var(--site-focus);
+  outline-offset: 2px;
+}
+
+.messages-support-increments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.messages-support-amount-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.messages-support-modal form > p {
+  margin: 0;
+  color: var(--site-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.messages-support-submit {
+  justify-self: center;
+  margin-top: 8px;
 }
 
 .messages-phone-frame {
@@ -5619,6 +5752,10 @@ a.message-inline-link:focus-visible {
 }
 
 .messages-phone-frame.has-admin-compose .messages-tab-panel {
+  padding-bottom: 76px;
+}
+
+.messages-phone-frame.has-support-action .messages-tab-panel {
   padding-bottom: 76px;
 }
 
@@ -5826,6 +5963,70 @@ a.message-inline-link:focus-visible {
   flex: 1 1 0;
   min-width: 0;
   aspect-ratio: 1;
+}
+
+.messages-support-reply {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0 22px;
+  padding: 14px;
+  color: var(--site-text);
+  background: var(--site-surface);
+  border: 1px solid color-mix(in srgb, var(--site-dotted) 70%, white);
+  border-radius: 0;
+}
+
+.messages-support-reply-meta {
+  margin-bottom: 2px;
+}
+
+.messages-reply-author {
+  color: var(--site-accent);
+  font-size: 0.86rem;
+}
+
+.messages-support-reply p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.messages-reply-button {
+  display: block;
+  width: 38px;
+  height: 38px;
+  margin: 12px auto 0 0;
+  padding: 0 0 2px;
+  color: var(--site-accent);
+  background: var(--site-surface-soft);
+  border: 1px solid var(--site-border);
+  border-radius: 50%;
+  font: 1.4rem/1 var(--font-pixel);
+  cursor: pointer;
+}
+
+.messages-reply-button:focus-visible {
+  outline: 2px solid var(--site-focus);
+  outline-offset: 2px;
+}
+
+.messages-support-reply .messages-reply-button {
+  width: 30px;
+  height: 30px;
+  margin: 0 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.messages-reply-target {
+  margin: 0 0 14px;
+  padding: 10px;
+  background: var(--site-surface-soft);
+  border-left: 3px solid var(--site-accent);
+  font-size: 0.85rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .messages-feed-image-button,

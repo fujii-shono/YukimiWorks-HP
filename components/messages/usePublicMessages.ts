@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { messagePosts, type MessagePost } from '@/data/messages';
+import { messagePosts, type MessagePost, type MessageSupportReply } from '@/data/messages';
 import { subscribeToFirebaseMessages } from '@/lib/firebase/messages';
 
 function getTokyoDateKey(date: Date) {
@@ -34,6 +34,7 @@ export function parseJapaneseDateTime(value: string) {
 }
 
 export const MESSAGE_SAVED_EVENT = 'yukimi-message-saved';
+export const SUPPORT_REPLY_SAVED_EVENT = 'yukimi-support-reply-saved';
 
 export function formatFirebaseDate(date: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -74,6 +75,10 @@ export function publishSavedMessage(post: MessagePost) {
   window.dispatchEvent(new CustomEvent<MessagePost>(MESSAGE_SAVED_EVENT, { detail: post }));
 }
 
+export function publishSupportReply(messageId: string, reply: MessageSupportReply) {
+  window.dispatchEvent(new CustomEvent(SUPPORT_REPLY_SAVED_EVENT, { detail: { messageId, reply } }));
+}
+
 export function usePublicMessages() {
   const [now, setNow] = useState<Date | null>(null);
   const [donationPosts, setDonationPosts] = useState<MessagePost[]>([]);
@@ -83,6 +88,32 @@ export function usePublicMessages() {
     setNow(new Date());
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const onSupportReplySaved = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return;
+      const detail = event.detail as { messageId?: unknown; reply?: Partial<MessageSupportReply> };
+      if (
+        typeof detail.messageId !== 'string' ||
+        typeof detail.reply?.body !== 'string' ||
+        typeof detail.reply.publishedAt !== 'string'
+      ) {
+        return;
+      }
+
+      const reply: MessageSupportReply = {
+        body: detail.reply.body,
+        publishedAt: detail.reply.publishedAt,
+        ...(typeof detail.reply.authorName === 'string' ? { authorName: detail.reply.authorName } : {}),
+      };
+      setDonationPosts((current) =>
+        current.map((post) => (post.id === detail.messageId ? { ...post, reply } : post)),
+      );
+    };
+
+    window.addEventListener(SUPPORT_REPLY_SAVED_EVENT, onSupportReplySaved);
+    return () => window.removeEventListener(SUPPORT_REPLY_SAVED_EVENT, onSupportReplySaved);
   }, []);
 
   useEffect(() => {

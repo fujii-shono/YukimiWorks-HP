@@ -36,23 +36,27 @@ function parseDisplayName(value: FormDataEntryValue | null) {
 }
 
 export async function POST(req: Request) {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
   const origin = getRequestOrigin(req);
+  const formData = await req.formData();
+  const fromMessages = formData.get('source') === 'messages';
+  const returnPath = fromMessages ? '/messages' : '/bokin';
+  const secretKey = process.env.STRIPE_SECRET_KEY;
 
   if (!secretKey) {
     console.error('[bokin/checkout] STRIPE_SECRET_KEY が設定されていません。');
-    return NextResponse.redirect(`${origin}/bokin?error=stripe-config`, { status: 303 });
+    return NextResponse.redirect(`${origin}${returnPath}?error=stripe-config`, { status: 303 });
   }
 
-  const formData = await req.formData();
   const amount = parseAmount(formData.get('amount'));
-  if (amount === null) return NextResponse.redirect(`${origin}/bokin?error=amount`, { status: 303 });
+  if (amount === null) return NextResponse.redirect(`${origin}${returnPath}?error=amount`, { status: 303 });
   const displayName = parseDisplayName(formData.get('displayName'));
 
   const params = new URLSearchParams({
     mode: 'payment',
-    success_url: `${origin}/bokin/thanks?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/bokin?canceled=1`,
+    success_url: fromMessages
+      ? `${origin}/messages?donation=success`
+      : `${origin}/bokin/thanks?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}${returnPath}?canceled=1`,
     'payment_method_types[0]': 'card',
     'metadata[kind]': 'bokin',
     'metadata[displayName]': displayName,
@@ -76,13 +80,13 @@ export async function POST(req: Request) {
   if (!response.ok) {
     const detail = await response.text();
     console.error('[bokin/checkout] Checkout Session の作成に失敗しました。', detail);
-    return NextResponse.redirect(`${origin}/bokin?error=checkout`, { status: 303 });
+    return NextResponse.redirect(`${origin}${returnPath}?error=checkout`, { status: 303 });
   }
 
   const session = (await response.json()) as { url?: string };
   if (!session.url) {
     console.error('[bokin/checkout] Checkout Session URL が返却されませんでした。');
-    return NextResponse.redirect(`${origin}/bokin?error=checkout`, { status: 303 });
+    return NextResponse.redirect(`${origin}${returnPath}?error=checkout`, { status: 303 });
   }
 
   return NextResponse.redirect(session.url, { status: 303 });

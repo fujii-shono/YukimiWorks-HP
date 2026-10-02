@@ -1,12 +1,19 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { MessageBody } from '@/components/messages/MessageBody';
+import { MessageSupportForm } from '@/components/messages/MessageSupportForm';
 import { QuickMessageComposer } from '@/components/messages/QuickMessageComposer';
-import { formatMessageDate, getMessageImages, parseJapaneseDateTime, usePublicMessages } from '@/components/messages/usePublicMessages';
-import type { MessagePost } from '@/data/messages';
+import {
+  formatMessageDate,
+  getMessageImages,
+  parseJapaneseDateTime,
+  publishSupportReply,
+  usePublicMessages,
+} from '@/components/messages/usePublicMessages';
+import { MAX_MESSAGE_SUPPORT_REPLY_LENGTH, type MessagePost } from '@/data/messages';
 import { cn } from '@/lib/format';
 
 const PAGE_SIZE = 10;
@@ -23,7 +30,19 @@ type SelectedImage = {
   body: string;
 };
 
-function MessageFeed({ posts, now, onSelectImage }: { posts: MessagePost[]; now: Date; onSelectImage: (image: SelectedImage) => void }) {
+function MessageFeed({
+  posts,
+  now,
+  isAdmin,
+  onReply,
+  onSelectImage,
+}: {
+  posts: MessagePost[];
+  now: Date;
+  isAdmin: boolean;
+  onReply: (post: MessagePost) => void;
+  onSelectImage: (image: SelectedImage) => void;
+}) {
   return (
     <div className="messages-feed">
       {posts.map((post, postIndex) => {
@@ -68,6 +87,47 @@ function MessageFeed({ posts, now, onSelectImage }: { posts: MessagePost[]; now:
                 ))}
               </div>
             ) : null}
+            {post.reply ? (
+              <div className="messages-support-reply">
+                <div className="message-panel-meta messages-support-reply-meta">
+                  <Image
+                    src="/logo/yukimi_works_favicon.png"
+                    alt="YukimiWorks"
+                    width={36}
+                    height={36}
+                    className="messages-feed-icon pixel-image"
+                    unoptimized
+                  />
+                  <span className="messages-reply-author">{post.reply.authorName || 'YukimiWorks'}</span>
+                  <time dateTime={parseJapaneseDateTime(post.reply.publishedAt).toISOString()}>
+                    {formatMessageDate(post.reply.publishedAt, now)}
+                  </time>
+                  {isAdmin && post.tone && post.id ? (
+                    <button
+                      type="button"
+                      className="messages-reply-button"
+                      onClick={() => onReply(post)}
+                      aria-label="このリプライを編集する"
+                      title="リプライを編集する"
+                    >
+                      <span aria-hidden="true">✎</span>
+                    </button>
+                  ) : null}
+                </div>
+                <p><MessageBody body={post.reply.body} /></p>
+              </div>
+            ) : null}
+            {isAdmin && post.tone && post.id && !post.reply ? (
+              <button
+                type="button"
+                className="messages-reply-button"
+                onClick={() => onReply(post)}
+                aria-label="この支援メッセージにリプライする"
+                title="リプライする"
+              >
+                <span aria-hidden="true">↩</span>
+              </button>
+            ) : null}
           </article>
         );
       })}
@@ -75,13 +135,110 @@ function MessageFeed({ posts, now, onSelectImage }: { posts: MessagePost[]; now:
   );
 }
 
+function SupportReplyModal({
+  post,
+  getIdToken,
+  onClose,
+}: {
+  post: MessagePost;
+  getIdToken: () => Promise<string>;
+  onClose: () => void;
+}) {
+  const editing = Boolean(post.reply);
+  const [body, setBody] = useState(post.reply?.body ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [busy, onClose]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!post.id) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/messages/support-replies/${encodeURIComponent(post.id)}`, {
+        method: editing ? 'PUT' : 'POST',
+        headers: {
+          Authorization: `Bearer ${await getIdToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ body }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        messageId?: string;
+        reply?: { body?: string; publishedAt?: string; authorName?: string };
+        error?: string;
+      } | null;
+      if (!response.ok || !result?.messageId || typeof result.reply?.body !== 'string' || typeof result.reply.publishedAt !== 'string') {
+        throw new Error(result?.error || 'リプライを保存できませんでした。');
+      }
+
+      publishSupportReply(result.messageId, {
+        body: result.reply.body,
+        publishedAt: result.reply.publishedAt,
+        ...(typeof result.reply.authorName === 'string' ? { authorName: result.reply.authorName } : {}),
+      });
+      onClose();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'リプライを保存できませんでした。');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="messages-compose-backdrop" onMouseDown={() => !busy && onClose()}>
+      <section
+        className="messages-compose-modal messages-reply-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="messages-reply-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="messages-compose-heading">
+          <h2 id="messages-reply-title">{editing ? 'リプライを編集' : '支援メッセージへリプライ'}</h2>
+          <button type="button" onClick={onClose} disabled={busy} aria-label="閉じる">×</button>
+        </div>
+        <p className="messages-reply-target">{post.body}</p>
+        <form onSubmit={submit}>
+          <label htmlFor="messages-reply-body">リプライ</label>
+          <textarea
+            id="messages-reply-body"
+            value={body}
+            rows={6}
+            maxLength={MAX_MESSAGE_SUPPORT_REPLY_LENGTH}
+            required
+            autoFocus
+            disabled={busy}
+            onChange={(event) => setBody(event.target.value)}
+          />
+          <span className="admin-character-count">{body.length} / {MAX_MESSAGE_SUPPORT_REPLY_LENGTH}</span>
+          {error ? <p className="form-status error" role="alert">{error}</p> : null}
+          <button type="submit" className="primary-button messages-compose-submit" disabled={busy}>
+            {busy ? '保存中…' : editing ? '更新' : 'リプライ'}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 export function MessagesView() {
   const { now, posts } = usePublicMessages();
-  const { profile } = useFirebaseAuth();
+  const { firebaseUser, loading, profile, profileLoading } = useFirebaseAuth();
   const [activeTab, setActiveTab] = useState<MessageTab>('messages');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<MessagePost | null>(null);
   const [poweredOff, setPoweredOff] = useState(false);
   const phoneShellRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -100,19 +257,24 @@ export function MessagesView() {
       ),
     [posts],
   );
+  const showSupportAction = !loading && !profileLoading && profile?.role !== 'admin';
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [activeTab]);
 
   useEffect(() => {
-    if (profile?.role !== 'admin') setComposerOpen(false);
+    if (profile?.role !== 'admin') {
+      setComposerOpen(false);
+      setReplyingTo(null);
+    }
   }, [profile?.role]);
 
   const togglePower = () => {
     if (!poweredOff) {
       phoneShellRef.current?.scrollTo({ top: 0 });
       setComposerOpen(false);
+      setReplyingTo(null);
     }
     setPoweredOff((current) => !current);
   };
@@ -148,7 +310,13 @@ export function MessagesView() {
 
   return (
     <>
-      <div className={cn('messages-phone-frame', profile?.role === 'admin' && 'has-admin-compose')}>
+      <div
+        className={cn(
+          'messages-phone-frame',
+          profile?.role === 'admin' && 'has-admin-compose',
+          showSupportAction && 'has-support-action',
+        )}
+      >
         <div ref={phoneShellRef} className={cn('messages-phone-shell', poweredOff && 'is-powered-off')}>
           <div className="messages-tabs" role="tablist" aria-label="Message表示切り替え">
             {tabs.map((tab) => (
@@ -171,7 +339,16 @@ export function MessagesView() {
             {!now ? <p className="empty-state">メッセージを読み込んでいます…</p> : null}
 
             {now && activeTab !== 'media' && visiblePosts.length > 0 ? (
-              <MessageFeed posts={visiblePosts} now={now} onSelectImage={setSelectedImage} />
+              <MessageFeed
+                posts={visiblePosts}
+                now={now}
+                isAdmin={profile?.role === 'admin'}
+                onReply={(post) => {
+                  setComposerOpen(false);
+                  setReplyingTo(post);
+                }}
+                onSelectImage={setSelectedImage}
+              />
             ) : null}
 
             {now && activeTab !== 'media' && activePosts.length === 0 ? (
@@ -212,11 +389,27 @@ export function MessagesView() {
           aria-label={poweredOff ? 'スマートフォンの電源を入れる' : 'スマートフォンの電源を切る'}
         />
         {profile?.role === 'admin' && !poweredOff ? (
-          <button type="button" className="messages-compose-button" onClick={() => setComposerOpen(true)} aria-label="メッセージを追加">
+          <button
+            type="button"
+            className="messages-compose-button"
+            onClick={() => {
+              setReplyingTo(null);
+              setComposerOpen(true);
+            }}
+            aria-label="メッセージを追加"
+          >
             +
           </button>
         ) : null}
         {composerOpen && !poweredOff ? <QuickMessageComposer onClose={() => setComposerOpen(false)} /> : null}
+        {replyingTo && firebaseUser && !poweredOff ? (
+          <SupportReplyModal
+            post={replyingTo}
+            getIdToken={() => firebaseUser.getIdToken()}
+            onClose={() => setReplyingTo(null)}
+          />
+        ) : null}
+        {showSupportAction && !poweredOff ? <MessageSupportForm /> : null}
       </div>
 
       {selectedImage ? (

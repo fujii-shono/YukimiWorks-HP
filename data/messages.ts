@@ -1,4 +1,13 @@
 export type MessageTone = 'blue' | 'purple' | 'red' | 'rainbow';
+export const MAX_MESSAGE_SUPPORT_REPLY_LENGTH = 300;
+
+export type MessageSupportReply = {
+  /** 日本時間で `YYYY-MM-DD HH:mm` の形式で指定する */
+  publishedAt: string;
+  body: string;
+  /** リプライ作成時点の管理者表示名 */
+  authorName?: string;
+};
 
 export type MessagePost = {
   /** Firestore由来の投稿を識別するためのID */
@@ -20,6 +29,8 @@ export type MessagePost = {
   body: string;
   /** 募金メッセージだけが使用する */
   tone?: MessageTone;
+  /** 募金メッセージに対する管理者からのリプライ */
+  reply?: MessageSupportReply;
 };
 
 /**

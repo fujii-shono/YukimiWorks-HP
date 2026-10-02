@@ -2281,3 +2281,42 @@
 - `npm run build`
 - Firebase Emulatorでデバッグ購入とクライアント直接更新の拒否を確認する
 - Stripeサンドボックスで単発決済、両サブスク、Webhook再送、支払い失敗、解約を確認する
+
+---
+
+## 追加対応: Message画面の応援・支援リプライ
+
+### 対応する仕様
+
+- Message画面のスマートフォン風エリア内の下部に、投稿へ重なる管理者以外向けの角丸「応援する」ボタンと支援モーダルを追加する
+- 支援額は50円を初期値とし、`+100`、`+1000`と表示名入力から既存Stripe Checkoutへ進める
+- ログイン中の通常ユーザーはアカウントのユーザー名を表示名へ初期入力し、モーダル内で変更可能にする
+- Message画面から開始した決済の完了・キャンセル後は`/messages`へ戻す
+- 管理者だけがMessage画面の未返信支援メッセージ左側に表示されるリプライ記号、または返信枠内に表示される編集記号から、1件のリプライを保存・編集できる。作成日時はRedisへ保存して維持し、管理者名は編集時点の管理者名へ更新する。Message画面と左サイドバーの両方で元メッセージ直下に通常メッセージと同じ四角い枠・アイコン・名前を用いて表示する
+
+### 実装方針
+
+- Stripe Checkoutと支援メッセージWebhookは既存処理を共用し、送信元を許可済みの値としてサーバー側で判定して戻り先だけを切り替える
+- リプライは支援メッセージIDに紐づけてRedisへ保存し、公開メッセージ取得時に支援メッセージへ結合する
+- リプライ保存APIはFirebase IDトークンとFirestore上の管理者権限を検証する
+- 保存後はクライアント状態を更新し、再読み込みなしでMessage画面へ反映する
+
+### 変更予定のファイルと理由
+
+- `components/messages/MessagesView.tsx`, `components/messages/MessageSupportForm.tsx`: 応援モーダル、管理者リプライ入力、即時反映
+- `components/messages/usePublicMessages.ts`, `components/ui/MessagePanel.tsx`, `data/messages.ts`: リプライを含む公開データと両表示箇所への反映
+- `app/api/bokin/checkout/route.ts`: Message画面用の安全な戻り先分岐
+- `app/api/messages/support-replies/[messageId]/route.ts`, `lib/bokinMessages.ts`: 権限検証済みリプライ保存とRedis読み書き
+- `app/globals.css`: 応援モーダル、リプライ操作、入れ子表示のレスポンシブスタイル
+
+### 影響範囲
+
+- `/messages`、左サイドバーのMessageパネル、既存募金Checkout、支援メッセージ取得API
+- 既存の募金ページ、おみくじ完了画面、通常メッセージ投稿は従来動作を維持する
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- 一般ユーザー・未ログイン・管理者それぞれの表示、金額加算、Checkout戻り先、管理者以外のAPI拒否、両Message表示でのリプライを確認する

@@ -99,6 +99,9 @@ export function MessagePanel() {
   const visibleOpenPost = openPost && now && parseJapaneseDateTime(openPost.publishedAt).getTime() <= now.getTime() ? openPost : null;
   const openPostFormattedDate = visibleOpenPost && now ? formatMessageDate(visibleOpenPost.publishedAt, now) : '\u00a0';
   const openPostDateTime = openPost ? parseJapaneseDateTime(openPost.publishedAt).toISOString() : '';
+  const openPostReplyFormattedDate = visibleOpenPost?.reply && now
+    ? formatMessageDate(visibleOpenPost.reply.publishedAt, now)
+    : '';
 
   return (
     <section ref={panelRef} className="window-panel message-panel" aria-label="メッセージ">
@@ -175,6 +178,24 @@ export function MessagePanel() {
                         </span>
                       ) : null}
                     </span>
+                    {post.reply ? (
+                      <span className="message-panel-support-reply">
+                        <span className="message-panel-meta message-panel-support-reply-meta">
+                          <Image
+                            src="/logo/yukimi_works_favicon.png"
+                            alt="YukimiWorks"
+                            width={26}
+                            height={26}
+                            className="message-panel-icon pixel-image"
+                            unoptimized
+                          />
+                          <span className="message-panel-support-reply-author">{post.reply.authorName || 'YukimiWorks'}</span>
+                        </span>
+                        <span className="message-panel-support-reply-body">
+                          <MessageBody body={post.reply.body} interactive={false} />
+                        </span>
+                      </span>
+                    ) : null}
                   </span>
                 </span>
               </button>
@@ -220,6 +241,27 @@ export function MessagePanel() {
             {getMessageImages(visibleOpenPost).map((image) => (
               <Image key={image.src} src={image.src} alt={image.alt} width={220} height={140} className="message-panel-tooltip-image" unoptimized />
             ))}
+            {visibleOpenPost.reply ? (
+              <div className="message-panel-support-reply message-panel-tooltip-reply">
+                <div className="message-panel-meta message-panel-support-reply-meta">
+                  <Image
+                    src="/logo/yukimi_works_favicon.png"
+                    alt="YukimiWorks"
+                    width={26}
+                    height={26}
+                    className="message-panel-icon pixel-image"
+                    unoptimized
+                  />
+                  <span className="message-panel-support-reply-author">{visibleOpenPost.reply.authorName || 'YukimiWorks'}</span>
+                  <time dateTime={parseJapaneseDateTime(visibleOpenPost.reply.publishedAt).toISOString()}>
+                    {openPostReplyFormattedDate}
+                  </time>
+                </div>
+                <p className="message-panel-support-reply-body">
+                  <MessageBody body={visibleOpenPost.reply.body} />
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

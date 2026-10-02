@@ -236,6 +236,7 @@ export function AdminMessageManager() {
       const savedMessage = await saveFirebaseMessage({
         id: editingId || undefined,
         body,
+        authorName: profile?.displayName ?? '管理者',
         publishedAt: new Date(`${publishedAt}:00+09:00`),
         existingImages,
         newFiles,

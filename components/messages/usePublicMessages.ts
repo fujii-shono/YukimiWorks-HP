@@ -145,6 +145,7 @@ export function usePublicMessages() {
           id: message.id,
           publishedAt: formatFirebaseDate(message.publishedAt.toDate()),
           body: message.body,
+          authorName: message.authorName,
           icon: { src: '/logo/yukimi_works_favicon.png', alt: 'YukimiWorks' },
           images: message.images.map((image) => ({ src: image.url, alt: image.alt })),
         })),

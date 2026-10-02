@@ -5519,6 +5519,7 @@ a.message-inline-link:focus-visible {
   margin: 0;
 }
 
+.message-panel-author,
 .message-panel-support-reply-author {
   color: var(--site-accent);
   font-size: 0.82rem;
@@ -5980,6 +5981,7 @@ a.message-inline-link:focus-visible {
   margin-bottom: 2px;
 }
 
+.messages-message-author,
 .messages-reply-author {
   color: var(--site-accent);
   font-size: 0.86rem;

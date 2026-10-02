@@ -35,6 +35,7 @@ export type XPostStatus = 'not_requested' | 'pending' | 'posting' | 'posted' | '
 export type FirebaseMessage = {
   id: string;
   body: string;
+  authorName?: string;
   images: FirebaseMessageImage[];
   postToX: boolean;
   xPostStatus: XPostStatus;

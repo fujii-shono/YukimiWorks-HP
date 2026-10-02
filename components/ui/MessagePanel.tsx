@@ -158,6 +158,7 @@ export function MessagePanel() {
                           unoptimized
                         />
                       ) : null}
+                      {post.icon && !post.tone ? <span className="message-panel-author">{post.authorName || post.icon.alt}</span> : null}
                       <time dateTime={dateTime}>{formattedDate}</time>
                     </span>
                     <span className="message-panel-body-row">
@@ -227,6 +228,9 @@ export function MessagePanel() {
                   className="message-panel-icon pixel-image"
                   unoptimized
                 />
+              ) : null}
+              {visibleOpenPost.icon && !visibleOpenPost.tone ? (
+                <span className="message-panel-author">{visibleOpenPost.authorName || visibleOpenPost.icon.alt}</span>
               ) : null}
               <time dateTime={openPostDateTime}>{openPostFormattedDate}</time>
             </div>

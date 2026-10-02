@@ -57,6 +57,7 @@ function MessageFeed({
               {post.icon && !post.tone ? (
                 <Image src={post.icon.src} alt={post.icon.alt} width={36} height={36} className="messages-feed-icon pixel-image" unoptimized />
               ) : null}
+              {post.icon && !post.tone ? <span className="messages-message-author">{post.authorName || post.icon.alt}</span> : null}
               <time dateTime={parseJapaneseDateTime(post.publishedAt).toISOString()}>{formatMessageDate(post.publishedAt, now)}</time>
             </header>
             <div className="messages-feed-body-row">

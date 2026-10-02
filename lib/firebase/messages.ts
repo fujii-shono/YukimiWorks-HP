@@ -45,6 +45,7 @@ function parseMessage(snapshot: QueryDocumentSnapshot<DocumentData>): FirebaseMe
   return {
     id: snapshot.id,
     body: data.body,
+    authorName: typeof data.authorName === 'string' ? data.authorName : undefined,
     images: images.slice(0, MAX_MESSAGE_IMAGES),
     postToX: data.postToX === true,
     xPostStatus,
@@ -106,6 +107,7 @@ async function uploadMessageImages(messageId: string, files: File[]) {
 export async function saveFirebaseMessage({
   id,
   body,
+  authorName,
   publishedAt,
   existingImages,
   newFiles,
@@ -115,6 +117,7 @@ export async function saveFirebaseMessage({
 }: {
   id?: string;
   body: string;
+  authorName: string;
   publishedAt: Date;
   existingImages: FirebaseMessageImage[];
   newFiles: File[];
@@ -126,6 +129,7 @@ export async function saveFirebaseMessage({
   if (!services) throw new Error('Firebase が設定されていません。');
 
   const normalizedBody = body.trim();
+  const normalizedAuthorName = authorName.trim().slice(0, 30) || '管理者';
   if (!normalizedBody || normalizedBody.length > MAX_MESSAGE_BODY_LENGTH) {
     throw new Error(`本文は1〜${MAX_MESSAGE_BODY_LENGTH}文字で入力してください。`);
   }
@@ -140,6 +144,7 @@ export async function saveFirebaseMessage({
       messageRef,
       {
         body: normalizedBody,
+        authorName: normalizedAuthorName,
         images: [...existingImages, ...uploadedImages],
         postToX,
         publishedAt: Timestamp.fromDate(publishedAt),

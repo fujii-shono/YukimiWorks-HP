@@ -73,6 +73,7 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
       const publishedAt = new Date();
       const savedMessage = await saveFirebaseMessage({
         body,
+        authorName: profile.displayName,
         publishedAt,
         existingImages: [],
         newFiles: files,
@@ -83,6 +84,7 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
         id: savedMessage.id,
         publishedAt: formatFirebaseDate(publishedAt),
         body: body.trim(),
+        authorName: profile.displayName,
         icon: { src: '/logo/yukimi_works_favicon.png', alt: 'YukimiWorks' },
         images: savedMessage.images.map((image) => ({ src: image.url, alt: image.alt })),
       });

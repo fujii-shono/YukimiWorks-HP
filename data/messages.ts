@@ -31,6 +31,8 @@ export type MessagePost = {
   tone?: MessageTone;
   /** 募金メッセージに対する管理者からのリプライ */
   reply?: MessageSupportReply;
+  /** 通常メッセージの投稿者名 */
+  authorName?: string;
 };
 
 /**

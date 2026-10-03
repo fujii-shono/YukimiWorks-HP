@@ -86,12 +86,12 @@ export async function getAllWorks(): Promise<Work[]> {
   const firebaseItems = documents.flatMap((document): Work[] => {
     const data = document.data();
     const publishedAt = timestampDate(data.publishedAt);
-    if (!publishedAt || typeof data.title !== 'string' || typeof data.description !== 'string' || typeof data.body !== 'string' || !['contents', 'tools', 'apps'].includes(String(data.category))) return [];
+    if (!publishedAt || typeof data.title !== 'string' || typeof data.body !== 'string' || !['contents', 'tools', 'apps'].includes(String(data.category))) return [];
     const thumbnail = isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail.url : '';
     const media = Array.isArray(data.media) ? data.media.filter(isMedia).map((item) => ({ type: item.type, src: item.url, alt: item.alt || undefined })) : [];
     const storedSegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, 50) : [];
     const body = storedSegments.length ? storedSegments.map(toPublicBodySegment) : data.body;
-    return [{ id: document.id, title: data.title, description: data.description, body, category: data.category as Work['category'], tags: strings(data.tags), thumbnail, ...(storedSegments.length ? {} : { media }), date: tokyoDate(publishedAt), publishedAt: publishedAt.toISOString(), url: optionalString(data.url), featured: data.featured === true, seoTitle: optionalString(data.seoTitle), seoDescription: optionalString(data.seoDescription), noIndex: data.noIndex === true }];
+    return [{ id: document.id, title: data.title, body, category: data.category as Work['category'], tags: strings(data.tags), thumbnail, ...(storedSegments.length ? {} : { media }), date: tokyoDate(publishedAt), publishedAt: publishedAt.toISOString(), url: optionalString(data.url), featured: data.featured === true, seoTitle: optionalString(data.seoTitle), seoDescription: optionalString(data.seoDescription), noIndex: data.noIndex === true }];
   });
   return mergeById(works, firebaseItems, (item) => item.publishedAt ?? item.date ?? '');
 }

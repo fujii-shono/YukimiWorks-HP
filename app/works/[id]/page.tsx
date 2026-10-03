@@ -6,7 +6,7 @@ import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { RichBody } from '@/components/ui/RichBody';
 import { AcrylicKeychainTool } from '@/components/works/AcrylicKeychainTool';
 import { siteConfig } from '@/data/siteConfig';
-import { works } from '@/data/works';
+import { getWorkDescription, works } from '@/data/works';
 import { getAllWorks } from '@/lib/firebase/content.server';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   if (!work) return {};
 
   const title = work.seoTitle ?? `${work.title} | YukimiWorks`;
-  const description = work.seoDescription ?? work.description;
+  const description = work.seoDescription ?? getWorkDescription(work);
   const ogImage = work.thumbnail.trim()
     ? (work.thumbnail.startsWith('http') ? work.thumbnail : `${siteConfig.siteUrl}${work.thumbnail}`)
     : undefined;
@@ -87,7 +87,7 @@ export default async function WorkDetailPage({ params }: { params: { id: string 
             ),
           )}
         </div>
-        <RichBody body={work.body ?? work.description} className="detail-body-center" />
+        {work.body ? <RichBody body={work.body} className="detail-body-center" /> : null}
         <div className="tag-list tag-list-center">
           {work.tags.map((tag) => (
             <span key={tag} className="tag-badge">

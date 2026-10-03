@@ -129,7 +129,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       setBodyBlocks(initialBodyBlocks());
     } else if (kind === 'works') {
       const record = item as FirebaseWork;
-      setForm({ ...emptyForm(), ...common, description: record.description, category: record.category, tags: record.tags.join(', '), featured: record.featured });
+      setForm({ ...emptyForm(), ...common, category: record.category, tags: record.tags.join(', '), featured: record.featured });
       setPrimary(record.thumbnail);
       setBodyBlocks(getBodyBlocks(record));
     } else if (kind === 'diary') {
@@ -256,7 +256,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       const common = { title: form.title, publishedAt: fromTokyoInput(form.publishedAt), seoTitle: form.seoTitle.trim() || null, seoDescription: form.seoDescription.trim() || null, noIndex: form.noIndex };
       let value: Record<string, unknown> & { title: string; publishedAt: Date };
       if (kind === 'portfolio') value = { ...common, description: form.description.trim(), tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), image: resolvedPrimary, featured: form.featured };
-      else if (kind === 'works') value = { ...common, description: form.description.trim(), body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), thumbnail: resolvedPrimary ?? null, media: resolvedMedia, url: null, featured: form.featured };
+      else if (kind === 'works') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), thumbnail: resolvedPrimary ?? null, media: resolvedMedia, url: null, featured: form.featured };
       else if (kind === 'diary') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, eyecatch: resolvedPrimary ?? null };
       else value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, thumbnail: resolvedPrimary ?? null, media: resolvedMedia, featured: form.featured };
       await saveFirebaseContent(kind, recordId, value, !editing);
@@ -317,7 +317,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       <div className="admin-subpage-header"><h2>{editing ? `${labels[kind]}編集` : `新しい${labels[kind]}`}</h2><button type="button" onClick={() => { reset(); setMode('list'); }} disabled={busy || preparingPrimary}>一覧へ戻る</button></div>
       <form className="admin-message-form admin-content-form" onSubmit={submit}>
         <label htmlFor="content-title">タイトル</label><input id="content-title" value={form.title} maxLength={120} required onChange={(event) => update('title', event.target.value)} />
-        {kind === 'portfolio' || kind === 'works' ? <><label htmlFor="content-description">説明</label><textarea id="content-description" value={form.description} rows={4} required onChange={(event) => update('description', event.target.value)} /></> : null}
+        {kind === 'portfolio' ? <><label htmlFor="content-description">説明</label><textarea id="content-description" value={form.description} rows={4} required onChange={(event) => update('description', event.target.value)} /></> : null}
         {supportsRichBody ? (
           <fieldset className="admin-body-editor">
             <legend>本文（文章・外部リンク・メディア）</legend>

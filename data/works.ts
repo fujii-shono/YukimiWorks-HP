@@ -15,7 +15,6 @@ export type WorkCategory = 'contents' | 'tools' | 'apps';
 export type Work = {
   id: string;
   title: string;
-  description: string;
   body?: WorkBodySegment[] | string;
   category: WorkCategory;
   tags: string[];
@@ -36,11 +35,26 @@ export const workCategoryLabels: Record<WorkCategory, string> = {
   apps: 'アプリサービス',
 };
 
+export function getWorkPlainText(work: Pick<Work, 'title' | 'body'>) {
+  if (typeof work.body === 'string') return work.body.trim() || work.title;
+  if (Array.isArray(work.body)) {
+    const text = work.body
+      .flatMap((segment) => segment.type === 'text' || segment.type === 'strikethrough' ? [segment.value] : [])
+      .join('\n\n')
+      .trim();
+    return text || work.title;
+  }
+  return work.title;
+}
+
+export function getWorkDescription(work: Pick<Work, 'title' | 'body'>) {
+  return getWorkPlainText(work).replace(/\s+/g, ' ').slice(0, 160);
+}
+
 export const works: Work[] = [
   {
     id: 'xnocount',
     title: 'Xのいいね数を消すやつ',
-    description: 'Xのいいね数を消す拡張機能',
     body: [
       {
         type: 'text',
@@ -68,7 +82,6 @@ export const works: Work[] = [
   {
     id: 'rikuari',
     title: 'リクあり',
-    description: 'クリエイターのための業務効率化ツール',
     body: [
       {
         type: 'text',
@@ -91,7 +104,6 @@ export const works: Work[] = [
   {
     id: 'rss-matome-web',
     title: 'RSSまとめ',
-    description: '好きなwebサイトを集めてみんなに共有',
     body: [
       {
         type: 'text',
@@ -114,7 +126,6 @@ export const works: Work[] = [
   {
     id: 'acrylic-keychain-tool',
     title: 'アクキーシミュレーター',
-    description: '透過PNGから、アクリルキーホルダーっぽい画像を作れます。回転させて透明感を確認できます。',
     body:
       '透過PNGを読み込むと、アクキーっぽい画像を作成できます。\n\n雰囲気を確認するためのツールなので、細かなカット指定はできません。',
     category: 'tools',
@@ -126,7 +137,6 @@ export const works: Work[] = [
   // {
   //   id: 'pixel-guide-collection',
   //   title: 'ピクセルガイド集',
-  //   description: 'ドット絵とレトロUIを題材にした記事・企画コンテンツです。',
   //   body: [
   //     {
   //       type: 'text',
@@ -148,7 +158,6 @@ export const works: Work[] = [
   // {
   //   id: 'mini-ops-tool',
   //   title: 'Mini Ops Tool',
-  //   description: '日常業務の小さな手間を減らすための社内向け支援ツールです。',
   //   body:
   //     'フォーム入力、一覧確認、定型処理を一つにまとめた軽量ツールです。\n\n操作を迷わせないこと、導入コストを低く抑えることを重視しました。',
   //   category: 'tools',
@@ -159,7 +168,6 @@ export const works: Work[] = [
   {
     id: 'tarif-web',
     title: 'Tarif -オンライン料金表-',
-    description: 'オンラインで料金表を作れるサービスです。',
     body: [
       {
         type: 'strikethrough',
@@ -182,7 +190,6 @@ export const works: Work[] = [
   {
     id: 'cocoa-app',
     title: 'Cocoa',
-    description: 'まるでSNSのように使える、オフラインの写真管理アプリです。',
     body: [
       {
         type: 'text',

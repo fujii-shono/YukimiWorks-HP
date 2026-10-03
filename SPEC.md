@@ -162,7 +162,7 @@ YukimiWorksのコーポレートホームページ。
 └── コンテンツ・ツール開発・アプリサービスの全成果物を表示し、分類で絞り込み可能
 
 /works/[id]（成果物個別ページ）
-└── 成果物詳細（画像・動画・タイトル・説明文）
+└── 成果物詳細（画像・動画・タイトル・本文）
 
 /portfolio（ポートフォリオページ）
 └── イラスト作品を一覧表示し、画像を追加して公開可能
@@ -779,7 +779,6 @@ export type WorkCategory = 'contents' | 'tools' | 'apps';
 export type Work = {
   id: string;
   title: string;
-  description: string;
   body?: WorkBodySegment[] | string;
   category: WorkCategory;
   tags: string[];
@@ -794,7 +793,6 @@ export const works: Work[] = [
   {
     id: 'test-work-01',
     title: 'テスト成果物',
-    description: 'テスト用のサンプルエントリーです。',
     body: '成果物の詳細説明を記載します。',
     category: 'apps',
     tags: ['サンプル'],
@@ -878,7 +876,8 @@ export const works: Work[] = [
 
 #### 詳細テキスト
 
-- `Work.body` を表示する（未定義の場合は `Work.description` を代替表示）
+- `Work.body` を表示する
+- `seoDescription` が未定義の場合は、`Work.body` の文章部分の先頭160文字をmeta description・OGP・Xカードの説明として使用する。本文が空の場合はタイトルを使用する
 - **中央揃え**（`text-align: center`）
 - 最大幅: `800px`、中央配置（`mx-auto`）のコンテナ内で中央揃えとする
 - **改行対応**: テキスト内の改行文字（`\n`）は視覚的な改行として描画する（`whitespace-pre-wrap` またはセグメントごとに `<br>` を挿入）
@@ -2006,7 +2005,7 @@ yukimiworks-hp/
 - コード内の既存データはFirestoreへ移植せず表示を維持し、管理画面から追加したFirestoreデータを同じ一覧へ追加する。IDが重複する場合はコード内データを優先する
 - コンテンツの公開日時は日本時間で指定し、未来の場合は指定時刻まで公開ページ、トップのプレビュー、What's Newへ表示しない
 - Firebase追加分も各一覧・詳細ページ、トップのPortfolio、Works・Portfolioの自動ニュース、日記更新、サイドバーのWhat's Newへ反映する
-- Firebase追加分の詳細ページにもtitle、description、OGP、canonicalを生成し、任意でSEOタイトル、SEO説明、noindexを設定できる
+- Firebase追加分の詳細ページにもtitle、meta description、OGP、canonicalを生成し、任意でSEOタイトル、SEO説明、noindexを設定できる
 - ポートフォリオの管理画面追加分は通常画像のみとし、HTMLアートとゲームは引き続きコード内で管理する
 - 管理画面のポートフォリオ一覧は、登録済み画像を小さなプレビューとして各項目に表示する
 - 管理画面の日記一覧は、本文の文章ブロックから先頭100文字までを抜粋表示する

@@ -3577,10 +3577,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   line-height: 1.2;
 }
 
-.retro-card-body-no-thumbnail {
-  min-height: 220px;
-}
-
 .retro-card-body h3 {
   margin: 0 0 8px;
   color: var(--site-accent);
@@ -3592,14 +3588,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 .retro-card-body p {
   margin: 0;
   font-family: var(--font-pixel);
-}
-
-.retro-card-summary {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-height: 1.55;
 }
 
 .card-kicker,

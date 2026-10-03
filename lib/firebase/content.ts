@@ -95,9 +95,9 @@ function parseContent<K extends ContentKind>(kind: K, snapshot: QueryDocumentSna
     return { ...base, description: data.description, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), image: data.image, featured: data.featured === true } as FirebaseContentByKind[K];
   }
   if (kind === 'works') {
-    if (typeof data.description !== 'string' || typeof data.body !== 'string' || !['contents', 'tools', 'apps'].includes(data.category) || !Array.isArray(data.tags) || !Array.isArray(data.media)) return null;
+    if (typeof data.body !== 'string' || !['contents', 'tools', 'apps'].includes(data.category) || !Array.isArray(data.tags) || !Array.isArray(data.media)) return null;
     const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
-    return { ...base, description: data.description, body: data.body, bodySegments, category: data.category, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), url: optionalString(data, 'url'), featured: data.featured === true } as FirebaseContentByKind[K];
+    return { ...base, body: data.body, bodySegments, category: data.category, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), url: optionalString(data, 'url'), featured: data.featured === true } as FirebaseContentByKind[K];
   }
   if (kind === 'diary') {
     if (typeof data.body !== 'string' || !['chat', 'report', 'development', 'behind-the-scenes', 'content-creation-tips'].includes(data.category)) return null;
@@ -155,7 +155,7 @@ export async function saveFirebaseContent(kind: ContentKind, id: string | undefi
   if (!services) throw new Error('Firebase が設定されていません。');
   if (!value.title.trim() || Number.isNaN(value.publishedAt.getTime())) throw new Error('タイトルと公開日時を入力してください。');
   const recordRef = id ? doc(services.db, contentCollectionNames[kind], id) : doc(collection(services.db, contentCollectionNames[kind]));
-  await setDoc(recordRef, { ...value, title: value.title.trim(), publishedAt: Timestamp.fromDate(value.publishedAt), updatedAt: serverTimestamp(), ...(kind === 'news' && !creating ? { summary: deleteField() } : {}), ...(creating ? { createdAt: serverTimestamp() } : {}) }, { merge: !creating });
+  await setDoc(recordRef, { ...value, title: value.title.trim(), publishedAt: Timestamp.fromDate(value.publishedAt), updatedAt: serverTimestamp(), ...((kind === 'news' && !creating) ? { summary: deleteField() } : {}), ...((kind === 'works' && !creating) ? { description: deleteField() } : {}), ...(creating ? { createdAt: serverTimestamp() } : {}) }, { merge: !creating });
   return recordRef.id;
 }
 

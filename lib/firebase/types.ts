@@ -78,7 +78,6 @@ export type FirebasePortfolioItem = {
 export type FirebaseWork = {
   id: string;
   title: string;
-  description: string;
   body: string;
   bodySegments: FirebaseContentBodySegment[];
   category: 'contents' | 'tools' | 'apps';

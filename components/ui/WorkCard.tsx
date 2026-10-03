@@ -1,7 +1,6 @@
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { workCategoryLabels, type Work } from '@/data/works';
-import { cn } from '@/lib/format';
 
 export function WorkCard({ work }: { work: Work }) {
   const hasThumbnail = work.thumbnail.trim().length > 0;
@@ -11,10 +10,9 @@ export function WorkCard({ work }: { work: Work }) {
       {hasThumbnail ? (
         <SleepWarningImage src={work.thumbnail} alt={`${work.title}のサムネイル`} width={560} height={315} className="retro-card-image" />
       ) : null}
-      <div className={cn('retro-card-body', !hasThumbnail && 'retro-card-body-no-thumbnail')}>
+      <div className="retro-card-body">
         <p className="card-kicker">{workCategoryLabels[work.category]}</p>
         <h3>{work.title}</h3>
-        {!hasThumbnail ? <p className="retro-card-summary">{work.description}</p> : null}
         <div className="tag-list">
           {work.tags.map((tag) => (
             <span key={tag} className="tag-badge">

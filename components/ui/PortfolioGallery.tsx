@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
+import { MessageBody } from '@/components/messages/MessageBody';
 import type { PortfolioItem } from '@/data/portfolio';
 
 export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
@@ -80,7 +81,7 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
               </div>
               {detailsOpen ? (
                 <div className="portfolio-modal-body">
-                  {selected.description ? <p className="modal-message">{selected.description}</p> : null}
+                  {selected.description ? <p className="modal-message"><MessageBody body={selected.description} /></p> : null}
                   {selected.date || selected.year ? (
                     <p className="card-meta portfolio-modal-date">{selected.date ?? String(selected.year)}</p>
                   ) : null}

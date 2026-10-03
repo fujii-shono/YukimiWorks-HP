@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Fragment } from 'react';
 import { notFound } from 'next/navigation';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { SiteFrame } from '@/components/layout/SiteFrame';
@@ -9,6 +10,28 @@ import { formatJapaneseDate } from '@/lib/format';
 import { getAllPortfolioItems } from '@/lib/firebase/content.server';
 
 export const dynamic = 'force-dynamic';
+
+const URL_PATTERN = /https?:\/\/[^\s<>"']+/g;
+const TRAILING_URL_PUNCTUATION = /[.,!?;:。、」』】］｝）》〉]+$/u;
+
+function PortfolioDescription({ value }: { value: string }) {
+  const nodes = [];
+  let cursor = 0;
+
+  for (const match of value.matchAll(URL_PATTERN)) {
+    const matchedUrl = match[0];
+    const start = match.index ?? cursor;
+    const trailing = matchedUrl.match(TRAILING_URL_PUNCTUATION)?.[0] ?? '';
+    const url = trailing ? matchedUrl.slice(0, -trailing.length) : matchedUrl;
+    if (start > cursor) nodes.push(value.slice(cursor, start));
+    nodes.push(<a key={`${start}-${url}`} className="message-inline-link" href={url} target="_blank" rel="noopener noreferrer">{url}</a>);
+    if (trailing) nodes.push(trailing);
+    cursor = start + matchedUrl.length;
+  }
+
+  if (cursor < value.length) nodes.push(value.slice(cursor));
+  return <p>{nodes.map((node, index) => <Fragment key={index}>{node}</Fragment>)}</p>;
+}
 
 export function generateStaticParams() {
   return portfolioItems.map((item) => ({ id: item.id }));
@@ -84,7 +107,7 @@ export default async function PortfolioDetailPage({ params }: { params: { id: st
           />
         </div>
         <div className="detail-body portfolio-detail-body">
-          {item.description ? <p>{item.description}</p> : null}
+          {item.description ? <PortfolioDescription value={item.description} /> : null}
           {item.date || item.year ? (
             <p className="card-meta portfolio-modal-date">{item.date ? formatJapaneseDate(item.date) : String(item.year)}</p>
           ) : null}

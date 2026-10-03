@@ -60,6 +60,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 export default async function WorkDetailPage({ params }: { params: { id: string } }) {
   const work = (await getAllWorks()).find((item) => item.id === params.id);
   if (!work) notFound();
+  const thumbnail = work.thumbnail.trim();
+  const additionalMedia = work.media?.filter((media) => media.src !== thumbnail);
 
   return (
     <SiteFrame>
@@ -72,7 +74,16 @@ export default async function WorkDetailPage({ params }: { params: { id: string 
           <hr />
         </div>
         <div className="detail-media-stack">
-          {work.media?.map((media, index) =>
+          {thumbnail ? (
+            <Image
+              src={thumbnail}
+              alt={`${work.title}のサムネイル`}
+              width={800}
+              height={450}
+              className="detail-media"
+            />
+          ) : null}
+          {additionalMedia?.map((media, index) =>
             media.type === 'image' ? (
               <Image
                 key={`${media.src}-${index}`}

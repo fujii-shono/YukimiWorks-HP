@@ -8,6 +8,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -150,12 +151,34 @@ export async function uploadContentFiles(kind: ContentKind, recordId: string, fi
   }
 }
 
-export async function saveFirebaseContent(kind: ContentKind, id: string | undefined, value: Record<string, unknown> & { title: string; publishedAt: Date }, creating = !id) {
+export async function saveFirebaseContent(kind: ContentKind, id: string | undefined, value: Record<string, unknown> & { title: string; publishedAt: Date }, creating = !id, previousId = id) {
   const services = getFirebaseServices();
   if (!services) throw new Error('Firebase が設定されていません。');
   if (!value.title.trim() || Number.isNaN(value.publishedAt.getTime())) throw new Error('タイトルと公開日時を入力してください。');
   const recordRef = id ? doc(services.db, contentCollectionNames[kind], id) : doc(collection(services.db, contentCollectionNames[kind]));
-  await setDoc(recordRef, { ...value, title: value.title.trim(), publishedAt: Timestamp.fromDate(value.publishedAt), updatedAt: serverTimestamp(), ...((kind === 'news' && !creating) ? { summary: deleteField() } : {}), ...((kind === 'works' && !creating) ? { description: deleteField() } : {}), ...(creating ? { createdAt: serverTimestamp() } : {}) }, { merge: !creating });
+  const storedValue = { ...value, title: value.title.trim(), publishedAt: Timestamp.fromDate(value.publishedAt), updatedAt: serverTimestamp(), ...(creating ? { createdAt: serverTimestamp() } : {}) };
+  if (creating) {
+    await runTransaction(services.db, async (transaction) => {
+      if ((await transaction.get(recordRef)).exists()) {
+        throw new Error(`URL ID「${recordRef.id}」はすでに登録されています。別のIDを入力してください。`);
+      }
+      transaction.set(recordRef, storedValue);
+    });
+  } else if (previousId && previousId !== recordRef.id) {
+    const previousRef = doc(services.db, contentCollectionNames[kind], previousId);
+    await runTransaction(services.db, async (transaction) => {
+      const [previousSnapshot, targetSnapshot] = await Promise.all([transaction.get(previousRef), transaction.get(recordRef)]);
+      if (!previousSnapshot.exists()) throw new Error('URL IDの変更元データが見つかりません。画面を再読み込みして、もう一度お試しください。');
+      if (targetSnapshot.exists()) throw new Error(`URL ID「${recordRef.id}」はすでに登録されています。別のIDを入力してください。`);
+      const migratedValue: Record<string, unknown> = { ...previousSnapshot.data(), ...storedValue };
+      if (kind === 'news') delete migratedValue.summary;
+      if (kind === 'works') delete migratedValue.description;
+      transaction.set(recordRef, migratedValue);
+      transaction.delete(previousRef);
+    });
+  } else {
+    await setDoc(recordRef, { ...storedValue, ...(kind === 'news' ? { summary: deleteField() } : {}), ...(kind === 'works' ? { description: deleteField() } : {}) }, { merge: true });
+  }
   return recordRef.id;
 }
 

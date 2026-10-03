@@ -16,10 +16,17 @@ import {
   type FirebaseContentByKind,
 } from '@/lib/firebase/content';
 import type { FirebaseContentBodySegment, FirebaseContentMedia, FirebaseDiaryEntry, FirebaseNews, FirebasePortfolioItem, FirebaseWork } from '@/lib/firebase/types';
+import { portfolioItems } from '@/data/portfolio';
+import { works } from '@/data/works';
 import { isSafeLinkHref } from '@/lib/format';
 import { cropImageToThumbnail } from '@/lib/image/crop';
 
 const labels: Record<ContentKind, string> = { portfolio: 'ポートフォリオ', works: '成果物', diary: '日記', news: 'ニュース' };
+const CONTENT_URL_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
+const staticContentIds = {
+  portfolio: new Set(portfolioItems.map((item) => item.id)),
+  works: new Set(works.map((item) => item.id)),
+};
 const categories = {
   works: [['contents', 'コンテンツ'], ['tools', 'ツール開発'], ['apps', 'アプリサービス']],
   diary: [['chat', '雑談'], ['report', '報告'], ['development', '開発日誌'], ['behind-the-scenes', '制作秘話'], ['content-creation-tips', 'コンテンツ制作の極意']],
@@ -37,7 +44,7 @@ function fromTokyoInput(value: string) {
 }
 
 function emptyForm() {
-  return { title: '', description: '', body: '', category: '', tags: '', publishedAt: toTokyoInput(new Date()), featured: false, seoTitle: '', seoDescription: '', noIndex: false };
+  return { urlId: '', title: '', description: '', body: '', category: '', tags: '', publishedAt: toTokyoInput(new Date()), featured: false, seoTitle: '', seoDescription: '', noIndex: false };
 }
 
 type FormState = ReturnType<typeof emptyForm>;
@@ -94,6 +101,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
   useEffect(() => subscribeToFirebaseContent(kind, (records) => setItems(records as AnyContent[]), () => setError('一覧を読み込めませんでした。')), [kind]);
 
   const requiresPrimary = kind === 'portfolio';
+  const supportsCustomUrlId = kind === 'portfolio' || kind === 'works';
   const supportsRichBody = kind === 'works' || kind === 'diary' || kind === 'news';
   const categoryOptions = kind === 'portfolio' ? [] : categories[kind as keyof typeof categories];
   const now = Date.now();
@@ -116,6 +124,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
   const openEdit = (item: AnyContent) => {
     setEditing(item);
     const common = {
+      urlId: item.id,
       title: item.title,
       publishedAt: toTokyoInput(item.publishedAt.toDate()),
       seoTitle: item.seoTitle ?? '',
@@ -224,9 +233,22 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const recordId = editing?.id ?? crypto.randomUUID();
     let uploaded: FirebaseContentMedia[] = [];
     try {
+      const requestedUrlId = form.urlId.trim();
+      const urlIdChanged = supportsCustomUrlId && requestedUrlId !== editing?.id;
+      if (supportsCustomUrlId && (!editing || urlIdChanged)) {
+        const pathPrefix = kind === 'works' ? '/works/' : '/portfolio/';
+        if (!requestedUrlId) throw new Error(`URL IDを入力してください。公開URLは「${pathPrefix}入力したID」になります。`);
+        if (!CONTENT_URL_ID_PATTERN.test(requestedUrlId)) {
+          throw new Error('URL IDは半角小文字の英数字とハイフンだけで入力してください（例: my-new-item）。先頭・末尾にハイフンは使えません。');
+        }
+        const reservedIds = staticContentIds[kind];
+        if (reservedIds.has(requestedUrlId) || items.some((item) => item.id === requestedUrlId)) {
+          throw new Error(`URL ID「${requestedUrlId}」はすでに${labels[kind]}で使われています。「${requestedUrlId}-2」など別のIDを入力してください。`);
+        }
+      }
+      const recordId = supportsCustomUrlId ? requestedUrlId : (editing?.id ?? crypto.randomUUID());
       if (requiresPrimary && !primary && !newPrimary) throw new Error('作品画像を選択してください。');
       const uploadedPrimary = newPrimary ? await uploadContentFiles(kind, recordId, [newPrimary], true) : [];
       uploaded.push(...uploadedPrimary);
@@ -259,7 +281,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       else if (kind === 'works') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), thumbnail: resolvedPrimary ?? null, media: resolvedMedia, url: null, featured: form.featured };
       else if (kind === 'diary') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, eyecatch: resolvedPrimary ?? null };
       else value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, thumbnail: resolvedPrimary ?? null, media: resolvedMedia, featured: form.featured };
-      await saveFirebaseContent(kind, recordId, value, !editing);
+      await saveFirebaseContent(kind, recordId, value, !editing, editing?.id);
       const replacedPrimary = newPrimary && primary ? [primary] : [];
       await deleteContentMedia([...removedMedia, ...replacedPrimary]);
       setNotice(`${labels[kind]}を保存しました。`);
@@ -316,6 +338,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     <div className="admin-message-manager">
       <div className="admin-subpage-header"><h2>{editing ? `${labels[kind]}編集` : `新しい${labels[kind]}`}</h2><button type="button" onClick={() => { reset(); setMode('list'); }} disabled={busy || preparingPrimary}>一覧へ戻る</button></div>
       <form className="admin-message-form admin-content-form" onSubmit={submit}>
+        {supportsCustomUrlId ? <><label htmlFor="content-url-id">URL ID（/{kind === 'works' ? 'works' : 'portfolio'}/ の後ろ）</label><input id="content-url-id" value={form.urlId} maxLength={80} required autoCapitalize="none" spellCheck={false} onChange={(event) => update('urlId', event.target.value)} placeholder="my-new-item" /><p className="admin-content-thumbnail-note">半角小文字の英数字とハイフンを使用できます。変更すると以前のURLは使えなくなります。</p></> : null}
         <label htmlFor="content-title">タイトル</label><input id="content-title" value={form.title} maxLength={120} required onChange={(event) => update('title', event.target.value)} />
         {kind === 'portfolio' ? <><label htmlFor="content-description">説明</label><textarea id="content-description" value={form.description} rows={4} required onChange={(event) => update('description', event.target.value)} /></> : null}
         {supportsRichBody ? (

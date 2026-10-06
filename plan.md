@@ -2402,3 +2402,54 @@
 - `npx tsc --noEmit --incremental false`
 - `npm run build`
 - 一般ユーザー・未ログイン・管理者それぞれの表示、金額加算、Checkout戻り先、管理者以外のAPI拒否、両Message表示でのリプライを確認する
+
+---
+
+## 追加対応: Works ツール開発「お題メーカー」
+
+### 対応する仕様
+
+- 既存のお題生成処理とお題データを移植し、ボタン操作でランダムなお題を表示する
+- 毎週月曜日08:00（日本時間）以降の週次お題を固定表示し、選ばれたお題のハッシュタグをコピーできるようにする
+- 既存の直近30件の履歴を引き継ぎ、同じお題の連続選出を避ける
+- 週次お題をDiscordへWebhook投稿し、MacのLaunchAgentに依存しない定期実行へ移行する
+- 週次お題をハッシュタグ付きでXへ投稿し、Production専用フラグと投稿状態でAPIの不要利用・重複投稿を防ぐ
+- 初回公開時などはFirebase Consoleから当週のお題を手動登録できるようにする
+
+### 実装方針
+
+- お題選出処理をブラウザとサーバーで共有できる純粋関数へ分離し、単一60%・2カテゴリ40%、禁止カテゴリ組み合わせ、最大20回の履歴回避を維持する
+- `odaiWeeklyTopics/{YYYY-MM-DD}` を週次お題の正本とし、文書IDは日本時間で月曜08:00から始まる期間の月曜日とする
+- Vercel Cronから毎日08:00 JSTに保護されたRoute Handlerを呼び、当週文書の作成、未送信Discord投稿の再試行、投稿状態の保存を行う
+- X投稿は既存のOAuthトークン更新処理を再利用し、Vercel Production・専用フラグ有効・ドライラン無効の場合だけ実行する
+- クライアントのランダム抽選結果はFirestoreへ保存せず、画面内履歴と移行済み履歴だけで連続重複を避ける
+- Firestoreの週次文書はAdmin SDKからのみ読み書きし、公開クライアントへ直接権限を付与しない
+
+### 変更予定のファイルと理由
+
+- `data/odai.json`, `data/odai-history.json`: 既存のお題候補と直近30件の履歴を移植するため
+- `lib/odai/generator.ts`: お題生成・履歴照合・ハッシュタグ整形を共通化するため
+- `lib/odai/weekly.server.ts`: 日本時間の週判定、Firestore保存、Discord送信状態を管理するため
+- `app/api/cron/weekly-odai/route.ts`, `vercel.json`: 定期実行エンドポイントとスケジュールを追加するため
+- `components/works/OdaiMaker.tsx`: 今週のお題、ランダム抽選、コピー操作を提供するため
+- `data/works.ts`, `app/works/[id]/page.tsx`, `app/globals.css`: サムネイルなしでWorksへ登録し、詳細UIを追加するため
+- `.env.example`, `README.md`, `SPEC.md`: 環境変数、手動登録方法、運用仕様を同期するため
+
+### 影響範囲
+
+- `/works` と `/works/odai-maker`、Firebase Admin SDK、Vercel Production Cron、Discord Webhook
+- 既存成果物の表示順・詳細表示と、既存Firebaseクライアント権限は維持する
+
+### 検証方法
+
+- お題生成関数の単一・組み合わせ・禁止ペア・履歴回避・ハッシュタグ整形を確認する
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Firebase Emulatorで手動週次文書の表示、同一週の再生成防止、Webhook未設定時のエラーを確認する
+- モバイル幅を含め、抽選・コピー・状態通知・横スクロールの有無を手動確認する
+
+### 懸念点・制約
+
+- Vercel HobbyではCronの実行時刻が指定時刻から遅れる場合がある
+- Discord Webhookへの送信成功後、Firestoreへ投稿済みを記録する前に処理が中断した場合は再試行で重複する可能性がある

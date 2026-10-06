@@ -3722,6 +3722,109 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   margin: 28px auto 0;
 }
 
+.odai-maker {
+  display: grid;
+  gap: 24px;
+  width: min(100%, 800px);
+  margin: 28px auto 0;
+  text-align: center;
+}
+
+.odai-section {
+  min-width: 0;
+  padding: 24px;
+  background: var(--site-surface-soft);
+  border: 2px solid var(--site-border);
+  box-shadow: inset 0 0 0 3px var(--site-surface);
+}
+
+.odai-section h3 {
+  margin: 0 0 14px;
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  font-weight: 400;
+}
+
+.odai-help,
+.odai-empty,
+.odai-period {
+  margin: 8px 0;
+  color: var(--site-text-muted);
+}
+
+.odai-result {
+  margin: 18px 0 8px;
+  overflow-wrap: anywhere;
+  color: var(--site-text);
+  font-family: var(--font-pixel);
+  font-size: clamp(1.5rem, 6vw, 2.25rem);
+  line-height: 1.5;
+}
+
+.odai-random-result {
+  display: grid;
+  place-items: center;
+  min-height: 3em;
+}
+
+.odai-draw-button {
+  margin-top: 10px;
+}
+
+.odai-copy-area {
+  display: grid;
+  gap: 8px;
+  margin-top: 22px;
+  text-align: left;
+}
+
+.odai-copy-area label {
+  font-family: var(--font-pixel);
+}
+
+.odai-copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.odai-copy-row input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  color: #000;
+  background: #fff;
+  border: 1px solid var(--site-border);
+}
+
+.odai-copy-button {
+  min-width: 120px;
+  padding: 12px 20px;
+}
+
+.odai-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--site-text-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 560px) {
+  .odai-section {
+    padding: 18px 14px;
+  }
+
+  .odai-copy-row {
+    grid-template-columns: 1fr;
+  }
+
+  .odai-copy-button,
+  .odai-draw-button {
+    width: 100%;
+  }
+}
+
 .acrylic-demo-page {
   --site-outer-bg: #eaf4ff;
   --site-bg: #fbfdff;

@@ -40,10 +40,13 @@ NEXT_PUBLIC_FIREBASE_APP_ID=<app-id>
 FIREBASE_PROJECT_ID=<project-id>
 FIREBASE_CLIENT_EMAIL=<service-account-email>
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"
+CRON_SECRET=<16文字以上のランダムな文字列>
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 X_CLIENT_ID=<X OAuth 2.0 Client ID>
 X_CLIENT_SECRET=<X OAuth 2.0 Client Secret>
 X_OAUTH_CALLBACK_URL=https://yukimiworks.com/api/x/callback
 X_POST_DRY_RUN=false
+X_WEEKLY_ODAI_ENABLED=false
 UPSTASH_REDIS_REST_URL=https://<your-redis-endpoint>.upstash.io
 UPSTASH_REDIS_REST_TOKEN=<your-redis-rest-token>
 REDIS_KEY_PREFIX=dev
@@ -145,6 +148,37 @@ npm run firebase:deploy:rules
 
 秘密鍵JSON本体やこれらの値はGitへ追加しません。Local Emulator Suiteでは上記3項目は不要です。
 
+## お題メーカーの週次更新とDiscord投稿
+
+`/works/odai-maker` の今週のお題は、Firestoreの `odaiWeeklyTopics/{週ID}` から取得します。週IDは日本時間の月曜日を `YYYY-MM-DD` で表した値で、その週の表示期間は月曜日08:00から翌週月曜日07:59までです。
+
+ProductionではVercel Cronが `/api/cron/weekly-odai` を毎日08:00（日本時間）に呼びます。通常は月曜日に当週のお題を作成し、火曜日以降は同じ文書を維持したままDiscord未送信時の再試行だけを行います。月曜日の実行自体が失敗して文書が存在しない場合は、翌日の実行で当週分を補完生成します。Vercelへ次を設定してください。
+
+- `CRON_SECRET`: Cronエンドポイントを保護する16文字以上のランダムな値
+- `DISCORD_WEBHOOK_URL`: DiscordチャンネルのIncoming Webhook URL
+- `X_WEEKLY_ODAI_ENABLED`: 今週のお題をXへ自動投稿する場合だけProductionで`true`にする
+
+お題候補は `data/odai.json`、Mac版から移行した直近30件は `data/odai-history.json` にあります。新しい週次文書も履歴へ加え、直近30件と同一のお題を避けます。
+
+X自動投稿は `VERCEL_ENV=production`、`X_WEEKLY_ODAI_ENABLED=true`、`X_POST_DRY_RUN`が`true`ではない、という3条件をすべて満たす場合だけX APIを呼びます。Preview・ローカル・ドライランではAPIを呼びません。管理画面で接続済みのXアカウントと既存のOAuth更新処理を使用し、投稿済みIDを週次文書へ保存して重複投稿を避けます。投稿内容は次の形式です。
+
+```text
+今週のお題
+#角x手紙 #お題メーカー
+https://yukimiworks.com/works/odai-maker
+```
+
+### 今週のお題をFirebase Consoleから手動登録する
+
+初回公開時など自動生成前に表示したい場合は、Firebase Consoleの Firestore Database で次の文書を作成します。
+
+1. コレクションIDを `odaiWeeklyTopics` にする
+2. ドキュメントIDを対象週の月曜日 `YYYY-MM-DD` にする（例: 2026年10月5日の週は `2026-10-05`）
+3. `topic` フィールドを文字列で追加し、`今週のお題：` を付けずにお題本文だけを入力する
+4. すでにMacからDiscordへ投稿済みなら `discordStatus` を文字列 `sent` にする。Web側から投稿させる場合は `pending` にするか省略する
+
+`weekId`、`validFrom`、`validUntil` がない手動文書でも、ドキュメントIDから表示期間を補完します。自動生成された文書にはこれらのフィールドとDiscord送信状態がすべて保存されます。週次コレクションはAdmin SDKだけが使用し、ブラウザからの直接読み書きは許可しません。
+
 ## X投稿連携
 
 「Xにも投稿する」を選んだメッセージは、Firestoreへの保存成功直後にXへ投稿します。サイト上の公開日時が未来でも、X投稿は予約されず保存時に即時実行されます。同じメッセージにX投稿IDが記録済みの場合、編集保存しても重複投稿しません。投稿失敗時はメッセージ自体を残し、管理画面の編集画面でもう一度保存すると再試行します。
@@ -240,10 +274,13 @@ NEXT_PUBLIC_FIREBASE_APP_ID
 FIREBASE_PROJECT_ID
 FIREBASE_CLIENT_EMAIL
 FIREBASE_PRIVATE_KEY
+CRON_SECRET
+DISCORD_WEBHOOK_URL
 X_CLIENT_ID
 X_CLIENT_SECRET
 X_OAUTH_CALLBACK_URL
 X_POST_DRY_RUN
+X_WEEKLY_ODAI_ENABLED
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 NEXT_PUBLIC_STRIPE_PURCHASE_DEBUG

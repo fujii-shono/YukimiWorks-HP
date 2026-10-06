@@ -53,6 +53,17 @@ export function getWorkDescription(work: Pick<Work, 'title' | 'body'>) {
 
 export const works: Work[] = [
   {
+    id: 'odai-maker',
+    title: 'お題メーカー',
+    body:
+      'イラスト制作のきっかけになるお題をランダムに抽選できます。\n\n毎週月曜日には、みんなで楽しめる「今週のお題」を更新します。',
+    category: 'tools',
+    tags: ['便利ツール', 'イラスト'],
+    thumbnail: '',
+    date: '2026-10-06',
+    featured: true,
+  },
+  {
     id: 'xnocount',
     title: 'Xのいいね数を消すやつ',
     body: [

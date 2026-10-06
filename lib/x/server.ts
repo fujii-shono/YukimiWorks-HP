@@ -240,6 +240,14 @@ async function createXPost(accessToken: string, body: string, images: MessageIma
   return postId;
 }
 
+export async function postTextToX(body: string) {
+  const text = body.trim();
+  if (!text) throw new Error('Xへ投稿する本文が空です。');
+  if (isXPostTooLong(text)) throw new Error('Xへ投稿する本文が文字数上限を超えています。');
+  const accessToken = await getValidXAccessToken();
+  return createXPost(accessToken, text, []);
+}
+
 export async function postFirebaseMessageToX(messageId: string) {
   const { db } = getFirebaseAdminServices();
   const messageRef = db.collection('messages').doc(messageId);

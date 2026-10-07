@@ -8,6 +8,18 @@ service firebase.storage {
         && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isAdultConfirmed() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.adultConfirmed == true;
+    }
+
+    function isBackAlleyConfirmed() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.backAlleyConfirmed == true;
+    }
+
     match /messages/{messageId}/{fileName} {
       allow read: if true;
       allow create, update: if isAdmin()
@@ -24,6 +36,39 @@ service firebase.storage {
           || (request.resource.contentType.matches('video/.*') && request.resource.size <= 100 * 1024 * 1024)
         )
         && (contentType != 'portfolio' || request.resource.contentType.matches('image/.*'));
+      allow delete: if isAdmin();
+    }
+
+    match /protected/back-alley/portfolio/{itemId}/{fileName} {
+      allow read: if isBackAlleyConfirmed() || isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
+    match /protected/back-alley/messages/{messageId}/{fileName} {
+      allow read: if isBackAlleyConfirmed() || isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
+
+    match /protected/back-alley/r18/portfolio/{itemId}/{fileName} {
+      allow read: if (isBackAlleyConfirmed() && isAdultConfirmed()) || isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
+    match /protected/back-alley/r18/messages/{messageId}/{fileName} {
+      allow read: if (isBackAlleyConfirmed() && isAdultConfirmed()) || isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
       allow delete: if isAdmin();
     }
 

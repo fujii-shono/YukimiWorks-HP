@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { messagePosts, type MessagePost, type MessageSupportReply } from '@/data/messages';
-import { subscribeToFirebaseMessages } from '@/lib/firebase/messages';
+import { getProtectedMediaUrl, subscribeToFirebaseMessages } from '@/lib/firebase/messages';
+import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 
 function getTokyoDateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -79,7 +80,8 @@ export function publishSupportReply(messageId: string, reply: MessageSupportRepl
   window.dispatchEvent(new CustomEvent(SUPPORT_REPLY_SAVED_EVENT, { detail: { messageId, reply } }));
 }
 
-export function usePublicMessages() {
+export function usePublicMessages(includeBackAlley = false) {
+  const { profile } = useFirebaseAuth();
   const [now, setNow] = useState<Date | null>(null);
   const [donationPosts, setDonationPosts] = useState<MessagePost[]>([]);
   const [firebasePosts, setFirebasePosts] = useState<MessagePost[]>([]);
@@ -139,19 +141,25 @@ export function usePublicMessages() {
   }, []);
 
   useEffect(() => {
-    return subscribeToFirebaseMessages((messages) => {
-      setFirebasePosts(
-        messages.map((message) => ({
+    const objectUrls: string[] = [];
+    let active = true;
+    const unsubscribe = subscribeToFirebaseMessages((messages) => {
+      void Promise.all(messages.map(async (message) => ({
           id: message.id,
           publishedAt: formatFirebaseDate(message.publishedAt.toDate()),
           body: message.body,
           authorName: message.authorName,
           icon: { src: '/logo/yukimi_works_favicon.png', alt: 'YukimiWorks' },
-          images: message.images.map((image) => ({ src: image.url, alt: image.alt })),
-        })),
-      );
-    });
-  }, []);
+          images: await Promise.all(message.images.map(async (image) => {
+            if (image.url) return { src: image.url, alt: image.alt };
+            const src = await getProtectedMediaUrl(image.path);
+            objectUrls.push(src);
+            return { src, alt: image.alt };
+          })),
+        }))).then((posts) => { if (active) setFirebasePosts(posts); }).catch(() => undefined);
+    }, undefined, includeBackAlley, includeBackAlley && profile?.adultConfirmed === true);
+    return () => { active = false; unsubscribe(); objectUrls.forEach((url) => URL.revokeObjectURL(url)); };
+  }, [includeBackAlley, profile?.adultConfirmed]);
 
   useEffect(() => {
     const onMessageSaved = (event: Event) => {

@@ -1,15 +1,19 @@
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { WelcomeCharacter } from '@/components/welcome/WelcomeCharacter';
 
-export function WelcomeSection() {
+const defaultWelcomeCopy = [
+  'YukimiWorksのホームページへようこそ。',
+  '当サイトでは小さなコンテンツから大きなサービスまで、',
+  'たくさんのアイデアを形にし、残しています。',
+];
+
+export function WelcomeSection({ copy = defaultWelcomeCopy }: { copy?: string[] }) {
   return (
     <RetroPanel title="Welcome" className="welcome-panel">
       <div className="welcome-content">
         <WelcomeCharacter />
         <div className="welcome-copy">
-          <p>YukimiWorksのホームページへようこそ。</p>
-          <p>当サイトでは小さなコンテンツから大きなサービスまで、</p>
-          <p>たくさんのアイデアを形にし、残しています。</p>
+          {copy.map((line) => <p key={line}>{line}</p>)}
         </div>
       </div>
     </RetroPanel>

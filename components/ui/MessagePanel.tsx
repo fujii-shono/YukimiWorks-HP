@@ -10,11 +10,11 @@ import { cn } from '@/lib/format';
 const RAINBOW_SHINE_ACTIVE_MS = 1_800;
 const RAINBOW_SHINE_WAIT_MS = 1_000;
 
-export function MessagePanel() {
+export function MessagePanel({ includeBackAlley = false, href = '/messages' }: { includeBackAlley?: boolean; href?: string }) {
   const [rainbowShineActive, setRainbowShineActive] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string; body: string } | null>(null);
 
-  const { now, posts } = usePublicMessages();
+  const { now, posts } = usePublicMessages(includeBackAlley);
 
   useEffect(() => {
     let activeTimer: number | null = null;
@@ -64,7 +64,7 @@ export function MessagePanel() {
         <span className="title-deco" aria-hidden="true">
           ❄
         </span>
-        <Link href="/messages" className="window-title-link">
+          <Link href={href} className="window-title-link">
           Message
         </Link>
         <span className="title-deco" aria-hidden="true">
@@ -154,7 +154,7 @@ export function MessagePanel() {
         })}
         {posts.length > 10 ? (
           <div className="message-panel-more">
-            <Link href="/messages">もっとメッセージを見る &raquo;</Link>
+          <Link href={href}>もっとメッセージを見る &raquo;</Link>
           </div>
         ) : null}
       </div>

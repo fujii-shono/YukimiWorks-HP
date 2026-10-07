@@ -8,11 +8,12 @@ import { MAX_MESSAGE_BODY_LENGTH, MAX_MESSAGE_IMAGES, saveFirebaseMessage } from
 import { postSavedMessageToX } from '@/lib/x/client';
 import { getXPostCharacterCount, isXPostTooLong, MAX_X_POST_CHARACTERS } from '@/lib/x/characters';
 
-export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
+export function QuickMessageComposer({ onClose, initialAudience = 'front' }: { onClose: () => void; initialAudience?: 'front' | 'back-alley' | 'r18' }) {
   const { firebaseUser, profile } = useFirebaseAuth();
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [postToX, setPostToX] = useState(false);
+  const [audience, setAudience] = useState<'front' | 'back-alley' | 'r18'>(initialAudience);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedWithXError, setSavedWithXError] = useState(false);
@@ -78,6 +79,7 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
         existingImages: [],
         newFiles: files,
         postToX,
+        audience,
         skipXPostForLength: xPostTooLong,
       });
       publishSavedMessage({
@@ -86,7 +88,7 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
         body: body.trim(),
         authorName: profile.displayName,
         icon: { src: '/logo/yukimi_works_favicon.png', alt: 'YukimiWorks' },
-        images: savedMessage.images.map((image) => ({ src: image.url, alt: image.alt })),
+        images: savedMessage.images.flatMap((image) => image.url ? [{ src: image.url, alt: image.alt }] : []),
       });
       if (postToX && !xPostTooLong) {
         try {
@@ -150,6 +152,15 @@ export function QuickMessageComposer({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           ) : null}
+
+          <label className="admin-x-post-toggle" htmlFor="quick-message-back-alley">
+            <input id="quick-message-back-alley" type="checkbox" checked={audience !== 'front'} disabled={busy || savedWithXError} onChange={(event) => setAudience(event.target.checked ? 'back-alley' : 'front')} />
+            裏路地用のメッセージにする
+          </label>
+          <label className="admin-x-post-toggle" htmlFor="quick-message-r18">
+            <input id="quick-message-r18" type="checkbox" checked={audience === 'r18'} disabled={busy || savedWithXError} onChange={(event) => setAudience(event.target.checked ? 'r18' : 'back-alley')} />
+            R18メッセージにする
+          </label>
 
           <label className="admin-x-post-toggle" htmlFor="quick-message-post-to-x">
             <input

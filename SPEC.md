@@ -1990,6 +1990,33 @@ yukimiworks-hp/
 
 ## Firebase認証・ユーザー・メッセージ管理
 
+## 裏路地（ログイン・成人確認専用ページ）
+
+- 通常サイトに「裏路地」バナーを表示し、`/back-alley`へ遷移させる
+- `/back-alley`配下は検索エンジンのインデックス対象外とする
+- 未ログインで通常サイトの裏路地バナーを押した場合は、現在の通常サイト画面にGoogleログイン案内をモーダル表示し、ログインしない場合は現在のページに留まる。直接アクセス時はログイン案内を表示し、ログインしない場合は`/`へ戻す
+- ログイン後の未確認ユーザーが通常サイトの「裏路地」バナーを押した場合は、現在の通常サイト画面に標準モーダルで「裏路地では少しニッチな作品を扱っています。大丈夫ですか？」と確認し、`users/{uid}.backAlleyConfirmed`に保存後に遷移する
+- 18歳以上かの確認は裏路地入場時ではなく、R18作品を開いた際に行い、確認済み状態を`users/{uid}.adultConfirmed`に保存する
+- 裏路地確認済み状態はアカウント設定に表示しない。成人確認済み状態はアカウント設定の「R18作品を表示する」チェックボックスで変更できる
+- 基本レイアウトは通常サイトと同じ上部バナー、2カラム、フッターとし、上部バナーは通常サイトのYukimiWorks表示をそのまま使用する。背景と配色は夜テーマと同じにする
+- Menuは`Top`、`Portfolio`、`Message`のみとし、それぞれ路地裏配下へ遷移させる
+- 裏路地サイドバーには、裏路地Messageを表示するMessageパネルとCounterを表示する
+- 裏路地から管理画面を開いた場合は`/back-alley/admin`を使用し、裏路地の共通レイアウトと配色を維持する。管理機能本体は通常の`/admin`と共通化する
+- 裏路地TopのWelcomeは通常Topと同じキャラクターとテキスト構成を使用し、文言は「裏路地へようこそ。」「表では扱えない大人な作品を扱っています。」とする
+- 画面左下に「通常ページに戻る」ドアを固定表示し、`/`へ遷移させる
+- What's Newは裏Portfolioの更新だけを表示する
+- 裏Portfolioは通常の裏作品とR18作品を分けて管理し、通常Portfolio、通常What's New、通常ニュースにはどちらも表示しない
+- 裏Homeと裏Portfolio一覧の作品カードは表Portfolioと共通の表示構造・デザインを使用し、画像とタイトルだけを表示する。説明は作品個別ページに表示する
+- 成人未確認時のR18作品は画像部分を黒塗りにして赤文字の`R18`を表示し、作品名と説明は表示する。画像データは取得させない
+- 管理画面のPortfolio一覧では表作品・裏路地作品を一元管理し、裏路地作品の右上に`裏`、R18作品にはさらに`R18`を表示する。管理画面から追加できる裏Portfolioは画像作品のみとし、HTMLアートとゲームはコードで管理する
+- 管理画面のPortfolio新規追加フォームでは「裏路地作品にする」「R18作品にする」を選択でき、R18を選択した作品は裏路地作品として保存する
+- 裏Portfolioと裏Messageの素材は`protected/back-alley/`に保存し、永続的な公開ダウンロードURLは保存しない
+- FirestoreとStorageのSecurity Rulesで、通常の裏データと素材は裏路地確認済みユーザー、R18データと素材はさらに成人確認済みユーザーだけに読み取りを許可する
+- Messageは管理画面で表用、裏路地用、裏路地R18用を指定する。通常Messageは表用だけ、裏Messageは表用と裏路地用を表示し、成人確認済みの場合は裏路地R18用も表示する
+- Message追加・編集フォームでは「裏路地用のメッセージにする」「R18メッセージにする」を選択できる
+- Xへの投稿は表用・裏路地用のどちらでも利用できる
+- 既存のPortfolioとMessageはすべて表用とし、初期状態の裏Portfolioは0件とする
+
 ### 認証と共通表示
 
 - ログインは Firebase Authentication の Google プロバイダーのみ使用する
@@ -2011,10 +2038,10 @@ yukimiworks-hp/
 
 ### ユーザーデータ
 
-- Firestore の `users/{uid}` に `displayName`, `plan`, `tickets`, `coins`, `purchasedWorkIds`, `role`, `stripeCustomerId`, `stripeSubscriptions`, 作成・更新日時を保存する
+- Firestore の `users/{uid}` に `displayName`, `plan`, `tickets`, `coins`, `purchasedWorkIds`, `role`, `backAlleyConfirmed`, `adultConfirmed`, `stripeCustomerId`, `stripeSubscriptions`, 作成・更新日時を保存する
 - `tickets` は `blue` / `night` の配列とする。旧 `plan` に格納済みのチケットは読み取り時に所持状態へ統合する
 - 初回ログイン時は `plan: none`, `tickets: []`, `coins: 10`, `purchasedWorkIds: []`, `role: user` とする
-- 本人がクライアントから直接変更できる値は `displayName` のみとする。`tickets`, `coins`, Stripe関連値はサーバー処理だけが更新する
+- 本人がクライアントから直接変更できる値は `displayName`, `backAlleyConfirmed`, `adultConfirmed` とする。`tickets`, `coins`, Stripe関連値はサーバー処理だけが更新する
 - `role`, `plan`, `purchasedWorkIds` は Firebase Console、ローカルでは Emulator UI から変更する
 - 管理者指定は対象文書の `role` を `admin` に変更して行う
 - Firestore Security Rules で保護値の本人更新を禁止する
@@ -2048,6 +2075,7 @@ yukimiworks-hp/
 - 本文の入力上限は300文字とする
 - メッセージ1件につき画像は最大4枚、1枚10MBまでとし、Firebase Storage の `messages/{messageId}/` へ保存する
 - 編集画面に「Xにも投稿する」チェックを置き、初期値はオフとする。チェックしたメッセージはFirestoreへの保存成功直後に、接続済みXアカウントへテキストと最大4枚の画像を自動投稿する
+- Xへメッセージ画像をアップロードする際、GIFは`tweet_gif`、その他の画像は`tweet_image`をメディアカテゴリに使用する
 - X投稿はサイト上の公開日時にかかわらず保存時に即時実行し、予約投稿は行わない
 - X投稿IDと投稿状態をメッセージに記録し、投稿済みメッセージの編集保存では重複投稿しない。投稿失敗時はメッセージを保存したまま失敗理由を表示し、次回保存時に再試行する
 - メッセージ一覧の各項目右上にX投稿状態を表示し、投稿済みは「X投稿済み」とする

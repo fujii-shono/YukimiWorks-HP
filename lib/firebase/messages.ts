@@ -14,7 +14,7 @@ import {
   type QueryDocumentSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { deleteObject, getBlob, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getFirebaseServices } from '@/lib/firebase/client';
 import type { FirebaseMessage, FirebaseMessageImage, XPostStatus } from '@/lib/firebase/types';
 
@@ -31,8 +31,6 @@ function parseMessage(snapshot: QueryDocumentSnapshot<DocumentData>): FirebaseMe
       Boolean(
         image &&
           typeof image === 'object' &&
-          'url' in image &&
-          typeof image.url === 'string' &&
           'path' in image &&
           typeof image.path === 'string' &&
           'alt' in image &&
@@ -47,6 +45,7 @@ function parseMessage(snapshot: QueryDocumentSnapshot<DocumentData>): FirebaseMe
     body: data.body,
     authorName: typeof data.authorName === 'string' ? data.authorName : undefined,
     images: images.slice(0, MAX_MESSAGE_IMAGES),
+    audience: data.audience === 'back-alley' ? 'back-alley' : 'front',
     postToX: data.postToX === true,
     xPostStatus,
     xPostId: typeof data.xPostId === 'string' ? data.xPostId : undefined,
@@ -62,6 +61,8 @@ function parseMessage(snapshot: QueryDocumentSnapshot<DocumentData>): FirebaseMe
 export function subscribeToFirebaseMessages(
   onMessages: (messages: FirebaseMessage[]) => void,
   onError?: () => void,
+  includeBackAlley = false,
+  includeR18 = false,
 ): Unsubscribe {
   const services = getFirebaseServices();
   if (!services) {
@@ -69,12 +70,30 @@ export function subscribeToFirebaseMessages(
     return () => {};
   }
 
-  const messagesQuery = query(collection(services.db, 'messages'), orderBy('publishedAt', 'desc'));
-  return onSnapshot(
-    messagesQuery,
-    (snapshot) => onMessages(snapshot.docs.map(parseMessage).filter((message): message is FirebaseMessage => message !== null)),
-    () => onError?.(),
-  );
+  let front: FirebaseMessage[] = [];
+  let back: FirebaseMessage[] = [];
+  let r18: FirebaseMessage[] = [];
+  const publish = () => onMessages([...front, ...back, ...r18].sort((a, b) => b.publishedAt.toMillis() - a.publishedAt.toMillis()));
+  const frontQuery = query(collection(services.db, 'messages'), orderBy('publishedAt', 'desc'));
+  const unsubscribes = [onSnapshot(frontQuery, (snapshot) => {
+    front = snapshot.docs.map(parseMessage).filter((message): message is FirebaseMessage => message !== null).map((message) => ({ ...message, audience: 'front' }));
+    publish();
+  }, () => onError?.())];
+  if (includeBackAlley) {
+    const backQuery = query(collection(services.db, 'backAlleyMessages'), orderBy('publishedAt', 'desc'));
+    unsubscribes.push(onSnapshot(backQuery, (snapshot) => {
+      back = snapshot.docs.map(parseMessage).filter((message): message is FirebaseMessage => message !== null).map((message) => ({ ...message, audience: 'back-alley' }));
+      publish();
+    }, () => onError?.()));
+  }
+  if (includeR18) {
+    const r18Query = query(collection(services.db, 'backAlleyR18Messages'), orderBy('publishedAt', 'desc'));
+    unsubscribes.push(onSnapshot(r18Query, (snapshot) => {
+      r18 = snapshot.docs.map(parseMessage).filter((message): message is FirebaseMessage => message !== null).map((message) => ({ ...message, audience: 'r18' }));
+      publish();
+    }, () => onError?.()));
+  }
+  return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
 }
 
 function validateFiles(files: File[], existingCount: number) {
@@ -85,18 +104,22 @@ function validateFiles(files: File[], existingCount: number) {
   }
 }
 
-async function uploadMessageImages(messageId: string, files: File[]) {
+async function uploadMessageImages(messageId: string, files: File[], audience: 'front' | 'back-alley' | 'r18') {
   const services = getFirebaseServices();
   if (!services) throw new Error('Firebase が設定されていません。');
 
   return Promise.all(
     files.map(async (file) => {
       const extension = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase() : '';
-      const path = `messages/${messageId}/${crypto.randomUUID()}${extension}`;
+      const path = audience === 'r18'
+        ? `protected/back-alley/r18/messages/${messageId}/${crypto.randomUUID()}${extension}`
+        : audience === 'back-alley'
+          ? `protected/back-alley/messages/${messageId}/${crypto.randomUUID()}${extension}`
+          : `messages/${messageId}/${crypto.randomUUID()}${extension}`;
       const imageRef = ref(services.storage, path);
       await uploadBytes(imageRef, file, { contentType: file.type });
       return {
-        url: await getDownloadURL(imageRef),
+        ...(audience === 'front' ? { url: await getDownloadURL(imageRef) } : {}),
         path,
         alt: 'メッセージ添付画像',
       } satisfies FirebaseMessageImage;
@@ -112,6 +135,8 @@ export async function saveFirebaseMessage({
   existingImages,
   newFiles,
   postToX,
+  audience = 'front',
+  previousAudience,
   skipXPostForLength = false,
   retrySkippedXPost = false,
 }: {
@@ -122,6 +147,8 @@ export async function saveFirebaseMessage({
   existingImages: FirebaseMessageImage[];
   newFiles: File[];
   postToX: boolean;
+  audience?: 'front' | 'back-alley' | 'r18';
+  previousAudience?: 'front' | 'back-alley' | 'r18';
   skipXPostForLength?: boolean;
   retrySkippedXPost?: boolean;
 }) {
@@ -136,8 +163,13 @@ export async function saveFirebaseMessage({
   if (Number.isNaN(publishedAt.getTime())) throw new Error('公開日時を入力してください。');
   validateFiles(newFiles, existingImages.length);
 
-  const messageRef = id ? doc(services.db, 'messages', id) : doc(collection(services.db, 'messages'));
-  const uploadedImages = await uploadMessageImages(messageRef.id, newFiles);
+  if (id && previousAudience && previousAudience !== audience && existingImages.length) {
+    throw new Error('公開先を変更する場合は、既存画像を削除して再アップロードしてください。');
+  }
+  const collectionName = audience === 'r18' ? 'backAlleyR18Messages' : audience === 'back-alley' ? 'backAlleyMessages' : 'messages';
+  const messageRef = id ? doc(services.db, collectionName, id) : doc(collection(services.db, collectionName));
+  const movingBetweenAudiences = Boolean(id && previousAudience && previousAudience !== audience);
+  const uploadedImages = await uploadMessageImages(messageRef.id, newFiles, audience);
 
   try {
     await setDoc(
@@ -146,15 +178,16 @@ export async function saveFirebaseMessage({
         body: normalizedBody,
         authorName: normalizedAuthorName,
         images: [...existingImages, ...uploadedImages],
+        audience,
         postToX,
         publishedAt: Timestamp.fromDate(publishedAt),
         updatedAt: serverTimestamp(),
+        ...(!id || movingBetweenAudiences ? { createdAt: serverTimestamp() } : {}),
         ...(id
           ? retrySkippedXPost
             ? { xPostStatus: 'pending', xPostError: null, xPostAttemptedAt: null }
             : {}
           : {
-              createdAt: serverTimestamp(),
               xPostStatus: postToX ? (skipXPostForLength ? 'skipped_too_long' : 'pending') : 'not_requested',
               xPostId: null,
               xPostError: null,
@@ -162,8 +195,12 @@ export async function saveFirebaseMessage({
               xPostedAt: null,
             }),
       },
-      { merge: Boolean(id) },
+      { merge: Boolean(id) && !movingBetweenAudiences },
     );
+    if (id && previousAudience && previousAudience !== audience) {
+      const previousCollection = previousAudience === 'r18' ? 'backAlleyR18Messages' : previousAudience === 'back-alley' ? 'backAlleyMessages' : 'messages';
+      await deleteDoc(doc(services.db, previousCollection, id));
+    }
   } catch (error) {
     await Promise.allSettled(uploadedImages.map((image) => deleteObject(ref(services.storage, image.path))));
     throw error;
@@ -172,10 +209,18 @@ export async function saveFirebaseMessage({
   return { id: messageRef.id, images: [...existingImages, ...uploadedImages] };
 }
 
+export async function getProtectedMediaUrl(path: string) {
+  const services = getFirebaseServices();
+  if (!services) throw new Error('Firebase が設定されていません。');
+  const blob = await getBlob(ref(services.storage, path));
+  return URL.createObjectURL(blob);
+}
+
 export async function deleteFirebaseMessage(message: FirebaseMessage) {
   const services = getFirebaseServices();
   if (!services) throw new Error('Firebase が設定されていません。');
-  await deleteDoc(doc(services.db, 'messages', message.id));
+  const collectionName = message.audience === 'r18' ? 'backAlleyR18Messages' : message.audience === 'back-alley' ? 'backAlleyMessages' : 'messages';
+  await deleteDoc(doc(services.db, collectionName, message.id));
   await Promise.allSettled(message.images.map((image) => deleteObject(ref(services.storage, image.path))));
 }
 

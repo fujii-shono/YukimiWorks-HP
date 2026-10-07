@@ -34,7 +34,8 @@ type XConnection = {
 };
 
 type MessageImage = {
-  url: string;
+  url?: string;
+  path?: string;
 };
 
 type MessageForX = {
@@ -45,6 +46,8 @@ type MessageForX = {
   xPostId?: string | null;
   xPostAttemptedAt?: Timestamp | null;
 };
+
+type XMediaCategory = 'tweet_image' | 'tweet_gif';
 
 function parseResponseError(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== 'object') return fallback;
@@ -204,18 +207,40 @@ async function getValidXAccessToken() {
   return refreshed.access_token;
 }
 
-async function uploadImageToX(accessToken: string, url: string) {
-  const imageResponse = await fetch(url, { cache: 'no-store' });
-  if (!imageResponse.ok) throw new Error('投稿画像をFirebase Storageから取得できませんでした。');
-  const contentType = imageResponse.headers.get('content-type')?.split(';')[0].trim() || '';
-  if (!contentType.startsWith('image/')) throw new Error('Xへ投稿できない画像形式です。');
-  const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+export function getXMediaCategory(imageBuffer: Buffer, contentType?: string): XMediaCategory {
+  const normalizedContentType = contentType?.split(';')[0].trim().toLowerCase();
+  const gifSignature = imageBuffer.subarray(0, 6).toString('ascii');
+  return normalizedContentType === 'image/gif' || gifSignature === 'GIF87a' || gifSignature === 'GIF89a'
+    ? 'tweet_gif'
+    : 'tweet_image';
+}
+
+async function uploadImageToX(accessToken: string, image: MessageImage) {
+  let imageBuffer: Buffer;
+  let contentType: string | undefined;
+  if (image.url) {
+    const imageResponse = await fetch(image.url, { cache: 'no-store' });
+    if (!imageResponse.ok) throw new Error('投稿画像をFirebase Storageから取得できませんでした。');
+    contentType = imageResponse.headers.get('content-type')?.split(';')[0].trim();
+    if (!contentType?.startsWith('image/')) throw new Error('Xへ投稿できない画像形式です。');
+    imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+  } else if (image.path) {
+    const { storage } = getFirebaseAdminServices();
+    const imageFile = storage.bucket().file(image.path);
+    const [downloadResult, metadataResult] = await Promise.all([imageFile.download(), imageFile.getMetadata()]);
+    [imageBuffer] = downloadResult;
+    contentType = metadataResult[0].contentType;
+  } else {
+    throw new Error('投稿画像の保存先が正しくありません。');
+  }
   if (imageBuffer.byteLength > X_IMAGE_LIMIT_BYTES) throw new Error('Xへ投稿する画像は1枚5MB以下にしてください。');
+
+  const mediaCategory = getXMediaCategory(imageBuffer, contentType);
 
   const response = await fetch(`${X_API_ORIGIN}/2/media/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ media: imageBuffer.toString('base64'), media_category: 'tweet_image' }),
+    body: JSON.stringify({ media: imageBuffer.toString('base64'), media_category: mediaCategory }),
     cache: 'no-store',
   });
   const payload = await readJson(response);
@@ -226,7 +251,7 @@ async function uploadImageToX(accessToken: string, url: string) {
 }
 
 async function createXPost(accessToken: string, body: string, images: MessageImage[]) {
-  const mediaIds = await Promise.all(images.slice(0, 4).map((image) => uploadImageToX(accessToken, image.url)));
+  const mediaIds = await Promise.all(images.slice(0, 4).map((image) => uploadImageToX(accessToken, image)));
   const response = await fetch(`${X_API_ORIGIN}/2/tweets`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -250,7 +275,10 @@ export async function postTextToX(body: string) {
 
 export async function postFirebaseMessageToX(messageId: string) {
   const { db } = getFirebaseAdminServices();
-  const messageRef = db.collection('messages').doc(messageId);
+  const frontRef = db.collection('messages').doc(messageId);
+  const backRef = db.collection('backAlleyMessages').doc(messageId);
+  const r18Ref = db.collection('backAlleyR18Messages').doc(messageId);
+  const messageRef = (await frontRef.get()).exists ? frontRef : (await backRef.get()).exists ? backRef : r18Ref;
 
   const claimed = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(messageRef);
@@ -275,7 +303,7 @@ export async function postFirebaseMessageToX(messageId: string) {
       return 'skipped_too_long' as const;
     }
     const images = message.images.filter(
-      (image): image is MessageImage => Boolean(image && typeof image === 'object' && typeof image.url === 'string'),
+      (image): image is MessageImage => Boolean(image && typeof image === 'object' && (typeof image.url === 'string' || typeof image.path === 'string')),
     );
     transaction.update(messageRef, {
       xPostStatus: 'posting',

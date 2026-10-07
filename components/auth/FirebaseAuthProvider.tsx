@@ -23,6 +23,8 @@ type AuthContextValue = {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
+  updateBackAlleyConfirmation: (confirmed: boolean) => Promise<void>;
+  updateAdultConfirmation: (confirmed: boolean) => Promise<void>;
   purchaseProduct: (product: AccountPurchaseProduct) => Promise<'debug' | 'redirect'>;
   openBillingPortal: () => Promise<void>;
 };
@@ -46,7 +48,12 @@ function parseSiteUser(value: unknown): SiteUser | null {
   // 既存ユーザーの plan は移行せず、表示時だけチケット所持状態として引き継ぐ。
   if (candidate.plan === 'blue' || candidate.plan === 'night') tickets.add(candidate.plan);
 
-  return { ...candidate, tickets: [...tickets] } as SiteUser;
+  return {
+    ...candidate,
+    backAlleyConfirmed: candidate.backAlleyConfirmed === true,
+    adultConfirmed: candidate.adultConfirmed === true,
+    tickets: [...tickets],
+  } as SiteUser;
 }
 
 async function ensureUserProfile(user: User) {
@@ -55,7 +62,16 @@ async function ensureUserProfile(user: User) {
 
   const userRef = doc(services.db, 'users', user.uid);
   const snapshot = await getDoc(userRef);
-  if (snapshot.exists()) return;
+  if (snapshot.exists()) {
+    if (typeof snapshot.data().adultConfirmed !== 'boolean' || typeof snapshot.data().backAlleyConfirmed !== 'boolean') {
+      await updateDoc(userRef, {
+        adultConfirmed: snapshot.data().adultConfirmed === true,
+        backAlleyConfirmed: snapshot.data().backAlleyConfirmed === true,
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return;
+  }
 
   await setDoc(userRef, {
     displayName: (user.displayName || 'ゲスト').trim().slice(0, 30),
@@ -64,6 +80,8 @@ async function ensureUserProfile(user: User) {
     coins: 10,
     purchasedWorkIds: [],
     role: 'user',
+    backAlleyConfirmed: false,
+    adultConfirmed: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -172,6 +190,24 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     [firebaseUser],
   );
 
+  const updateAdultConfirmation = useCallback(async (confirmed: boolean) => {
+    const services = getFirebaseServices();
+    if (!services || !firebaseUser) throw new Error('ログインが必要です。');
+    await updateDoc(doc(services.db, 'users', firebaseUser.uid), {
+      adultConfirmed: confirmed,
+      updatedAt: serverTimestamp(),
+    });
+  }, [firebaseUser]);
+
+  const updateBackAlleyConfirmation = useCallback(async (confirmed: boolean) => {
+    const services = getFirebaseServices();
+    if (!services || !firebaseUser) throw new Error('ログインが必要です。');
+    await updateDoc(doc(services.db, 'users', firebaseUser.uid), {
+      backAlleyConfirmed: confirmed,
+      updatedAt: serverTimestamp(),
+    });
+  }, [firebaseUser]);
+
   const purchaseProduct = useCallback(
     async (product: AccountPurchaseProduct) => {
       const services = getFirebaseServices();
@@ -218,10 +254,12 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       signIn,
       signOut,
       updateDisplayName,
+      updateBackAlleyConfirmation,
+      updateAdultConfirmation,
       purchaseProduct,
       openBillingPortal,
     }),
-    [configured, error, firebaseUser, loading, openBillingPortal, profile, profileLoading, purchaseProduct, signIn, signOut, updateDisplayName],
+    [configured, error, firebaseUser, loading, openBillingPortal, profile, profileLoading, purchaseProduct, signIn, signOut, updateAdultConfirmation, updateBackAlleyConfirmation, updateDisplayName],
   );
 
   return <FirebaseAuthContext.Provider value={value}>{children}</FirebaseAuthContext.Provider>;

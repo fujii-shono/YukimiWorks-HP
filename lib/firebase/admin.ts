@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 let adminApp: App | null = null;
 
@@ -21,6 +22,7 @@ function getAdminApp() {
     process.env.FIREBASE_AUTH_EMULATOR_HOST ||= '127.0.0.1:9099';
     process.env.FIRESTORE_EMULATOR_HOST ||= '127.0.0.1:8080';
     process.env.GCLOUD_PROJECT ||= projectId;
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST ||= '127.0.0.1:9199';
   }
 
   const existingApp = getApps().find((app) => app.name === 'yukimiworks-server');
@@ -30,7 +32,7 @@ function getAdminApp() {
   }
 
   if (emulatorMode) {
-    adminApp = initializeApp({ projectId }, 'yukimiworks-server');
+    adminApp = initializeApp({ projectId, storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com` }, 'yukimiworks-server');
     return adminApp;
   }
 
@@ -44,6 +46,7 @@ function getAdminApp() {
     {
       credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail, privateKey }),
       projectId: process.env.FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     },
     'yukimiworks-server',
   );
@@ -52,7 +55,7 @@ function getAdminApp() {
 
 export function getFirebaseAdminServices() {
   const app = getAdminApp();
-  return { auth: getAuth(app), db: getFirestore(app) };
+  return { auth: getAuth(app), db: getFirestore(app), storage: getStorage(app) };
 }
 
 export async function requireFirebaseUser(request: Request) {

@@ -18,6 +18,8 @@ export type SiteUser = {
   coins: number;
   purchasedWorkIds: string[];
   role: UserRole;
+  backAlleyConfirmed: boolean;
+  adultConfirmed: boolean;
   stripeCustomerId?: string;
   stripeSubscriptions?: Partial<Record<UserTicket, StripeSubscriptionState>>;
   createdAt?: Timestamp;
@@ -25,10 +27,12 @@ export type SiteUser = {
 };
 
 export type FirebaseMessageImage = {
-  url: string;
+  url?: string;
   path: string;
   alt: string;
 };
+
+export type MessageAudience = 'front' | 'back-alley' | 'r18';
 
 export type XPostStatus = 'not_requested' | 'pending' | 'posting' | 'posted' | 'failed' | 'skipped_too_long';
 
@@ -37,6 +41,7 @@ export type FirebaseMessage = {
   body: string;
   authorName?: string;
   images: FirebaseMessageImage[];
+  audience: MessageAudience;
   postToX: boolean;
   xPostStatus: XPostStatus;
   xPostId?: string;
@@ -44,6 +49,20 @@ export type FirebaseMessage = {
   xPostAttemptedAt?: Timestamp;
   xPostedAt?: Timestamp;
   publishedAt: Timestamp;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+export type FirebaseBackAlleyPortfolioItem = {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  image?: { type: 'image'; path: string; alt: string };
+  r18: boolean;
+  locked?: boolean;
+  publishedAt: Timestamp;
+  featured: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };

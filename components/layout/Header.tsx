@@ -1,11 +1,12 @@
 'use client';
 
 import Image from 'next/image';
+import NextLink from 'next/link';
 import { useRef, useState } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
-import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
+import { RestrictedLink } from '@/components/ui/RestrictedLink';
 
-export function Header() {
+export function Header({ homeHref = '/' }: { homeHref?: string }) {
   const { event, tagline, absent, canPeek, peekActive, triggerPeek, peekImageSrc, showPeekBubble } = useTimeTheme();
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -16,6 +17,7 @@ export function Header() {
   const siteTitle = event === 'sleep-warning' ? 'はやく　寝ろ' : 'YukimiWorks';
   const headerDecorationIcon =
     event === 'lunch' ? '/icons/food/contents.png' : event === 'snack' ? '/icons/sweets/apps.png' : null;
+  const headerContent = <><h1 id="site-title">{siteTitle}</h1><p className="tagline">{tagline}</p></>;
 
   const resetDrag = () => {
     startXRef.current = null;
@@ -103,10 +105,11 @@ export function Header() {
           )}
         </div>
         <div className="hero-banner-panel hero-banner-panel-center">
-          <Link href="/" className="hero-link" aria-label="YukimiWorks トップページへ移動">
-            <h1 id="site-title">{siteTitle}</h1>
-            <p className="tagline">{tagline}</p>
-          </Link>
+          {homeHref === '/' ? (
+            <RestrictedLink href={homeHref} className="hero-link" aria-label="YukimiWorks トップページへ移動">{headerContent}</RestrictedLink>
+          ) : (
+            <NextLink href={homeHref} className="hero-link" aria-label="YukimiWorks トップページへ移動">{headerContent}</NextLink>
+          )}
           <div className="dotted-rule" aria-hidden="true" />
         </div>
         <div className="hero-banner-panel hero-banner-panel-right">

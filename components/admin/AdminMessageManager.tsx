@@ -7,6 +7,7 @@ import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { AdminTrafficAnalytics } from '@/components/admin/AdminTrafficAnalytics';
 import { AdminContentManager } from '@/components/admin/AdminContentManager';
 import { TrackingLinkBuilder } from '@/components/admin/TrackingLinkBuilder';
+import { ProtectedImage } from '@/components/back-alley/ProtectedImage';
 import {
   deleteFirebaseMessage,
   deleteMessageImages,
@@ -58,7 +59,7 @@ function getXPostStatusLabel(message: FirebaseMessage) {
   return 'X投稿待ち';
 }
 
-export function AdminMessageManager() {
+export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admin' | '/back-alley/admin' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { firebaseUser, profile, loading, profileLoading } = useFirebaseAuth();
@@ -69,6 +70,7 @@ export function AdminMessageManager() {
   const [removedImages, setRemovedImages] = useState<FirebaseMessageImage[]>([]);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [postToX, setPostToX] = useState(false);
+  const [audience, setAudience] = useState<'front' | 'back-alley' | 'r18'>('front');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function AdminMessageManager() {
 
   useEffect(() => {
     if (!isAdmin || activeSection !== 'messages') return;
-    return subscribeToFirebaseMessages(setMessages, () => setError('メッセージ一覧を読み込めませんでした。'));
+    return subscribeToFirebaseMessages(setMessages, () => setError('メッセージ一覧を読み込めませんでした。'), true, true);
   }, [activeSection, isAdmin]);
 
   useEffect(() => {
@@ -144,6 +146,7 @@ export function AdminMessageManager() {
       setRemovedImages([]);
       setNewFiles([]);
       setPostToX(message.postToX);
+      setAudience(message.audience);
       setError(null);
     } else {
       setBody('');
@@ -152,6 +155,7 @@ export function AdminMessageManager() {
       setRemovedImages([]);
       setNewFiles([]);
       setPostToX(false);
+      setAudience('front');
       setError(null);
     }
 
@@ -166,25 +170,26 @@ export function AdminMessageManager() {
     setRemovedImages([]);
     setNewFiles([]);
     setPostToX(false);
+    setAudience('front');
     setError(null);
   };
 
   const openMessages = () => {
     setNotice(null);
     resetForm();
-    router.push('/admin?section=messages');
+    router.push(`${basePath}?section=messages`);
   };
 
   const openNewMessage = () => {
     resetForm();
     setNotice(null);
-    router.push('/admin?section=messages&mode=new');
+    router.push(`${basePath}?section=messages&mode=new`);
   };
 
   const editMessage = (message: FirebaseMessage) => {
     setNotice(null);
     setError(null);
-    router.push(`/admin?section=messages&mode=edit&id=${encodeURIComponent(message.id)}`);
+    router.push(`${basePath}?section=messages&mode=edit&id=${encodeURIComponent(message.id)}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -241,6 +246,8 @@ export function AdminMessageManager() {
         existingImages,
         newFiles,
         postToX,
+        audience,
+        previousAudience: editingMessage?.audience,
         skipXPostForLength: xPostTooLong,
         retrySkippedXPost: Boolean(!xPostTooLong && editingMessage?.xPostStatus === 'skipped_too_long'),
       });
@@ -260,7 +267,7 @@ export function AdminMessageManager() {
       resetForm();
       setNotice(nextNotice);
       if (xPostError) setError(`メッセージは保存しましたが、Xへ投稿できませんでした：${xPostError}`);
-      router.push('/admin?section=messages');
+      router.push(`${basePath}?section=messages`);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'メッセージを保存できませんでした。');
     } finally {
@@ -312,7 +319,7 @@ export function AdminMessageManager() {
   const backToDashboard = () => {
     resetForm();
     setNotice(null);
-    router.push('/admin');
+    router.push(basePath);
   };
 
   if (loading || profileLoading) return <p className="admin-access-message">ログイン情報を確認しています…</p>;
@@ -328,7 +335,7 @@ export function AdminMessageManager() {
               type="button"
               key={section.id}
               className="pixel-button admin-section-button"
-              onClick={() => (section.id === 'messages' ? openMessages() : router.push(`/admin?section=${section.id}`))}
+              onClick={() => (section.id === 'messages' ? openMessages() : router.push(`${basePath}?section=${section.id}`))}
             >
               {section.label}
             </button>
@@ -343,7 +350,7 @@ export function AdminMessageManager() {
   }
 
   if (activeSection !== 'messages') {
-    return <AdminContentManager kind={activeSection} onBack={backToDashboard} />;
+    return <AdminContentManager kind={activeSection as 'portfolio' | 'works' | 'diary' | 'news'} onBack={backToDashboard} />;
   }
 
   return (
@@ -390,6 +397,7 @@ export function AdminMessageManager() {
                 {message.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               </time>
               <p>{message.body}</p>
+              <span>{message.audience === 'r18' ? '裏路地 R18用' : message.audience === 'back-alley' ? '裏路地用' : '表用'}</span>
               <span>
                 {message.images.length > 0 ? `画像 ${message.images.length}枚` : '画像なし'}
               </span>
@@ -404,7 +412,7 @@ export function AdminMessageManager() {
         <form className="admin-message-form" onSubmit={submit}>
           <div className="admin-list-heading">
             <h3>{messageView === 'edit' ? 'メッセージ編集' : '新しいメッセージ'}</h3>
-            <button type="button" onClick={() => { resetForm(); router.push('/admin?section=messages'); }} disabled={busy}>一覧へ戻る</button>
+            <button type="button" onClick={() => { resetForm(); router.push(`${basePath}?section=messages`); }} disabled={busy}>一覧へ戻る</button>
           </div>
           <label htmlFor="admin-message-body">本文</label>
           <textarea
@@ -440,6 +448,15 @@ export function AdminMessageManager() {
             disabled={existingImages.length >= MAX_MESSAGE_IMAGES}
           />
 
+          <label className="admin-x-post-toggle" htmlFor="admin-message-back-alley">
+            <input id="admin-message-back-alley" type="checkbox" checked={audience !== 'front'} onChange={(event) => setAudience(event.target.checked ? 'back-alley' : 'front')} />
+            裏路地用のメッセージにする
+          </label>
+          <label className="admin-x-post-toggle" htmlFor="admin-message-r18">
+              <input id="admin-message-r18" type="checkbox" checked={audience === 'r18'} onChange={(event) => setAudience(event.target.checked ? 'r18' : 'back-alley')} />
+              R18メッセージにする
+          </label>
+
           <label className="admin-x-post-toggle" htmlFor="admin-message-post-to-x">
             <input
               id="admin-message-post-to-x"
@@ -460,7 +477,7 @@ export function AdminMessageManager() {
             <div className="admin-image-grid">
               {existingImages.map((image) => (
                 <figure key={image.path}>
-                  <Image src={image.url} alt={image.alt} width={180} height={120} unoptimized />
+                  {image.url ? <Image src={image.url} alt={image.alt} width={180} height={120} unoptimized /> : <ProtectedImage path={image.path} alt={image.alt} />}
                   <button type="button" onClick={() => removeExistingImage(image)}>削除</button>
                 </figure>
               ))}

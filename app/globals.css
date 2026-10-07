@@ -27,6 +27,100 @@
   --pixel-tint-blend-mode: multiply;
 }
 
+/* Back Alley */
+.back-alley-entry-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 58px;
+  color: #f1f6ff;
+  background: #07142f;
+  border: 3px double #7096dc;
+  text-decoration: none;
+  letter-spacing: 0.12em;
+}
+
+.back-alley-entry-banner:hover,
+.back-alley-entry-banner:focus-visible { background: #0d1e43; color: #fff; }
+
+.back-alley-root {
+  min-height: 100vh;
+  color: #f1f6ff;
+  background-color: #07142f;
+  background-image: radial-gradient(circle, color-mix(in srgb, #4f72b4 28%, transparent) 0.8px, transparent 1px);
+  background-size: 4px 4px;
+  --site-outer-bg: #07142f;
+  --site-bg: #0d1e43;
+  --site-surface: #122854;
+  --site-surface-soft: #172f5f;
+  --site-accent: #9bbcff;
+  --site-accent-soft: #5f8fe9;
+  --site-text: #f1f6ff;
+  --site-text-muted: #c0cee8;
+  --site-border: #7096dc;
+  --site-dotted: #4f72b4;
+  --site-focus: #ffffff;
+  --pixel-tint-overlay: #274a88;
+  --pixel-tint-opacity: 0.66;
+  --pixel-tint-blend-mode: multiply;
+}
+
+.back-alley-root .page-shell { color: var(--site-text); }
+.back-alley-root .sidebar-nav { min-height: 0; align-content: start; }
+
+html:has(.back-alley-root),
+body:has(.back-alley-root) {
+  background-color: #07142f !important;
+  background-image: radial-gradient(circle, color-mix(in srgb, #4f72b4 28%, transparent) 0.8px, transparent 1px) !important;
+  background-size: 4px 4px !important;
+}
+
+.back-alley-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #e7e2eb;
+  background: #08080b;
+}
+.back-alley-gate-panel { width: min(520px, 100%); background: #15131a; border-color: #70677d; }
+.back-alley-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 20px; }
+.back-alley-gate-actions a,
+.back-alley-gate-actions button { min-height: 44px; padding: 9px 14px; }
+
+.back-alley-exit {
+  position: fixed;
+  z-index: 90;
+  left: 14px;
+  bottom: 14px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 10px;
+  color: var(--site-text);
+  background: var(--site-surface);
+  border: 2px solid var(--site-border);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--site-outer-bg) 72%, black);
+  font-size: 0.72rem;
+  text-decoration: none;
+}
+.back-alley-portfolio-preview-list { padding-bottom: 22px; }
+.r18-locked-cover { display: grid; width: 100%; aspect-ratio: 1; overflow: hidden; place-items: center; color: #ff3838; background: var(--site-surface); font-size: clamp(1.5rem, 5vw, 3rem); font-weight: 700; letter-spacing: 0.1em; white-space: nowrap; }
+.portfolio-preview-item > .portfolio-preview-thumb.r18-locked-cover { display: grid !important; place-items: center; font-size: 1.25rem; letter-spacing: 0.06em; }
+.retro-card-image.r18-locked-cover { display: grid; }
+.r18-detail-locked-cover { margin-bottom: 18px; }
+.back-alley-portfolio-detail > img { display: block; max-width: 100%; max-height: 75vh; margin: 0 auto 18px; object-fit: contain; }
+.protected-image-status { display: grid; min-height: 120px; place-items: center; background: #0b0a0e; color: #aaa0b0; }
+.account-adult-setting { margin-top: 16px; padding: 12px; border: 1px dotted var(--site-dotted); }
+.account-adult-setting h3,
+.account-adult-setting p { margin: 0 0 8px; }
+.account-adult-confirmation { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+@media (max-width: 720px) {
+  .back-alley-exit { left: 8px; bottom: 8px; }
+  .back-alley-exit span:last-child { max-width: 72px; text-align: center; }
+}
+
 html[data-theme='early-morning'],
 body[data-theme='early-morning'] {
   --site-outer-bg: #fff0d9;
@@ -920,6 +1014,7 @@ textarea {
 }
 
 .admin-portfolio-list-item {
+  position: relative;
   min-height: 80px;
 }
 
@@ -934,6 +1029,23 @@ textarea {
 
 .admin-portfolio-list-item > div {
   clear: both;
+}
+
+.admin-portfolio-list-item > .admin-portfolio-list-labels {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  clear: none;
+  gap: 5px;
+}
+
+.admin-portfolio-list-labels span {
+  padding: 1px 6px;
+  color: var(--site-accent);
+  border: 1px solid currentColor;
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .admin-message-list article .admin-content-list-summary {
@@ -6346,6 +6458,10 @@ a.message-inline-link:focus-visible {
   }
 
   .donation-sidebar-banner {
+    order: 5;
+  }
+
+  .back-alley-entry-banner {
     order: 5;
   }
 

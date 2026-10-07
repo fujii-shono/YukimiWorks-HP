@@ -1,6 +1,7 @@
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
+import { PortfolioPreviewContent } from '@/components/ui/PortfolioCardContent';
 import { getAllPortfolioItems } from '@/lib/firebase/content.server';
 
 export async function PortfolioPreviewSection() {
@@ -12,8 +13,7 @@ export async function PortfolioPreviewSection() {
       <div className="portfolio-preview-list">
         {latestItems.map((item) => (
           <Link key={item.id} href={item.href} className="portfolio-preview-item">
-            <PortfolioMedia item={item} variant="preview" className="portfolio-preview-thumb" />
-            <span className="portfolio-preview-title">{item.title}</span>
+            <PortfolioPreviewContent media={<PortfolioMedia item={item} variant="preview" className="portfolio-preview-thumb" />} title={item.title} />
           </Link>
         ))}
       </div>

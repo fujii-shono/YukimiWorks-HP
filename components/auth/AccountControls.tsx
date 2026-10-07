@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import type { AccountPurchaseProduct } from '@/lib/accountPurchaseProducts';
@@ -9,11 +10,13 @@ import type { AccountPurchaseProduct } from '@/lib/accountPurchaseProducts';
 const OPEN_ACCOUNT_EVENT = 'yukimi:open-account';
 
 export function LoginEntryButton() {
+  const pathname = usePathname();
   const { firebaseUser, profile, loading, profileLoading } = useFirebaseAuth();
+  const adminHref = pathname.startsWith('/back-alley') ? '/back-alley/admin' : '/admin';
 
   if (!loading && firebaseUser && profile?.role === 'admin') {
     return (
-      <Link href="/admin" className="sidebar-login-button">
+      <Link href={adminHref} className="sidebar-login-button">
         管理画面
       </Link>
     );
@@ -32,6 +35,7 @@ export function LoginEntryButton() {
 }
 
 export function AccountControls() {
+  const pathname = usePathname();
   const titleId = useId();
   const {
     firebaseUser,
@@ -43,6 +47,7 @@ export function AccountControls() {
     signIn,
     signOut,
     updateDisplayName,
+    updateAdultConfirmation,
     purchaseProduct,
     openBillingPortal,
   } = useFirebaseAuth();
@@ -53,6 +58,8 @@ export function AccountControls() {
   const [purchasing, setPurchasing] = useState<AccountPurchaseProduct | null>(null);
   const [purchaseNotice, setPurchaseNotice] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [adultConfirmationSaving, setAdultConfirmationSaving] = useState(false);
+  const [adultConfirmationError, setAdultConfirmationError] = useState<string | null>(null);
 
   useEffect(() => {
     const openAccount = (event: Event) => {
@@ -113,6 +120,15 @@ export function AccountControls() {
     }
   };
 
+  const changeAdultConfirmation = (checked: boolean) => {
+    if (checked && !window.confirm('18歳以上ですか？')) return;
+    setAdultConfirmationSaving(true);
+    setAdultConfirmationError(null);
+    void updateAdultConfirmation(checked)
+      .catch(() => setAdultConfirmationError('R18作品の表示設定を更新できませんでした。'))
+      .finally(() => setAdultConfirmationSaving(false));
+  };
+
   const purchase = async (product: AccountPurchaseProduct, label: string) => {
     setPurchasing(product);
     setPurchaseError(null);
@@ -141,6 +157,7 @@ export function AccountControls() {
   const isAdmin = profile?.role === 'admin';
   const hasBlueTicket = profile?.tickets.includes('blue') || false;
   const hasNightTicket = profile?.tickets.includes('night') || false;
+  const adminHref = pathname.startsWith('/back-alley') ? '/back-alley/admin' : '/admin';
 
   return (
     <>
@@ -214,8 +231,16 @@ export function AccountControls() {
                       {formError ? <p className="form-error">{formError}</p> : null}
                     </form>
 
+                    <section className="account-adult-setting">
+                      <label className="account-adult-confirmation">
+                        <input type="checkbox" checked={profile.adultConfirmed} disabled={adultConfirmationSaving} onChange={(event) => changeAdultConfirmation(event.target.checked)} />
+                        R18作品を表示する
+                      </label>
+                      {adultConfirmationError ? <p className="form-error">{adultConfirmationError}</p> : null}
+                    </section>
+
                     {isAdmin ? (
-                      <Link className="pixel-button account-admin-link" href="/admin" onClick={() => setModal(null)}>
+                      <Link className="pixel-button account-admin-link" href={adminHref} onClick={() => setModal(null)}>
                         管理画面へ
                       </Link>
                     ) : (

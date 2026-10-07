@@ -1,3 +1,103 @@
+# 路地裏ページ・成人確認・非公開素材対応
+
+## 追加対応: XへのGIF投稿
+
+### 対応する仕様
+
+- メッセージに添付したGIFをXへ`tweet_gif`としてアップロードする
+
+### 実装方針
+
+- 公開画像はHTTPレスポンス、保護画像はFirebase StorageメタデータからMIMEタイプを取得する
+- MIMEタイプが不正確な場合に備え、ファイル先頭のGIFシグネチャも確認する
+- GIFだけ`tweet_gif`、その他の画像は従来どおり`tweet_image`を使用する
+
+### 変更予定のファイルと理由
+
+- `lib/x/server.ts`: Xメディアカテゴリを画像形式に応じて切り替えるため
+- `SPEC.md`: GIF投稿時の正式仕様を明記するため
+
+### 影響範囲
+
+- 通常・裏路地・R18メッセージのX画像投稿
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+
+### 懸念点・制約
+
+- 実際のX投稿は`X_POST_DRY_RUN=false`の環境と接続済みXアカウントが必要
+
+## 対応する仕様
+
+- `/back-alley` 配下に黒基調の専用Top・Portfolio・Messageを追加する
+- 未ログインで通常サイトの裏路地バナーを押した場合は、現在のページ上にログイン案内を表示する。直接アクセス時はログインを拒否した場合に`/`へ戻す
+- 通常サイトの裏路地バナー押下時に標準モーダルで裏路地のニッチな作品への確認を行い、`backAlleyConfirmed`へ保存してから遷移する。R18作品クリック時には別途`adultConfirmed`を確認する
+- 設定では裏路地確認を表示せず、「R18作品を表示する」チェックボックスで成人確認を変更できるようにする
+- 裏Portfolioは通常の裏作品とR18作品を分離し、未成人確認時はR18の黒塗り索引のみ表示する
+- 裏Messageでは表用と裏用を表示し、通常Messageでは表用だけを表示する
+- 既存Portfolio・Messageはすべて表用とし、初期の裏Portfolioは0件とする
+- 路地裏配下はSEOインデックス対象外とする
+
+## 実装方針
+
+- 成人確認は画面表示だけでなくFirestore・Storage Rulesの読み取り条件にする
+- 裏Portfolioを`backAlleyPortfolioItems`、保護素材を`protected/back-alley/portfolio/{itemId}/`に分離する
+- Portfolio新規追加フォームとMessageフォームから、裏路地用・R18用の公開先を選択できるようにする
+- 保護画像に永続ダウンロードURLを保存せず、Firebase Storage SDKの認可付き取得からBlob URLを作る
+- Messageは`front | back-alley | r18`の保存先を分離し、未設定の既存データは`front`と解釈する
+- 裏路地用の共通フレームでTop・Portfolio・Messageのみメニュ表示する
+- 管理機能は共通コンポーネントとし、裏路地からは`/back-alley/admin`で裏路地レイアウトのまま表示する
+- 共通フレームのサイドバーへ、裏路地MessageパネルとCounterを追加する
+
+## 変更予定ファイル
+
+- `SPEC.md`, `plan.md`: 正式仕様と実装計画
+- `app/back-alley/**`, `components/back-alley/**`: 専用画面、認証ゲート、フレーム、保護画像
+- `components/layout/Sidebar.tsx`, `app/globals.css`: 入口バナーと黒基調デザイン
+- `components/auth/**`, `lib/firebase/types.ts`: 成人確認状態の取得・更新
+- `components/admin/**`, `lib/firebase/**`: PortfolioとMessageの公開先を一元管理
+- `firestore.rules`, `storage.rules`: 裏データと素材の認可
+
+## 影響範囲
+
+- Firebaseユーザードキュメント、管理画面、Message、Security Rules、路地裏配下のSEO
+
+## 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- 未ログイン、成人未確認、成人確認済みの表示分岐とRulesによる拒否を確認する
+
+## 懸念点・制約
+
+- Webで表示済みの素材を正当な閲覧者が保存する行為までは防止できない
+- 将来の有料ゲームは、同じRulesにチケットまたは`purchasedWorkIds`条件を追加して拡張する
+
+### 追加調整: R18未確認時の裏Portfolio表示
+
+- R18表示可否は管理者ロールではなく`adultConfirmed`だけで判定し、未確認時は一覧・直接URLともR18索引カードのみを取得する。
+- 裏HomeのPortfolioは通常作品・R18作品ともに注目設定された最大8件を表示し、R18作品は未確認時にも索引カードとして表示する。
+- 共通ヘッダーは遷移先を指定可能にし、裏路地内では`/back-alley`へ戻す。
+- 通常ユーザー向けのR18作品データ・素材の読み取りRulesは成人確認を必須とする。管理画面の権限は維持し、公開画面では管理者も成人確認状態に従う。
+- 検証: lint、型チェック、production build。Firebase Rulesの反映後、未確認の通常ユーザーで一覧・直接URL・Storage取得が拒否されることを確認する。
+
+### 追加調整: 裏PortfolioのプレビューとR18本文
+
+- 裏Homeの注目作品プレビューは通常Topと同じサムネイル寸法を使用する。
+- R18索引にはタイトルと説明だけを保持し、未確認時も表示する。画像パス・画像データは索引に含めず、成人確認後だけ取得する。
+- 裏HomeのPortfolio見出しと「その他の作品」は、表Homeと同じ導線で裏Portfolio一覧へ遷移させる。
+- モバイルでは裏路地バナーを天使の羽根募金バナーの直後に表示する。
+- 表裏のPortfolioカードとHomeプレビューは共通の表示コンポーネントを使用し、カード上は画像とタイトルだけを表示する。
+
+---
+
+## 既存計画
+
 ## 追加対応: メッセージ内リンク表示
 
 ### 対応する仕様

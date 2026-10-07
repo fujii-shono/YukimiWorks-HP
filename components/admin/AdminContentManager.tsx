@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Image from 'next/image';
+import { ProtectedImage } from '@/components/back-alley/ProtectedImage';
 import {
   deleteContentMedia,
   deleteFirebaseContent,
@@ -15,11 +16,12 @@ import {
   type ContentKind,
   type FirebaseContentByKind,
 } from '@/lib/firebase/content';
-import type { FirebaseContentBodySegment, FirebaseContentMedia, FirebaseDiaryEntry, FirebaseNews, FirebasePortfolioItem, FirebaseWork } from '@/lib/firebase/types';
+import type { FirebaseBackAlleyPortfolioItem, FirebaseContentBodySegment, FirebaseContentMedia, FirebaseDiaryEntry, FirebaseNews, FirebasePortfolioItem, FirebaseWork } from '@/lib/firebase/types';
 import { portfolioItems } from '@/data/portfolio';
 import { works } from '@/data/works';
 import { isSafeLinkHref } from '@/lib/format';
 import { cropImageToThumbnail } from '@/lib/image/crop';
+import { BACK_ALLEY_ID_PATTERN, deleteBackAlleyPortfolio, saveBackAlleyPortfolio, subscribeToBackAlleyPortfolio, syncBackAlleyR18Index } from '@/lib/firebase/backAlley';
 
 const labels: Record<ContentKind, string> = { portfolio: 'ポートフォリオ', works: '成果物', diary: '日記', news: 'ニュース' };
 const CONTENT_URL_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
@@ -86,7 +88,9 @@ function getDiaryListExcerpt(record: FirebaseDiaryEntry, maxLength = 100) {
 
 export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKind, never>; onBack: () => void }) {
   const [items, setItems] = useState<AnyContent[]>([]);
+  const [backAlleyItems, setBackAlleyItems] = useState<FirebaseBackAlleyPortfolioItem[]>([]);
   const [editing, setEditing] = useState<AnyContent | null>(null);
+  const [editingBackAlley, setEditingBackAlley] = useState<FirebaseBackAlleyPortfolioItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [primary, setPrimary] = useState<FirebaseContentMedia | undefined>();
   const [bodyBlocks, setBodyBlocks] = useState<AdminBodyBlock[]>(initialBodyBlocks);
@@ -97,8 +101,20 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
   const [preparingPrimary, setPreparingPrimary] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [backAlley, setBackAlley] = useState(false);
+  const [r18, setR18] = useState(false);
 
   useEffect(() => subscribeToFirebaseContent(kind, (records) => setItems(records as AnyContent[]), () => setError('一覧を読み込めませんでした。')), [kind]);
+  useEffect(() => {
+    if (kind !== 'portfolio') {
+      setBackAlleyItems([]);
+      return () => {};
+    }
+    return subscribeToBackAlleyPortfolio((records) => {
+      setBackAlleyItems(records);
+      void Promise.all(records.filter((item) => item.r18).map(syncBackAlleyR18Index)).catch(() => undefined);
+    }, () => setError('裏Portfolio一覧を読み込めませんでした。'), { includeScheduled: true, includeR18: true });
+  }, [kind]);
 
   const requiresPrimary = kind === 'portfolio';
   const supportsCustomUrlId = kind === 'portfolio' || kind === 'works';
@@ -108,11 +124,14 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
 
   const reset = () => {
     setEditing(null);
+    setEditingBackAlley(null);
     setForm(emptyForm());
     setPrimary(undefined);
     setBodyBlocks(initialBodyBlocks());
     setNewPrimary(null);
     setRemovedMedia([]);
+    setBackAlley(false);
+    setR18(false);
     setError(null);
   };
 
@@ -123,6 +142,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
 
   const openEdit = (item: AnyContent) => {
     setEditing(item);
+    setEditingBackAlley(null);
     const common = {
       urlId: item.id,
       title: item.title,
@@ -154,6 +174,20 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     }
     setNewPrimary(null);
     setRemovedMedia([]);
+    setError(null);
+    setMode('form');
+  };
+
+  const openBackAlleyEdit = (item: FirebaseBackAlleyPortfolioItem) => {
+    setEditing(null);
+    setEditingBackAlley(item);
+    setForm({ ...emptyForm(), urlId: item.id, title: item.title, description: item.description, tags: item.tags.join(', '), publishedAt: toTokyoInput(item.publishedAt.toDate()), featured: item.featured });
+    setPrimary(undefined);
+    setBodyBlocks(initialBodyBlocks());
+    setNewPrimary(null);
+    setRemovedMedia([]);
+    setBackAlley(true);
+    setR18(item.r18);
     setError(null);
     setMode('form');
   };
@@ -236,8 +270,9 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     let uploaded: FirebaseContentMedia[] = [];
     try {
       const requestedUrlId = form.urlId.trim();
-      const urlIdChanged = supportsCustomUrlId && requestedUrlId !== editing?.id;
-      if (supportsCustomUrlId && (!editing || urlIdChanged)) {
+      const existingId = editing?.id ?? editingBackAlley?.id;
+      const urlIdChanged = supportsCustomUrlId && requestedUrlId !== existingId;
+      if (supportsCustomUrlId && (!existingId || urlIdChanged)) {
         const pathPrefix = kind === 'works' ? '/works/' : '/portfolio/';
         if (!requestedUrlId) throw new Error(`URL IDを入力してください。公開URLは「${pathPrefix}入力したID」になります。`);
         if (!CONTENT_URL_ID_PATTERN.test(requestedUrlId)) {
@@ -249,7 +284,27 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         }
       }
       const recordId = supportsCustomUrlId ? requestedUrlId : (editing?.id ?? crypto.randomUUID());
-      if (requiresPrimary && !primary && !newPrimary) throw new Error('作品画像を選択してください。');
+      if (requiresPrimary && !primary && !editingBackAlley?.image && !newPrimary) throw new Error('作品画像を選択してください。');
+      if (kind === 'portfolio' && backAlley) {
+        if (editing) throw new Error('既存の表作品は裏路地へ変更できません。裏路地作品として新規追加してください。');
+        if (!BACK_ALLEY_ID_PATTERN.test(recordId)) throw new Error('URL IDは半角小文字の英数字とハイフンで入力してください。');
+        if (!newPrimary && (!editingBackAlley || editingBackAlley.r18 !== r18)) throw new Error('作品画像を選択してください。');
+        await saveBackAlleyPortfolio({
+          id: recordId,
+          previous: editingBackAlley ?? undefined,
+          title: form.title,
+          description: form.description,
+          tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+          publishedAt: fromTokyoInput(form.publishedAt),
+          featured: form.featured,
+          r18,
+          imageFile: newPrimary ?? undefined,
+        });
+        setNotice('Portfolioを保存しました。');
+        reset();
+        setMode('list');
+        return;
+      }
       const uploadedPrimary = newPrimary ? await uploadContentFiles(kind, recordId, [newPrimary], true) : [];
       uploaded.push(...uploadedPrimary);
       const resolvedPrimary = uploadedPrimary[0] ? { ...uploadedPrimary[0], alt: `${form.title}の画像` } : primary;
@@ -309,19 +364,41 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     }
   };
 
+  const removeBackAlley = async (item: FirebaseBackAlleyPortfolioItem) => {
+    if (!window.confirm(`「${item.title}」を削除しますか？`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteBackAlleyPortfolio(item);
+      setNotice('Portfolioを削除しました。');
+    } catch {
+      setError('削除できませんでした。');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (mode === 'list') return (
     <div className="admin-message-manager">
       <div className="admin-subpage-header"><h2>{labels[kind]}</h2><button type="button" onClick={onBack}>管理項目へ戻る</button></div>
       <section className="admin-message-list">
         <div className="admin-list-heading"><h3>登録済み{labels[kind]}</h3><button type="button" className="pixel-button" onClick={openNew}>新規追加</button></div>
         {notice ? <p className="form-success">{notice}</p> : null}{error ? <p className="form-error">{error}</p> : null}
-        {!items.length ? <p>Firebaseに登録されたデータはありません。コード内の既存データはここには表示されません。</p> : null}
-        {items.map((item) => {
-          const portfolioImage = kind === 'portfolio' ? (item as FirebasePortfolioItem).image : null;
+        {kind === 'portfolio' && !items.length && !backAlleyItems.length ? <p>Firebaseに登録されたデータはありません。コード内の既存データはここには表示されません。</p> : null}
+        {kind !== 'portfolio' && !items.length ? <p>Firebaseに登録されたデータはありません。コード内の既存データはここには表示されません。</p> : null}
+        {kind === 'portfolio' ? [...items, ...backAlleyItems].sort((a, b) => b.publishedAt.toMillis() - a.publishedAt.toMillis()).map((item) => {
+          const isBackAlley = 'r18' in item;
+          return <article key={`${isBackAlley ? 'back' : 'front'}-${item.id}`} className="admin-portfolio-list-item">
+            {isBackAlley ? item.image ? <ProtectedImage path={item.image.path} alt="" className="admin-portfolio-list-image" /> : null : <Image src={(item as FirebasePortfolioItem).image.url} alt="" width={56} height={56} className="admin-portfolio-list-image" unoptimized />}
+            <div className="admin-portfolio-list-labels">{isBackAlley ? <span>裏</span> : null}{isBackAlley && item.r18 ? <span>R18</span> : null}</div>
+            <time>{item.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</time>
+            <p>{item.title}</p>
+            <div><button type="button" onClick={() => isBackAlley ? openBackAlleyEdit(item) : openEdit(item)} disabled={busy}>編集</button><button type="button" onClick={() => void (isBackAlley ? removeBackAlley(item) : remove(item))} disabled={busy}>削除</button></div>
+          </article>;
+        }) : items.map((item) => {
           const diaryExcerpt = kind === 'diary' ? getDiaryListExcerpt(item as FirebaseDiaryEntry) : '';
           return (
-            <article key={item.id} className={portfolioImage ? 'admin-portfolio-list-item' : undefined}>
-              {portfolioImage ? <Image src={portfolioImage.url} alt="" width={56} height={56} className="admin-portfolio-list-image" unoptimized /> : null}
+            <article key={item.id}>
               <time>{item.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</time>
               {item.publishedAt.toMillis() > now ? <span className="admin-message-x-status">公開予約</span> : null}
               <p>{item.title}</p>
@@ -336,9 +413,9 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
 
   return (
     <div className="admin-message-manager">
-      <div className="admin-subpage-header"><h2>{editing ? `${labels[kind]}編集` : `新しい${labels[kind]}`}</h2><button type="button" onClick={() => { reset(); setMode('list'); }} disabled={busy || preparingPrimary}>一覧へ戻る</button></div>
+      <div className="admin-subpage-header"><h2>{editing || editingBackAlley ? `${labels[kind]}編集` : `新しい${labels[kind]}`}</h2><button type="button" onClick={() => { reset(); setMode('list'); }} disabled={busy || preparingPrimary}>一覧へ戻る</button></div>
       <form className="admin-message-form admin-content-form" onSubmit={submit}>
-        {supportsCustomUrlId ? <><label htmlFor="content-url-id">URL ID（/{kind === 'works' ? 'works' : 'portfolio'}/ の後ろ）</label><input id="content-url-id" value={form.urlId} maxLength={80} required autoCapitalize="none" spellCheck={false} onChange={(event) => update('urlId', event.target.value)} placeholder="my-new-item" /><p className="admin-content-thumbnail-note">半角小文字の英数字とハイフンを使用できます。変更すると以前のURLは使えなくなります。</p></> : null}
+        {supportsCustomUrlId ? <><label htmlFor="content-url-id">URL ID（/{kind === 'works' ? 'works' : 'portfolio'}/ の後ろ）</label><input id="content-url-id" value={form.urlId} maxLength={80} required disabled={Boolean(editingBackAlley)} autoCapitalize="none" spellCheck={false} onChange={(event) => update('urlId', event.target.value)} placeholder="my-new-item" /><p className="admin-content-thumbnail-note">半角小文字の英数字とハイフンを使用できます。変更すると以前のURLは使えなくなります。</p></> : null}
         <label htmlFor="content-title">タイトル</label><input id="content-title" value={form.title} maxLength={120} required onChange={(event) => update('title', event.target.value)} />
         {kind === 'portfolio' ? <><label htmlFor="content-description">説明</label><textarea id="content-description" value={form.description} rows={4} required onChange={(event) => update('description', event.target.value)} /></> : null}
         {supportsRichBody ? (
@@ -383,12 +460,14 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         {categoryOptions.length ? <><label htmlFor="content-category">カテゴリ</label><select id="content-category" value={form.category} required onChange={(event) => update('category', event.target.value)}><option value="">選択してください</option>{categoryOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></> : null}
         {kind === 'portfolio' || kind === 'works' ? <><label htmlFor="content-tags">タグ（カンマ区切り）</label><input id="content-tags" value={form.tags} onChange={(event) => update('tags', event.target.value)} /></> : null}
         <label htmlFor="content-published-at">公開日時（日本時間）</label><input id="content-published-at" type="datetime-local" value={form.publishedAt} required onChange={(event) => update('publishedAt', event.target.value)} />
-        <label htmlFor="content-primary">{kind === 'portfolio' ? '作品画像' : kind === 'diary' ? 'アイキャッチ（任意）' : 'サムネイル（任意）'}</label><input id="content-primary" type="file" accept="image/*" required={requiresPrimary && !primary} disabled={busy || preparingPrimary} onChange={(event) => void choosePrimary(event.target.files?.[0])} />
+        <label htmlFor="content-primary">{kind === 'portfolio' ? '作品画像' : kind === 'diary' ? 'アイキャッチ（任意）' : 'サムネイル（任意）'}</label><input id="content-primary" type="file" accept="image/*" required={requiresPrimary && !primary && !editingBackAlley?.image} disabled={busy || preparingPrimary} onChange={(event) => void choosePrimary(event.target.files?.[0])} />
         {kind !== 'portfolio' ? <p className="admin-content-thumbnail-note">アイキャッチ・サムネイルは16:9で中央トリミングして保存します。本文メディアは元画像のままです。</p> : null}
         {primary ? <div className="admin-media-row"><a href={primary.url} target="_blank" rel="noreferrer">登録済み画像</a><button type="button" onClick={() => removeExisting(primary)}>削除</button></div> : null}
+        {editingBackAlley?.image ? <ProtectedImage path={editingBackAlley.image.path} alt={editingBackAlley.image.alt} /> : null}
         {newPrimary ? <p>{preparingPrimary ? '画像を準備中…' : newPrimary.name}</p> : null}
+        {kind === 'portfolio' && !editing ? <><label className="admin-x-post-toggle"><input type="checkbox" checked={backAlley} onChange={(event) => { setBackAlley(event.target.checked); if (!event.target.checked) setR18(false); }} />裏路地作品にする</label><label className="admin-x-post-toggle"><input type="checkbox" checked={r18} onChange={(event) => { setR18(event.target.checked); if (event.target.checked) setBackAlley(true); }} />R18作品にする</label></> : null}
         {kind !== 'diary' ? <label className="admin-x-post-toggle"><input type="checkbox" checked={form.featured} onChange={(event) => update('featured', event.target.checked)} />注目表示</label> : null}
-        <details><summary>SEO設定（任意）</summary><div className="admin-content-seo"><label htmlFor="content-seo-title">SEOタイトル</label><input id="content-seo-title" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} /><label htmlFor="content-seo-description">SEO説明</label><textarea id="content-seo-description" rows={3} value={form.seoDescription} onChange={(event) => update('seoDescription', event.target.value)} /><label className="admin-x-post-toggle"><input type="checkbox" checked={form.noIndex} onChange={(event) => update('noIndex', event.target.checked)} />検索結果に掲載しない</label></div></details>
+        {!(kind === 'portfolio' && backAlley) ? <details><summary>SEO設定（任意）</summary><div className="admin-content-seo"><label htmlFor="content-seo-title">SEOタイトル</label><input id="content-seo-title" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} /><label htmlFor="content-seo-description">SEO説明</label><textarea id="content-seo-description" rows={3} value={form.seoDescription} onChange={(event) => update('seoDescription', event.target.value)} /><label className="admin-x-post-toggle"><input type="checkbox" checked={form.noIndex} onChange={(event) => update('noIndex', event.target.checked)} />検索結果に掲載しない</label></div></details> : null}
         {error ? <p className="form-error">{error}</p> : null}<div className="admin-form-actions"><button type="submit" className="pixel-button" disabled={busy || preparingPrimary}>{busy ? '保存中…' : preparingPrimary ? '画像を準備中…' : '保存'}</button></div>
       </form>
     </div>

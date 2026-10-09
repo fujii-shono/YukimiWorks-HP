@@ -155,7 +155,7 @@ npm run firebase:seed:bunny
 
 3. 成人確認済みのテストユーザーで`/back-alley/portfolio/bunny`を開き、`1.png`、ボタン、各ボタン選択後のフェードを確認します。成人未確認のユーザーには画像データを取得させません。
 
-本番へ登録する場合は、Firebase Admin SDK用の本番環境変数を`.env.local`へ設定し、Security Rulesをデプロイした後にだけ次を実行します。
+本番へ登録する場合は、Firebase Admin SDK用の本番環境変数をGit管理外の`.env.firebase-production`へ設定します。ローカル開発用の`.env.local`には本番用の値を入れません。Security Rulesをデプロイした後にだけ次を実行します。
 
 ```bash
 npm run firebase:publish:bunny

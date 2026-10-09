@@ -110,10 +110,28 @@ body:has(.back-alley-root) {
 .portfolio-preview-media > .portfolio-preview-thumb.r18-locked-cover { display: grid !important; place-items: center; font-size: 1.25rem; letter-spacing: 0.06em; }
 .retro-card-image.r18-locked-cover { display: grid; }
 .r18-detail-locked-cover { margin-bottom: 18px; }
-.back-alley-portfolio-detail > img { display: block; max-width: 100%; max-height: 75vh; margin: 0 auto 18px; object-fit: contain; }
+.back-alley-portfolio-detail {
+  --portfolio-detail-media-max-height: min(860px, calc(100dvh - 240px));
+}
+.back-alley-portfolio-detail > img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--portfolio-detail-media-max-height);
+  margin: 0 auto 18px;
+  object-fit: contain;
+}
 .protected-image-status { display: grid; min-height: 120px; place-items: center; background: #0b0a0e; color: #aaa0b0; }
 .two-choice-r18 { display: grid; gap: 14px; width: min(100%, 720px); margin: 0 auto 18px; }
-.two-choice-r18-scene { position: relative; width: 100%; aspect-ratio: 1829 / 2764; overflow: hidden; background: #fff; }
+.two-choice-r18-scene {
+  position: relative;
+  width: min(100%, calc((var(--portfolio-detail-media-max-height) - 104px) * 1829 / 2764));
+  margin: 0 auto;
+  aspect-ratio: 1829 / 2764;
+  overflow: hidden;
+  background: #fff;
+}
 .two-choice-r18-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; opacity: 1; }
 .two-choice-r18-initial { transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1); }
 .two-choice-r18-result { opacity: 0; pointer-events: none; }
@@ -1890,7 +1908,7 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .portfolio-html-shell-modal {
-  width: min(100%, calc((100vh - 200px) * var(--portfolio-html-width, 719) / var(--portfolio-html-height, 1200)));
+  width: min(100%, calc(var(--portfolio-media-max-height, calc(100dvh - 220px)) * var(--portfolio-html-width, 719) / var(--portfolio-html-height, 1200)));
   height: auto;
   aspect-ratio: var(--portfolio-html-aspect-ratio, 719 / 1200);
   max-width: 100%;
@@ -4981,6 +4999,7 @@ html:has(.acrylic-demo-page) body {
 }
 
 .portfolio-detail-panel {
+  --portfolio-media-max-height: min(860px, calc(100dvh - 260px));
   display: grid;
   gap: 22px;
 }
@@ -4995,18 +5014,33 @@ html:has(.acrylic-demo-page) body {
 }
 
 .portfolio-detail-image {
+  display: flex;
   width: 100%;
   max-width: 100%;
+  justify-content: center;
   margin: 0 auto;
 }
 
 .portfolio-detail-image .portfolio-media-image-modal {
-  max-height: none;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--portfolio-media-max-height);
 }
 
-.portfolio-detail-html {
-  width: min(100%, 960px);
+.portfolio-detail-html.portfolio-html-shell-modal {
+  width: min(100%, 960px, calc(var(--portfolio-media-max-height) * var(--portfolio-html-width, 719) / var(--portfolio-html-height, 1200)));
   margin: 0 auto;
+}
+
+.portfolio-detail-html.portfolio-html-shell-fit-height {
+  width: min(100%, 960px);
+}
+
+.portfolio-html-shell-fit-height.portfolio-html-shell-modal .portfolio-html-stage {
+  max-height: var(--portfolio-media-max-height, calc(100dvh - 220px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .portfolio-detail-body {
@@ -5184,7 +5218,7 @@ html:has(.acrylic-demo-page) body {
 .modal-panel {
   position: relative;
   width: min(98vw, 1680px);
-  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
   overflow: auto;
   box-sizing: border-box;
   padding: 20px;
@@ -5193,7 +5227,8 @@ html:has(.acrylic-demo-page) body {
 }
 
 .portfolio-modal-panel {
-  --portfolio-modal-media-max-height: calc(100vh - 220px);
+  --portfolio-modal-media-max-height: min(860px, calc(100dvh - 220px));
+  --portfolio-media-max-height: var(--portfolio-modal-media-max-height);
   width: min(98vw, 1680px);
 }
 
@@ -5438,7 +5473,7 @@ html:has(.acrylic-demo-page) body {
 
 .portfolio-modal-image-wrap {
   width: 100%;
-  max-height: min(var(--portfolio-modal-media-max-height), 860px);
+  max-height: var(--portfolio-modal-media-max-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5450,6 +5485,13 @@ html:has(.acrylic-demo-page) body {
   max-height: var(--portfolio-modal-media-max-height);
   background: #fff;
   object-fit: contain;
+}
+
+.portfolio-modal-image .portfolio-media-image-modal {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--portfolio-modal-media-max-height);
 }
 
 .portfolio-html-modal {
@@ -6685,7 +6727,7 @@ a.message-inline-link:focus-visible {
   }
 
   .portfolio-modal-panel {
-    --portfolio-modal-media-max-height: calc(100vh - 240px);
+    --portfolio-modal-media-max-height: min(860px, calc(100dvh - 240px));
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
     padding: 16px;

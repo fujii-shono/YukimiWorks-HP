@@ -12,6 +12,7 @@ import { TimeThemeProvider } from '@/components/theme/TimeThemeProvider';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { MessagePanel } from '@/components/ui/MessagePanel';
+import { getPortfolioNewsTitle } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { cn } from '@/lib/format';
 
@@ -56,7 +57,7 @@ function BackAlleyContent({ children }: { children: React.ReactNode }) {
   const { items } = useBackAlleyPortfolio();
   const latestUpdates: WhatsNewItem[] = items.slice(0, 3).map((item) => ({
     id: item.id,
-    title: item.title,
+    title: getPortfolioNewsTitle(item.title),
     date: formatTokyoDate(item.publishedAt.toDate()),
     href: `/back-alley/portfolio/${item.id}`,
   }));

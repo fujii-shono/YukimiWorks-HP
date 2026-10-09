@@ -233,12 +233,16 @@ const getPortfolioThumbnail = (item: (typeof portfolioItems)[number]) => {
   return item.content.thumbnail ?? '';
 };
 
+export function getPortfolioNewsTitle(title: string) {
+  return `ポートフォリオ「${title}」を追加しました`;
+}
+
 function createPortfolioNews(items: typeof portfolioItems): News[] {
   return items
   .filter((item) => Boolean(item.date))
   .map((item) => ({
     id: `portfolio-${item.id}`,
-    title: `ポートフォリオ「${item.title}」を追加しました`,
+    title: getPortfolioNewsTitle(item.title),
     date: item.date as string,
     category: 'other',
     thumbnail: getPortfolioThumbnail(item),

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { LoginEntryButton } from '@/components/auth/AccountControls';
+import { WhatsNewPanel, type WhatsNewItem } from '@/components/layout/WhatsNewPanel';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { MessagePanel } from '@/components/ui/MessagePanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
@@ -34,14 +35,7 @@ type CounterMilestone = {
   effect?: 'cracker';
 };
 
-type WhatsNewItem = {
-  id: string;
-  title: string;
-  date: string;
-  href: string;
-};
-
-function getLatestUpdates(now: Date | null) {
+function getLatestUpdates(now: Date | null): WhatsNewItem[] {
   const diaryUpdates: WhatsNewItem[] = now
     ? diaryEntries
         .filter((entry) => isDiaryPublished(entry, now))
@@ -53,7 +47,9 @@ function getLatestUpdates(now: Date | null) {
         }))
     : [];
 
-  return [...newsItems, ...diaryUpdates].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+  return [...newsItems.map((item) => ({ ...item, href: item.href ?? `/news/${item.id}` })), ...diaryUpdates]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
 }
 
 function formatCounterDisplay(value: number) {
@@ -333,36 +329,7 @@ export function Sidebar() {
         </nav>
       </section>
 
-      <section className="window-panel news-panel">
-        <h2 className="window-title">
-          <span className="title-deco" aria-hidden="true">
-            ❄
-          </span>
-          <Link href="/news" className="window-title-link">
-            What&apos;s New
-          </Link>
-          <span className="title-deco" aria-hidden="true">
-            ❄
-          </span>
-        </h2>
-        <div className="sidebar-content">
-          {latestNews.length > 0 ? (
-            latestNews.map((item) => (
-              <article className="news-item" key={item.id}>
-                <time dateTime={item.date}>{item.date.replaceAll('-', '/')}</time>
-                <p>
-                  <Link href={item.href ?? `/news/${item.id}`}>{item.title}</Link>
-                </p>
-              </article>
-            ))
-          ) : (
-            <p>更新情報はありません</p>
-          )}
-          <Link className="more-link" href="/news">
-            過去の更新履歴 &raquo;
-          </Link>
-        </div>
-      </section>
+      <WhatsNewPanel items={latestNews} historyHref="/news" LinkComponent={Link} />
 
       {pathname !== '/bokin' ? (
         <Link className="donation-sidebar-banner" href="/bokin" aria-label="募金ページへ移動する">
@@ -382,8 +349,8 @@ export function Sidebar() {
         </Link>
       ) : null}
 
-      <Link className="back-alley-entry-banner" href="/back-alley" aria-label="裏路地へ移動する" onClick={openBackAlley}>
-        裏路地
+      <Link className="back-alley-entry-banner" href="/back-alley" aria-label="裏ページへ移動する" onClick={openBackAlley}>
+        裏ページ
       </Link>
      
 
@@ -460,7 +427,7 @@ export function Sidebar() {
         <div className="modal-overlay" onMouseDown={() => setBackAlleyLoginOpen(false)}>
           <section className="modal-panel modal-panel-small" role="dialog" aria-modal="true" aria-labelledby="back-alley-login-title" onMouseDown={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setBackAlleyLoginOpen(false)}>×</button>
-            <h2 id="back-alley-login-title">裏路地</h2>
+            <h2 id="back-alley-login-title">裏ページ</h2>
             <p>この先の閲覧にはログインが必要です。</p>
             {!configured ? <p className="form-error">Firebaseが設定されていません。</p> : null}
             {authError ? <p className="form-error">{authError}</p> : null}
@@ -476,8 +443,8 @@ export function Sidebar() {
         <div className="modal-overlay" onMouseDown={() => setBackAlleyConfirmationOpen(false)}>
           <section className="modal-panel modal-panel-small" role="dialog" aria-modal="true" aria-labelledby="back-alley-confirm-title" onMouseDown={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setBackAlleyConfirmationOpen(false)}>×</button>
-            <h2 id="back-alley-confirm-title">裏路地へ入りますか？</h2>
-            <p>裏路地では少しニッチな作品を扱っています。大丈夫ですか？</p>
+            <h2 id="back-alley-confirm-title">裏ページへ入りますか？</h2>
+            <p>裏ページでは少しニッチな作品を扱っています。大丈夫ですか？</p>
             {backAlleyConfirmationError ? <p className="form-error">{backAlleyConfirmationError}</p> : null}
             <div className="back-alley-gate-actions">
               <button type="button" className="pixel-button" autoFocus disabled={backAlleyConfirmationSaving} onClick={confirmBackAlley}>{backAlleyConfirmationSaving ? '保存中…' : '大丈夫です'}</button>

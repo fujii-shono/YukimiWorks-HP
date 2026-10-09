@@ -11,12 +11,30 @@ function parseItem(snapshot: QueryDocumentSnapshot<DocumentData>, r18: boolean):
   const data = snapshot.data();
   if (typeof data.title !== 'string' || typeof data.description !== 'string' || !Array.isArray(data.tags) || !(data.publishedAt instanceof Timestamp)) return null;
   if (!data.image || data.image.type !== 'image' || typeof data.image.path !== 'string' || typeof data.image.alt !== 'string') return null;
+  const interaction = data.interaction?.type === 'two-choice'
+    && typeof data.interaction.prompt === 'string'
+    && typeof data.interaction.top?.label === 'string'
+    && typeof data.interaction.bottom?.label === 'string'
+    && data.interaction.top?.image?.type === 'image'
+    && typeof data.interaction.top.image.path === 'string'
+    && typeof data.interaction.top.image.alt === 'string'
+    && data.interaction.bottom?.image?.type === 'image'
+    && typeof data.interaction.bottom.image.path === 'string'
+    && typeof data.interaction.bottom.image.alt === 'string'
+    ? {
+        type: 'two-choice' as const,
+        prompt: data.interaction.prompt,
+        top: { label: data.interaction.top.label, image: data.interaction.top.image },
+        bottom: { label: data.interaction.bottom.label, image: data.interaction.bottom.image },
+      }
+    : undefined;
   return {
     id: snapshot.id,
     title: data.title,
     description: data.description,
     tags: data.tags.filter((tag: unknown): tag is string => typeof tag === 'string'),
     image: data.image,
+    interaction,
     r18,
     publishedAt: data.publishedAt,
     featured: data.featured === true,

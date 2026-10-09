@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { RestrictedLink } from '@/components/ui/RestrictedLink';
 
-export function Header({ homeHref = '/' }: { homeHref?: string }) {
+export function Header({ homeHref = '/', tagline: taglineOverride }: { homeHref?: string; tagline?: string }) {
   const { event, tagline, absent, canPeek, peekActive, triggerPeek, peekImageSrc, showPeekBubble } = useTimeTheme();
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -17,7 +17,7 @@ export function Header({ homeHref = '/' }: { homeHref?: string }) {
   const siteTitle = event === 'sleep-warning' ? 'はやく　寝ろ' : 'YukimiWorks';
   const headerDecorationIcon =
     event === 'lunch' ? '/icons/food/contents.png' : event === 'snack' ? '/icons/sweets/apps.png' : null;
-  const headerContent = <><h1 id="site-title">{siteTitle}</h1><p className="tagline">{tagline}</p></>;
+  const headerContent = <><h1 id="site-title">{siteTitle}</h1><p className="tagline">{taglineOverride ?? tagline}</p></>;
 
   const resetDrag = () => {
     startXRef.current = null;

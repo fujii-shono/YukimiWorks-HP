@@ -15,7 +15,7 @@ export function BackAlleyGate({ children }: { children: React.ReactNode }) {
   if (!firebaseUser) return (
     <main className="back-alley-gate">
       <section className="window-panel back-alley-gate-panel">
-        <h1 className="window-title">裏路地</h1>
+        <h1 className="window-title">裏ページ</h1>
         <p>この先の閲覧にはログインが必要です。</p>
         {!configured ? <p className="form-error">Firebaseが設定されていません。</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
@@ -30,8 +30,8 @@ export function BackAlleyGate({ children }: { children: React.ReactNode }) {
     <>
       <main className="back-alley-gate">
         <section className="window-panel back-alley-gate-panel" aria-labelledby="back-alley-confirm-title">
-        <h1 id="back-alley-confirm-title" className="window-title">裏路地へ入りますか？</h1>
-        <p>裏路地では少しニッチな作品を扱っています。大丈夫ですか？</p>
+        <h1 id="back-alley-confirm-title" className="window-title">裏ページへ入りますか？</h1>
+        <p>裏ページでは少しニッチな作品を扱っています。大丈夫ですか？</p>
         {confirmError ? <p className="form-error">{confirmError}</p> : null}
         <div className="back-alley-gate-actions">
           <button type="button" className="pixel-button" disabled={saving} onClick={() => {

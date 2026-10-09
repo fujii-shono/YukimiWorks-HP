@@ -5,7 +5,9 @@ import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { MessageBody } from '@/components/messages/MessageBody';
 import { PortfolioCardContent } from '@/components/ui/PortfolioCardContent';
+import { PortfolioDetailMeta } from '@/components/ui/PortfolioDetailMeta';
 import type { PortfolioItem } from '@/data/portfolio';
+import { formatJapaneseDate } from '@/lib/format';
 
 export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
   const [selected, setSelected] = useState<PortfolioItem | null>(null);
@@ -80,9 +82,7 @@ export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
               {detailsOpen ? (
                 <div className="portfolio-modal-body">
                   {selected.description ? <p className="modal-message"><MessageBody body={selected.description} /></p> : null}
-                  {selected.date || selected.year ? (
-                    <p className="card-meta portfolio-modal-date">{selected.date ?? String(selected.year)}</p>
-                  ) : null}
+                  <PortfolioDetailMeta date={selected.date ? formatJapaneseDate(selected.date) : selected.year ? String(selected.year) : undefined} tags={selected.tags} />
                   <div className="portfolio-modal-actions">
                     <Link href={selected.href} className="pixel-button portfolio-browser-link">
                       ブラウザで見る

@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["https://www.yukimi-works.co.jp"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]

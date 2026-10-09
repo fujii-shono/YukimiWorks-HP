@@ -1,4 +1,43 @@
-# 路地裏ページ・成人確認・非公開素材対応
+# 裏ページ・成人確認・非公開素材対応
+
+## 追加対応: R18作品「Bunny」の二択イラスト
+
+### 対応する仕様
+
+- 裏PortfolioのHTMLアートとゲームはコード管理する
+- R18画像は`protected/back-alley/r18/portfolio/{itemId}/`へ保存し、成人確認済みの裏ページユーザーだけが取得できる
+- ユーザー依頼: `bunny`作品をR18で登録し、初期画像`1.png`の下に「あなたの番だ。どちらを引く？」と「上」「下」の選択肢を表示する。選択時は初期画像を1.6秒でフェードアウトしてから、白背景上で`a.png`または`b.png`だけを1.6秒でフェードインする。選択後は「選び直す」だけを表示する
+
+### 実装方針
+
+- ローカルでは`private-content/`を開発専用Route Handler経由で直接読み込み、Firebase Storageへのアップロードを不要にする。本番では同じ作品データに保存した保護Firebase Storageパスだけから取得する
+- `backAlleyR18PortfolioItems/bunny`に主画像、二択インタラクション、作品情報を登録し、成人未確認者向けには既存の画像パスを含まない索引文書だけを登録する
+- 詳細画面では保護Storageから3画像をBlob URLとして取得し、初期画像から選択画像へ不透明度を切り替える。サムネイルは主画像`1.png`を使用し、R18作品のHome・Portfolioカードにはピンクの`r18`バッジを重ねる
+- 表裏Portfolioの詳細における日付・タグは共通コンポーネントで描画し、裏Portfolioでもリストの既定マーカーを出さない
+
+### 変更予定のファイルと理由
+
+- `scripts/register-bunny-r18.mjs`, `package.json`: ローカルEmulatorと本番に同じ作品データを登録するため
+- `lib/firebase/types.ts`, `lib/firebase/backAlley.ts`, `firestore.rules`: 二択作品メタデータを安全に保存・取得するため
+- `components/back-alley/ProtectedImage.tsx`, `components/back-alley/TwoChoiceR18Scene.tsx`, `app/back-alley/portfolio/[id]/page.tsx`, `app/globals.css`: 認可済み画像の読み込みと選択・フェード表示のため
+- `README.md`, `SPEC.md`: Bunnyの登録・表示仕様を記録するため
+
+### 影響範囲
+
+- 裏PortfolioのR18詳細ページと、その保護Storage登録フロー
+- `bunny`以外の通常・R18ポートフォリオは従来どおり単一画像を表示する
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Local Emulator Suiteで登録スクリプトを実行し、成人未確認時の画像非取得、成人確認後のサムネイル、選択ボタン、フェード切り替えを確認する
+
+### 懸念点・制約
+
+- 成人確認済みの閲覧者が画像を保存または撮影する行為は防止できない
+- 本番登録にはFirebase Admin SDKの本番環境変数が必要であり、今回のローカル登録とは分ける
 
 ## 追加対応: XへのGIF投稿
 
@@ -19,7 +58,7 @@
 
 ### 影響範囲
 
-- 通常・裏路地・R18メッセージのX画像投稿
+- 通常・裏ページ・R18メッセージのX画像投稿
 
 ### 検証方法
 
@@ -34,24 +73,24 @@
 ## 対応する仕様
 
 - `/back-alley` 配下に黒基調の専用Top・Portfolio・Messageを追加する
-- 未ログインで通常サイトの裏路地バナーを押した場合は、現在のページ上にログイン案内を表示する。直接アクセス時はログインを拒否した場合に`/`へ戻す
-- 通常サイトの裏路地バナー押下時に標準モーダルで裏路地のニッチな作品への確認を行い、`backAlleyConfirmed`へ保存してから遷移する。R18作品クリック時には別途`adultConfirmed`を確認する
-- 設定では裏路地確認を表示せず、「R18作品を表示する」チェックボックスで成人確認を変更できるようにする
+- 未ログインで通常サイトの裏ページバナーを押した場合は、現在のページ上にログイン案内を表示する。直接アクセス時はログインを拒否した場合に`/`へ戻す
+- 通常サイトの裏ページバナー押下時に標準モーダルで裏ページのニッチな作品への確認を行い、`backAlleyConfirmed`へ保存してから遷移する。R18作品クリック時には別途`adultConfirmed`を確認する
+- 設定では裏ページ確認を表示せず、「R18作品を表示する」チェックボックスで成人確認を変更できるようにする
 - 裏Portfolioは通常の裏作品とR18作品を分離し、未成人確認時はR18の黒塗り索引のみ表示する
 - 裏Messageでは表用と裏用を表示し、通常Messageでは表用だけを表示する
 - 既存Portfolio・Messageはすべて表用とし、初期の裏Portfolioは0件とする
-- 路地裏配下はSEOインデックス対象外とする
+- 裏ページ配下はSEOインデックス対象外とする
 
 ## 実装方針
 
 - 成人確認は画面表示だけでなくFirestore・Storage Rulesの読み取り条件にする
 - 裏Portfolioを`backAlleyPortfolioItems`、保護素材を`protected/back-alley/portfolio/{itemId}/`に分離する
-- Portfolio新規追加フォームとMessageフォームから、裏路地用・R18用の公開先を選択できるようにする
+- Portfolio新規追加フォームとMessageフォームから、裏ページ用・R18用の公開先を選択できるようにする
 - 保護画像に永続ダウンロードURLを保存せず、Firebase Storage SDKの認可付き取得からBlob URLを作る
 - Messageは`front | back-alley | r18`の保存先を分離し、未設定の既存データは`front`と解釈する
-- 裏路地用の共通フレームでTop・Portfolio・Messageのみメニュ表示する
-- 管理機能は共通コンポーネントとし、裏路地からは`/back-alley/admin`で裏路地レイアウトのまま表示する
-- 共通フレームのサイドバーへ、裏路地MessageパネルとCounterを追加する
+- 裏ページ用の共通フレームでTop・Portfolio・Messageのみメニュ表示する
+- 管理機能は共通コンポーネントとし、裏ページからは`/back-alley/admin`で裏ページレイアウトのまま表示する
+- 共通フレームのサイドバーへ、裏ページMessageパネルとCounterを追加する
 
 ## 変更予定ファイル
 
@@ -64,7 +103,7 @@
 
 ## 影響範囲
 
-- Firebaseユーザードキュメント、管理画面、Message、Security Rules、路地裏配下のSEO
+- Firebaseユーザードキュメント、管理画面、Message、Security Rules、裏ページ配下のSEO
 
 ## 検証方法
 
@@ -82,7 +121,7 @@
 
 - R18表示可否は管理者ロールではなく`adultConfirmed`だけで判定し、未確認時は一覧・直接URLともR18索引カードのみを取得する。
 - 裏HomeのPortfolioは通常作品・R18作品ともに注目設定された最大8件を表示し、R18作品は未確認時にも索引カードとして表示する。
-- 共通ヘッダーは遷移先を指定可能にし、裏路地内では`/back-alley`へ戻す。
+- 共通ヘッダーは遷移先を指定可能にし、裏ページ内では`/back-alley`へ戻す。
 - 通常ユーザー向けのR18作品データ・素材の読み取りRulesは成人確認を必須とする。管理画面の権限は維持し、公開画面では管理者も成人確認状態に従う。
 - 検証: lint、型チェック、production build。Firebase Rulesの反映後、未確認の通常ユーザーで一覧・直接URL・Storage取得が拒否されることを確認する。
 
@@ -91,7 +130,7 @@
 - 裏Homeの注目作品プレビューは通常Topと同じサムネイル寸法を使用する。
 - R18索引にはタイトルと説明だけを保持し、未確認時も表示する。画像パス・画像データは索引に含めず、成人確認後だけ取得する。
 - 裏HomeのPortfolio見出しと「その他の作品」は、表Homeと同じ導線で裏Portfolio一覧へ遷移させる。
-- モバイルでは裏路地バナーを天使の羽根募金バナーの直後に表示する。
+- モバイルでは裏ページバナーを天使の羽根募金バナーの直後に表示する。
 - 表裏のPortfolioカードとHomeプレビューは共通の表示コンポーネントを使用し、カード上は画像とタイトルだけを表示する。
 
 ---

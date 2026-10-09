@@ -12,6 +12,7 @@ yarn-error.log*
 !.env.example
 .firebase-data
 .firebase
+private-content/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log

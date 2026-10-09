@@ -8,6 +8,7 @@ import { portfolioItems } from '@/data/portfolio';
 import { siteConfig } from '@/data/siteConfig';
 import { formatJapaneseDate } from '@/lib/format';
 import { getAllPortfolioItems } from '@/lib/firebase/content.server';
+import { PortfolioDetailMeta } from '@/components/ui/PortfolioDetailMeta';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,19 +109,8 @@ export default async function PortfolioDetailPage({ params }: { params: { id: st
         </div>
         <div className="detail-body portfolio-detail-body">
           {item.description ? <PortfolioDescription value={item.description} /> : null}
-          {item.date || item.year ? (
-            <p className="card-meta portfolio-modal-date">{item.date ? formatJapaneseDate(item.date) : String(item.year)}</p>
-          ) : null}
+          <PortfolioDetailMeta date={item.date ? formatJapaneseDate(item.date) : item.year ? String(item.year) : undefined} tags={item.tags} />
         </div>
-        {item.tags?.length ? (
-          <div className="tag-list portfolio-detail-tags">
-            {item.tags.map((tag) => (
-              <span key={tag} className="tag-badge">
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
       </section>
     </SiteFrame>
   );

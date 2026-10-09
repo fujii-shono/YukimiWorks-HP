@@ -7,6 +7,8 @@
     "dev:firebase": "firebase emulators:exec --project demo-yukimiworks --only auth,firestore,storage \"npm run dev\"",
     "firebase:emulators": "node scripts/start-firebase-emulators.mjs",
     "firebase:cleanup": "node scripts/stop-firebase-emulators.mjs",
+    "firebase:seed:bunny": "node scripts/register-bunny-r18.mjs --emulator",
+    "firebase:publish:bunny": "node --env-file-if-exists=.env.local scripts/register-bunny-r18.mjs --production",
     "firebase:deploy:rules": "firebase deploy --only firestore:rules,storage",
     "build": "next build",
     "start": "next start",

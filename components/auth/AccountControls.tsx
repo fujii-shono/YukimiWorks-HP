@@ -162,7 +162,7 @@ export function AccountControls() {
   return (
     <>
       {!loading && firebaseUser && profile ? (
-        <div className="account-status" aria-label="ログイン中のアカウント情報">
+        <div className={`account-status${pathname.startsWith('/back-alley') ? ' back-alley-account-status' : ''}`} aria-label="ログイン中のアカウント情報">
           <span className="account-welcome">
             ようこそ {isAdmin ? '管理者' : ''}{profile.displayName}さん
           </span>
@@ -272,7 +272,7 @@ export function AccountControls() {
                               </button>
                             </div>
                             <div className="account-purchase-row">
-                              <span>夜チケット（夜の作品見放題）</span><span>1000円</span>
+                              <span>夜チケット（裏の作品見放題）</span><span>1000円</span>
                               <button type="button" disabled={purchasing !== null || hasNightTicket} onClick={() => void purchase('night-ticket', '夜チケット')}>
                                 {hasNightTicket ? '購入済み' : '購入'}
                               </button>

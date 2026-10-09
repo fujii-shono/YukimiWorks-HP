@@ -105,12 +105,26 @@ body:has(.back-alley-root) {
   text-decoration: none;
 }
 .back-alley-portfolio-preview-list { padding-bottom: 22px; }
+.back-alley-portfolio-preview-list .portfolio-preview-thumb { height: 84px; object-fit: cover; }
 .r18-locked-cover { display: grid; width: 100%; aspect-ratio: 1; overflow: hidden; place-items: center; color: #ff3838; background: var(--site-surface); font-size: clamp(1.5rem, 5vw, 3rem); font-weight: 700; letter-spacing: 0.1em; white-space: nowrap; }
-.portfolio-preview-item > .portfolio-preview-thumb.r18-locked-cover { display: grid !important; place-items: center; font-size: 1.25rem; letter-spacing: 0.06em; }
+.portfolio-preview-media > .portfolio-preview-thumb.r18-locked-cover { display: grid !important; place-items: center; font-size: 1.25rem; letter-spacing: 0.06em; }
 .retro-card-image.r18-locked-cover { display: grid; }
 .r18-detail-locked-cover { margin-bottom: 18px; }
 .back-alley-portfolio-detail > img { display: block; max-width: 100%; max-height: 75vh; margin: 0 auto 18px; object-fit: contain; }
 .protected-image-status { display: grid; min-height: 120px; place-items: center; background: #0b0a0e; color: #aaa0b0; }
+.two-choice-r18 { display: grid; gap: 14px; width: min(100%, 720px); margin: 0 auto 18px; }
+.two-choice-r18-scene { position: relative; width: 100%; aspect-ratio: 1829 / 2764; overflow: hidden; background: #fff; }
+.two-choice-r18-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; opacity: 1; }
+.two-choice-r18-initial { transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1); }
+.two-choice-r18-result { opacity: 0; pointer-events: none; }
+.two-choice-r18-scene.is-transitioning .two-choice-r18-initial { opacity: 0; }
+.two-choice-r18-scene.is-transitioning .two-choice-r18-result.is-visible { opacity: 1; transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1) 0.3s; }
+.two-choice-r18-controls { display: grid; justify-items: center; gap: 10px; padding: 12px; color: var(--site-text); background: var(--site-surface-soft); border: 1px solid var(--site-border); transition: opacity 420ms ease; }
+.two-choice-r18-controls p { margin: 0; font-weight: 700; }
+.two-choice-r18-controls > div { display: flex; gap: 10px; }
+.two-choice-r18-controls .pixel-button { min-width: 5rem; }
+.two-choice-r18-retry { display: flex; justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .two-choice-r18-initial, .two-choice-r18-scene.is-transitioning .two-choice-r18-result.is-visible, .two-choice-r18-controls { transition-duration: 1ms; } }
 .account-adult-setting { margin-top: 16px; padding: 12px; border: 1px dotted var(--site-dotted); }
 .account-adult-setting h3,
 .account-adult-setting p { margin: 0 0 8px; }
@@ -569,6 +583,19 @@ textarea {
 
 .account-welcome {
   overflow-wrap: anywhere;
+}
+
+.back-alley-account-status {
+  color: #f1f6ff;
+  background: #122854;
+  border-color: #7096dc;
+  box-shadow: 2px 2px 0 color-mix(in srgb, #4f72b4 70%, transparent);
+}
+
+.back-alley-account-status .account-settings-button {
+  color: #f1f6ff;
+  background: #172f5f;
+  border-color: #7096dc;
 }
 
 .account-item-icon {
@@ -1812,6 +1839,12 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   border-bottom: 1px solid var(--site-border);
   background: var(--site-surface-soft);
 }
+
+.portfolio-card-media,
+.portfolio-preview-media { position: relative; display: block; }
+.portfolio-card-media { width: 100%; }
+.portfolio-preview-media { width: min(100%, 84px); }
+.portfolio-r18-badge { position: absolute; z-index: 2; top: 5px; right: 5px; padding: 2px 5px; color: #8d174b; background: #ffb6d1; border: 1px solid #f06b9f; font-size: 0.72rem; font-weight: 700; line-height: 1; }
 
 .portfolio-preview-thumb {
   flex: 0 0 auto;
@@ -6716,6 +6749,15 @@ a.message-inline-link:focus-visible {
 
   .portfolio-preview-list .portfolio-media-shell-preview {
     width: 180px;
+  }
+
+  .portfolio-preview-media {
+    width: 180px;
+    max-width: none;
+  }
+
+  .back-alley-portfolio-preview-list .portfolio-preview-thumb {
+    height: 180px;
   }
 
   .portfolio-preview-title {

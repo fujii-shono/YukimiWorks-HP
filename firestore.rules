@@ -73,6 +73,36 @@ service cloud.firestore {
         && (images.size() < 4 || validImage(images[3]));
     }
 
+    function validBackAlleyPortfolioImage(image, itemId) {
+      return image is map
+        && image.keys().hasOnly(['type', 'path', 'alt'])
+        && image.type == 'image'
+        && image.path is string
+        && image.path.matches('protected/back-alley/r18/portfolio/' + itemId + '/.*')
+        && image.alt is string
+        && image.alt.size() <= 160;
+    }
+
+    function validTwoChoiceOption(option, itemId) {
+      return option is map
+        && option.keys().hasOnly(['label', 'image'])
+        && option.label is string
+        && option.label.size() >= 1
+        && option.label.size() <= 30
+        && validBackAlleyPortfolioImage(option.image, itemId);
+    }
+
+    function validTwoChoiceInteraction(interaction, itemId) {
+      return interaction is map
+        && interaction.keys().hasOnly(['type', 'prompt', 'top', 'bottom'])
+        && interaction.type == 'two-choice'
+        && interaction.prompt is string
+        && interaction.prompt.size() >= 1
+        && interaction.prompt.size() <= 120
+        && validTwoChoiceOption(interaction.top, itemId)
+        && validTwoChoiceOption(interaction.bottom, itemId);
+    }
+
     function validContentMedia(media) {
       return media is map
         && media.keys().hasOnly(['type', 'url', 'path', 'alt'])
@@ -198,16 +228,12 @@ service cloud.firestore {
     match /backAlleyR18PortfolioItems/{itemId} {
       allow read: if (isBackAlleyConfirmed() && isAdultConfirmed()) || isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['title', 'description', 'tags', 'image', 'r18', 'publishedAt', 'featured', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['title', 'description', 'tags', 'image', 'interaction', 'r18', 'publishedAt', 'featured', 'createdAt', 'updatedAt'])
         && request.resource.data.title is string
         && request.resource.data.description is string
         && request.resource.data.tags is list
-        && request.resource.data.image is map
-        && request.resource.data.image.keys().hasOnly(['type', 'path', 'alt'])
-        && request.resource.data.image.type == 'image'
-        && request.resource.data.image.path is string
-        && request.resource.data.image.path.matches('protected/back-alley/r18/portfolio/' + itemId + '/.*')
-        && request.resource.data.image.alt is string
+        && validBackAlleyPortfolioImage(request.resource.data.image, itemId)
+        && (!('interaction' in request.resource.data) || validTwoChoiceInteraction(request.resource.data.interaction, itemId))
         && request.resource.data.r18 == true
         && request.resource.data.publishedAt is timestamp
         && request.resource.data.featured is bool

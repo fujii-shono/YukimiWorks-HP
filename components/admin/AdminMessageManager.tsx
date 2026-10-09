@@ -397,7 +397,7 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
                 {message.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               </time>
               <p>{message.body}</p>
-              <span>{message.audience === 'r18' ? '裏路地 R18用' : message.audience === 'back-alley' ? '裏路地用' : '表用'}</span>
+              <span>{message.audience === 'r18' ? '裏ページ R18用' : message.audience === 'back-alley' ? '裏ページ用' : '表用'}</span>
               <span>
                 {message.images.length > 0 ? `画像 ${message.images.length}枚` : '画像なし'}
               </span>
@@ -450,7 +450,7 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
 
           <label className="admin-x-post-toggle" htmlFor="admin-message-back-alley">
             <input id="admin-message-back-alley" type="checkbox" checked={audience !== 'front'} onChange={(event) => setAudience(event.target.checked ? 'back-alley' : 'front')} />
-            裏路地用のメッセージにする
+            裏ページ用のメッセージにする
           </label>
           <label className="admin-x-post-toggle" htmlFor="admin-message-r18">
               <input id="admin-message-r18" type="checkbox" checked={audience === 'r18'} onChange={(event) => setAudience(event.target.checked ? 'r18' : 'back-alley')} />

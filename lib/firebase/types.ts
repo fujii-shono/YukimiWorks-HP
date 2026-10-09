@@ -59,6 +59,12 @@ export type FirebaseBackAlleyPortfolioItem = {
   description: string;
   tags: string[];
   image?: { type: 'image'; path: string; alt: string };
+  interaction?: {
+    type: 'two-choice';
+    prompt: string;
+    top: { label: string; image: { type: 'image'; path: string; alt: string } };
+    bottom: { label: string; image: { type: 'image'; path: string; alt: string } };
+  };
   r18: boolean;
   locked?: boolean;
   publishedAt: Timestamp;

@@ -155,7 +155,7 @@ export function QuickMessageComposer({ onClose, initialAudience = 'front' }: { o
 
           <label className="admin-x-post-toggle" htmlFor="quick-message-back-alley">
             <input id="quick-message-back-alley" type="checkbox" checked={audience !== 'front'} disabled={busy || savedWithXError} onChange={(event) => setAudience(event.target.checked ? 'back-alley' : 'front')} />
-            裏路地用のメッセージにする
+            裏ページ用のメッセージにする
           </label>
           <label className="admin-x-post-toggle" htmlFor="quick-message-r18">
             <input id="quick-message-r18" type="checkbox" checked={audience === 'r18'} disabled={busy || savedWithXError} onChange={(event) => setAudience(event.target.checked ? 'r18' : 'back-alley')} />

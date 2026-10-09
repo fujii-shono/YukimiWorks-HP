@@ -286,7 +286,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       const recordId = supportsCustomUrlId ? requestedUrlId : (editing?.id ?? crypto.randomUUID());
       if (requiresPrimary && !primary && !editingBackAlley?.image && !newPrimary) throw new Error('作品画像を選択してください。');
       if (kind === 'portfolio' && backAlley) {
-        if (editing) throw new Error('既存の表作品は裏路地へ変更できません。裏路地作品として新規追加してください。');
+        if (editing) throw new Error('既存の表作品は裏ページへ変更できません。裏ページ作品として新規追加してください。');
         if (!BACK_ALLEY_ID_PATTERN.test(recordId)) throw new Error('URL IDは半角小文字の英数字とハイフンで入力してください。');
         if (!newPrimary && (!editingBackAlley || editingBackAlley.r18 !== r18)) throw new Error('作品画像を選択してください。');
         await saveBackAlleyPortfolio({
@@ -465,7 +465,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         {primary ? <div className="admin-media-row"><a href={primary.url} target="_blank" rel="noreferrer">登録済み画像</a><button type="button" onClick={() => removeExisting(primary)}>削除</button></div> : null}
         {editingBackAlley?.image ? <ProtectedImage path={editingBackAlley.image.path} alt={editingBackAlley.image.alt} /> : null}
         {newPrimary ? <p>{preparingPrimary ? '画像を準備中…' : newPrimary.name}</p> : null}
-        {kind === 'portfolio' && !editing ? <><label className="admin-x-post-toggle"><input type="checkbox" checked={backAlley} onChange={(event) => { setBackAlley(event.target.checked); if (!event.target.checked) setR18(false); }} />裏路地作品にする</label><label className="admin-x-post-toggle"><input type="checkbox" checked={r18} onChange={(event) => { setR18(event.target.checked); if (event.target.checked) setBackAlley(true); }} />R18作品にする</label></> : null}
+        {kind === 'portfolio' && !editing ? <><label className="admin-x-post-toggle"><input type="checkbox" checked={backAlley} onChange={(event) => { setBackAlley(event.target.checked); if (!event.target.checked) setR18(false); }} />裏ページ作品にする</label><label className="admin-x-post-toggle"><input type="checkbox" checked={r18} onChange={(event) => { setR18(event.target.checked); if (event.target.checked) setBackAlley(true); }} />R18作品にする</label></> : null}
         {kind !== 'diary' ? <label className="admin-x-post-toggle"><input type="checkbox" checked={form.featured} onChange={(event) => update('featured', event.target.checked)} />注目表示</label> : null}
         {!(kind === 'portfolio' && backAlley) ? <details><summary>SEO設定（任意）</summary><div className="admin-content-seo"><label htmlFor="content-seo-title">SEOタイトル</label><input id="content-seo-title" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} /><label htmlFor="content-seo-description">SEO説明</label><textarea id="content-seo-description" rows={3} value={form.seoDescription} onChange={(event) => update('seoDescription', event.target.value)} /><label className="admin-x-post-toggle"><input type="checkbox" checked={form.noIndex} onChange={(event) => update('noIndex', event.target.checked)} />検索結果に掲載しない</label></div></details> : null}
         {error ? <p className="form-error">{error}</p> : null}<div className="admin-form-actions"><button type="submit" className="pixel-button" disabled={busy || preparingPrimary}>{busy ? '保存中…' : preparingPrimary ? '画像を準備中…' : '保存'}</button></div>

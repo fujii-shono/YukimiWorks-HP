@@ -107,6 +107,68 @@ role: user
 
 終了済みのFirestore Emulatorが孤立プロセスとして8080番ポートに残った場合、`npm run firebase:emulators`は起動前にそのプロセスだけを自動終了します。手動で孤立プロセスだけを回収する場合は`npm run firebase:cleanup`を使用してください。他の実行中プロセスが同じポートを使用している場合は、誤終了を避けるため自動終了せず、PIDとコマンドを表示します。
 
+## R18・有料作品の画像登録
+
+### 原本画像の配置場所
+
+R18作品と有料作品の原本画像は、公開ディレクトリの`public/`へ置かず、プロジェクトルートの`private-content/`で管理します。`private-content/`全体は`.gitignore`の対象であり、Next.jsから静的配信されません。
+
+作品ごとにURL IDと同じ名前のフォルダを作成します。第一回目のR18作品画像は、次の場所へ置いてください。
+
+```text
+private-content/back-alley/r18/portfolio/<作品ID>/main.webp
+```
+
+たとえばURL IDを`first-r18-work`にする場合は、`private-content/back-alley/r18/portfolio/first-r18-work/main.webp`です。JPEGまたはPNGを使用する場合は、実際の形式に合わせて拡張子を変更します。ファイル名は`main`を推奨しますが、管理画面から選択するため任意の名前でも登録できます。
+
+将来登録する有料作品の原本は、次の場所へ分けます。
+
+```text
+private-content/paid/portfolio/<作品ID>/main.webp
+```
+
+このフォルダは原本整理用であり、置いただけではサイトやFirebaseへ登録されません。画像ファイルをGitへ追加したり、`public/`へコピーしたり、Firebase StorageのURLをコードやFirestoreへ手入力したりしないでください。チーム間で原本を共有する場合は、Gitではなくアクセス制限された制作素材用ストレージを使用します。
+
+### R18作品をローカルで登録・確認する
+
+1. 前述の配置場所へ作品画像を置きます。
+2. `npm run firebase:emulators`と`npm run dev`を別ターミナルで起動します。一時データでよい場合は`npm run dev:firebase`でも確認できます。
+3. `http://localhost:3000`で疑似Googleユーザーを作成し、Emulator UIの`users/{uid}.role`を`admin`に変更します。
+4. `http://localhost:3000/back-alley/admin?section=portfolio`を開き、「新規追加」を押します。
+5. URL ID、タイトル、説明、タグ、公開日時を入力し、「作品画像」で`private-content/back-alley/r18/portfolio/<作品ID>/`の画像を選択します。
+6. 「R18作品にする」を有効にします。「裏ページ作品にする」も自動的に有効になります。
+7. 保存後、Storage Emulatorの`protected/back-alley/r18/portfolio/<作品ID>/`と、Firestore Emulatorの`backAlleyR18PortfolioItems/{作品ID}`に登録されたことを確認します。
+8. 一般ユーザーでR18表示を未許可にした状態では画像データが取得されず黒い`R18`表示になること、許可後だけ画像が表示されることを確認します。
+
+本番登録も同じ管理画面の手順を使用します。管理画面がランダムなファイル名で保護Storageへアップロードし、Firestoreには永続的な公開ダウンロードURLではなくStorageパスだけを保存するため、Firebase Consoleでの手動アップロードとURLのコピーは不要です。画像は1枚10MB以下の画像形式にしてください。
+
+### R18 HTML作品「Bunny」の登録
+
+`bunny`は、`1.png`をサムネイル・初期画像として表示するR18のコード管理作品です。画像下の「あなたの番だ。どちらを引く？」と`上`・`下`ボタンで`a.png`または`b.png`へ緩やかにクロスフェードし、選択後は「選び直す」だけを表示します。管理画面へ3枚を個別登録する必要はありません。ローカルでは画像をFirebase Storageへアップロードせず、開発専用の`/api/local-r18-assets/bunny/`から`private-content/`のファイルを直接読み込みます。この経路は本番では404になります。
+
+1. `private-content/back-alley/r18/portfolio/bunny/`に`1.png`、`a.png`、`b.png`を置きます。
+2. Emulatorを起動した状態で、次を実行します。
+
+```bash
+npm run firebase:seed:bunny
+```
+
+3. 成人確認済みのテストユーザーで`/back-alley/portfolio/bunny`を開き、`1.png`、ボタン、各ボタン選択後のフェードを確認します。成人未確認のユーザーには画像データを取得させません。
+
+本番へ登録する場合は、Firebase Admin SDK用の本番環境変数を`.env.local`へ設定し、Security Rulesをデプロイした後にだけ次を実行します。
+
+```bash
+npm run firebase:publish:bunny
+```
+
+このコマンドは3画像を`protected/back-alley/r18/portfolio/bunny/`へアップロードし、主画像と二択画像のStorageパスをR18作品文書へ保存します。本番では開発用経路を持たず、この保護Storageからだけ画像を取得します。画像URLは保存しません。
+
+### 有料作品を登録する前の注意
+
+有料作品の原本配置先は予約済みですが、現時点の管理画面には有料区分、購入条件、専用のStorage保存先・Security Rulesが未実装です。実装完了までは、有料作品を通常PortfolioやR18作品として代用登録しないでください。
+
+実装後はR18作品と同様に、管理画面で`private-content/paid/portfolio/<作品ID>/`の画像を選び、有料区分と購入条件を設定して保存する運用とします。保存先は`protected/paid/portfolio/<作品ID>/`とし、青チケットまたは対象作品の購入権限をサーバー側とSecurity Rulesの両方で確認できる状態になるまでは本番登録を行いません。
+
 ## Firebase 本番プロジェクト設定
 
 1. Firebase Console でプロジェクトを作成し、Webアプリを追加します。

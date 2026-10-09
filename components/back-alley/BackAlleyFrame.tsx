@@ -7,6 +7,7 @@ import { BackAlleyGate } from '@/components/back-alley/BackAlleyGate';
 import { useBackAlleyPortfolio } from '@/components/back-alley/useBackAlleyPortfolio';
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
+import { WhatsNewPanel, type WhatsNewItem } from '@/components/layout/WhatsNewPanel';
 import { TimeThemeProvider } from '@/components/theme/TimeThemeProvider';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
@@ -19,6 +20,17 @@ const menu = [
   { href: '/back-alley/portfolio', label: 'Portfolio' },
   { href: '/back-alley/messages', label: 'Message' },
 ];
+
+function formatTokyoDate(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
 
 function BackAlleyCounterPanel() {
   const { event, sleepMode } = useTimeTheme();
@@ -42,18 +54,24 @@ function BackAlleyCounterPanel() {
 function BackAlleyContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { items } = useBackAlleyPortfolio();
+  const latestUpdates: WhatsNewItem[] = items.slice(0, 3).map((item) => ({
+    id: item.id,
+    title: item.title,
+    date: formatTokyoDate(item.publishedAt.toDate()),
+    href: `/back-alley/portfolio/${item.id}`,
+  }));
   return (
       <div className="back-alley-root">
         <a className="skip-link" href="#back-alley-main">本文へ移動</a>
         <div className="page-shell">
-          <Header homeHref="/back-alley" />
+          <Header homeHref="/back-alley" tagline="裏ページへようこそ" />
           <div className="layout-grid">
-            <aside className="sidebar" aria-label="裏路地メニュー">
+            <aside className="sidebar" aria-label="裏ページメニュー">
               <section className="window-panel menu-panel"><h2 className="window-title">Menu</h2><nav className="sidebar-nav is-open">{menu.map((item) => {
                 const active = item.href === '/back-alley' ? pathname === item.href : pathname.startsWith(item.href);
                 return <Link key={item.href} href={item.href} className={cn('nav-link', active && 'active')}><span className="nav-mark">◇</span>{item.label}</Link>;
               })}</nav></section>
-              <section className="window-panel news-panel"><h2 className="window-title">What&apos;s New</h2><div className="sidebar-content">{items.slice(0, 3).map((item) => <article className="news-item" key={item.id}><time>{item.publishedAt.toDate().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</time><p><Link href={`/back-alley/portfolio/${item.id}`}>{item.title}</Link></p></article>)}{items.length === 0 ? <p>更新情報はありません</p> : null}</div></section>
+              <WhatsNewPanel items={latestUpdates} historyHref="/back-alley/portfolio" />
               <MessagePanel includeBackAlley href="/back-alley/messages" />
               <BackAlleyCounterPanel />
             </aside>

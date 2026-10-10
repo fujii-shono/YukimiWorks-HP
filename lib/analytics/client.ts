@@ -16,20 +16,24 @@ async function analyticsRequest(user: User, path: string, init?: RequestInit) {
   return payload;
 }
 
-export async function generateTrackingLink(user: User, destinationUrl: string) {
+export async function generateTrackingLink(
+  user: User,
+  destinationUrl: string,
+  options?: { kind: 'standalone'; label: string },
+) {
   return analyticsRequest(user, '/api/analytics/links', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ destinationUrl }),
+    body: JSON.stringify({ destinationUrl, ...options }),
   }) as Promise<{ token: string; destinationUrl: string; trackingUrl: string }>;
 }
 
-export async function getXTrafficStats(user: User) {
+export async function getTrafficStats(user: User) {
   const payload = (await analyticsRequest(user, '/api/analytics/x-traffic')) as { links: TrackingLinkStats[] };
   return payload.links;
 }
 
-export async function getXTrafficDetail(user: User, token: string, granularity: TrafficGranularity, anchor: string) {
+export async function getTrafficDetail(user: User, token: string, granularity: TrafficGranularity, anchor: string) {
   const params = new URLSearchParams({ token, granularity, anchor });
   const payload = (await analyticsRequest(user, `/api/analytics/x-traffic?${params}`)) as { detail: TrackingTrafficDetail };
   return payload.detail;

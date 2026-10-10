@@ -75,15 +75,6 @@ body:has(.back-alley-root) {
   background-size: 4px 4px !important;
 }
 
-.back-alley-gate {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  color: #e7e2eb;
-  background: #08080b;
-}
-.back-alley-gate-panel { width: min(520px, 100%); background: #15131a; border-color: #70677d; }
 .back-alley-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 20px; }
 .back-alley-gate-actions a,
 .back-alley-gate-actions button { min-height: 44px; padding: 9px 14px; }
@@ -133,16 +124,17 @@ body:has(.back-alley-root) {
   background: #fff;
 }
 .two-choice-r18-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; opacity: 1; }
-.two-choice-r18-initial { transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1); }
-.two-choice-r18-result { opacity: 0; pointer-events: none; }
-.two-choice-r18-scene.is-transitioning .two-choice-r18-initial { opacity: 0; }
-.two-choice-r18-scene.is-transitioning .two-choice-r18-result.is-visible { opacity: 1; transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1) 0.3s; }
+.two-choice-r18-initial { transition: opacity 1.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.two-choice-r18-result { opacity: 0; pointer-events: none; transition: opacity 1.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.two-choice-r18-scene.is-fading .two-choice-r18-initial,
+.two-choice-r18-scene.is-result .two-choice-r18-initial { opacity: 0; }
+.two-choice-r18-scene.is-result .two-choice-r18-result.is-visible { opacity: 1; }
 .two-choice-r18-controls { display: grid; justify-items: center; gap: 10px; padding: 12px; color: var(--site-text); background: var(--site-surface-soft); border: 1px solid var(--site-border); transition: opacity 420ms ease; }
 .two-choice-r18-controls p { margin: 0; font-weight: 700; }
 .two-choice-r18-controls > div { display: flex; gap: 10px; }
 .two-choice-r18-controls .pixel-button { min-width: 5rem; }
 .two-choice-r18-retry { display: flex; justify-content: center; }
-@media (prefers-reduced-motion: reduce) { .two-choice-r18-initial, .two-choice-r18-scene.is-transitioning .two-choice-r18-result.is-visible, .two-choice-r18-controls { transition-duration: 1ms; } }
+@media (prefers-reduced-motion: reduce) { .two-choice-r18-initial, .two-choice-r18-result, .two-choice-r18-controls { transition-duration: 1ms; } }
 .account-adult-setting { margin-top: 16px; padding: 12px; border: 1px dotted var(--site-dotted); }
 .account-adult-setting h3,
 .account-adult-setting p { margin: 0 0 8px; }
@@ -1165,6 +1157,88 @@ textarea {
   font-size: 0.82rem;
 }
 
+.traffic-kind-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.traffic-kind-tabs button {
+  min-height: 42px;
+  padding: 8px 12px;
+}
+
+.traffic-kind-tabs button[aria-selected='true'] {
+  color: #fff;
+  background: var(--site-accent);
+}
+
+.traffic-link-create-form {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px dotted var(--site-dotted);
+}
+
+.traffic-link-create-form h3,
+.traffic-link-create-form > p {
+  margin: 0;
+}
+
+.traffic-link-create-form h3 {
+  color: var(--site-accent);
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.traffic-link-create-form > p,
+.traffic-link-create-form label,
+.traffic-copy-notice {
+  color: var(--site-text-muted);
+  font-size: 0.78rem;
+}
+
+.traffic-link-create-form input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  color: var(--site-text);
+  background: var(--site-bg);
+  border: 1px solid var(--site-border);
+  font: inherit;
+}
+
+.traffic-link-create-form > button {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 8px 12px;
+}
+
+.traffic-created-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--site-surface-soft);
+  border: 1px solid var(--site-border);
+}
+
+.traffic-created-link span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+}
+
+.traffic-created-link button,
+.traffic-link-card-actions button {
+  padding: 5px 10px;
+}
+
+.traffic-copy-notice {
+  margin: 0;
+}
+
 .traffic-link-list {
   display: grid;
   gap: 14px;
@@ -1231,9 +1305,11 @@ textarea {
   font-size: 0.78rem;
 }
 
-.traffic-details-button {
+.traffic-link-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 12px;
-  padding: 5px 10px;
 }
 
 .traffic-trend {
@@ -6817,9 +6893,12 @@ a.message-inline-link:focus-visible {
     font-size: 0.7rem;
   }
 
-  .admin-image-grid,
-  .admin-section-grid {
+  .admin-image-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-section-grid {
+    grid-template-columns: 1fr;
   }
 
   .account-modal,
@@ -6853,6 +6932,11 @@ a.message-inline-link:focus-visible {
 
   .tracking-link-controls > div {
     grid-template-columns: 1fr;
+  }
+
+  .traffic-created-link {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .traffic-link-card > header {

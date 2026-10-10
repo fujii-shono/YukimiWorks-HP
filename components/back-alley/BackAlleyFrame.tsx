@@ -3,7 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { LoginEntryButton } from '@/components/auth/AccountControls';
+import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { BackAlleyGate } from '@/components/back-alley/BackAlleyGate';
+import { BackAlleyHomeContent } from '@/components/back-alley/BackAlleyHomeContent';
 import { useBackAlleyPortfolio } from '@/components/back-alley/useBackAlleyPortfolio';
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
@@ -52,8 +55,10 @@ function BackAlleyCounterPanel() {
   return <section className="window-panel counter-panel" aria-label="サイト情報"><h2 className="window-title"><span className="title-deco" aria-hidden="true">❄</span><span>Counter</span><span className="title-deco" aria-hidden="true">❄</span></h2><div className="counter-body"><div className="counter-digits" aria-label="装飾用カウンター">{count}</div><span className="counter-character-slot"><span className="pixel-tint-frame pixel-tint-frame-counter" style={{ '--pixel-mask': `url("${event === 'sleep-warning' ? '/effects/eyes.png' : characterSrc}")` } as React.CSSProperties}><SleepWarningImage src={characterSrc} alt="YukimiWorksのミニキャラクター" width={37} height={45} className={cn('tiny-character pixel-image tinted-pixel-art', event !== 'sleep-warning' && 'pixel-art-silhouette')} unoptimized draggable={false} /></span></span></div><p>Since {siteConfig.since}</p></section>;
 }
 
-function BackAlleyContent({ children }: { children: React.ReactNode }) {
+function BackAlleyContent({ children, forceHome = false }: { children: React.ReactNode; forceHome?: boolean }) {
   const pathname = usePathname();
+  const activePathname = forceHome ? '/back-alley' : pathname;
+  const { profile } = useFirebaseAuth();
   const { items } = useBackAlleyPortfolio();
   const latestUpdates: WhatsNewItem[] = items.slice(0, 3).map((item) => ({
     id: item.id,
@@ -68,8 +73,9 @@ function BackAlleyContent({ children }: { children: React.ReactNode }) {
           <Header homeHref="/back-alley" tagline="裏ページへようこそ" />
           <div className="layout-grid">
             <aside className="sidebar" aria-label="裏ページメニュー">
+              {profile?.role === 'admin' ? <LoginEntryButton /> : null}
               <section className="window-panel menu-panel"><h2 className="window-title">Menu</h2><nav className="sidebar-nav is-open">{menu.map((item) => {
-                const active = item.href === '/back-alley' ? pathname === item.href : pathname.startsWith(item.href);
+                const active = item.href === '/back-alley' ? activePathname === item.href : activePathname.startsWith(item.href);
                 return <Link key={item.href} href={item.href} className={cn('nav-link', active && 'active')}><span className="nav-mark">◇</span>{item.label}</Link>;
               })}</nav></section>
               <WhatsNewPanel items={latestUpdates} historyHref="/back-alley/portfolio" />
@@ -86,5 +92,6 @@ function BackAlleyContent({ children }: { children: React.ReactNode }) {
 }
 
 export function BackAlleyFrame({ children }: { children: React.ReactNode }) {
-  return <TimeThemeProvider><BackAlleyGate><BackAlleyContent>{children}</BackAlleyContent></BackAlleyGate></TimeThemeProvider>;
+  const background = <BackAlleyContent forceHome><BackAlleyHomeContent /></BackAlleyContent>;
+  return <TimeThemeProvider><BackAlleyGate background={background}><BackAlleyContent>{children}</BackAlleyContent></BackAlleyGate></TimeThemeProvider>;
 }

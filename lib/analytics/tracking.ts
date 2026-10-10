@@ -20,7 +20,12 @@ export function isTrackingToken(token: string) {
   return TOKEN_PATTERN.test(token);
 }
 
-export async function createTrackingLink(rawDestination: string, adminUid: string, requestOrigin?: string) {
+type CreateTrackingLinkOptions = {
+  kind?: 'message' | 'standalone';
+  label?: string;
+};
+
+export async function createTrackingLink(rawDestination: string, adminUid: string, requestOrigin?: string, options: CreateTrackingLinkOptions = {}) {
   const siteUrl = publicSiteUrl(requestOrigin);
   let destination: URL;
   try {
@@ -34,8 +39,14 @@ export async function createTrackingLink(rawDestination: string, adminUid: strin
 
   const token = randomBytes(16).toString('base64url');
   const trackingUrl = new URL(`/go/${token}`, siteUrl).toString();
+  const kind = options.kind === 'standalone' ? 'standalone' : 'message';
+  const label = options.label?.trim();
+  if (kind === 'standalone' && !label) throw new Error('表示名を入力してください。');
+  if (label && label.length > 80) throw new Error('表示名は80文字以内で入力してください。');
   const { db } = getFirebaseAdminServices();
   await db.collection('trackingLinks').doc(token).create({
+    kind,
+    label: label || null,
     destinationUrl: destination.toString(),
     trackingUrl,
     createdBy: adminUid,
@@ -205,8 +216,10 @@ export async function getTrackingStats(): Promise<TrackingLinkStats[]> {
       const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(0).toISOString();
       return {
         token: link.id,
+        kind: data.kind === 'standalone' ? 'standalone' : 'message',
         destinationUrl: typeof data.destinationUrl === 'string' ? data.destinationUrl : '',
         trackingUrl: typeof data.trackingUrl === 'string' ? data.trackingUrl : '',
+        label: typeof data.label === 'string' ? data.label : undefined,
         messageId,
         messageBody: messageId ? messageBodies.get(messageId) : undefined,
         totalVisitors: Number(data.totalVisitors) || 0,

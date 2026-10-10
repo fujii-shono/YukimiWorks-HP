@@ -16,8 +16,10 @@ export type TrackingTrafficDetail = {
 
 export type TrackingLinkStats = {
   token: string;
+  kind: 'message' | 'standalone';
   destinationUrl: string;
   trackingUrl: string;
+  label?: string;
   messageId?: string;
   messageBody?: string;
   totalVisitors: number;

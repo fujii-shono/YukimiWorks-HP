@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
-import { getXTrafficDetail, getXTrafficStats } from '@/lib/analytics/client';
+import { generateTrackingLink, getTrafficDetail, getTrafficStats } from '@/lib/analytics/client';
 import type { TrackingLinkStats, TrackingTrafficDetail, TrafficGranularity, TrafficPoint } from '@/lib/analytics/types';
 
 function tokyoAnchor(granularity: TrafficGranularity) {
@@ -71,6 +71,7 @@ function TrafficChart({ points, label }: { points: TrafficPoint[]; label: string
 
 export function AdminTrafficAnalytics({ onBack }: { onBack: () => void }) {
   const { firebaseUser } = useFirebaseAuth();
+  const [activeTab, setActiveTab] = useState<'message' | 'standalone'>('message');
   const [links, setLinks] = useState<TrackingLinkStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,12 +81,18 @@ export function AdminTrafficAnalytics({ onBack }: { onBack: () => void }) {
   const [detail, setDetail] = useState<TrackingTrafficDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [label, setLabel] = useState('');
+  const [destinationUrl, setDestinationUrl] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createdTrackingUrl, setCreatedTrackingUrl] = useState<string | null>(null);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!firebaseUser) return;
     let active = true;
     setLoading(true);
-    void getXTrafficStats(firebaseUser)
+    void getTrafficStats(firebaseUser)
       .then((nextLinks) => {
         if (active) setLinks(nextLinks);
       })
@@ -106,7 +113,7 @@ export function AdminTrafficAnalytics({ onBack }: { onBack: () => void }) {
     setDetailLoading(true);
     setDetailError(null);
     setDetail(null);
-    void getXTrafficDetail(firebaseUser, selectedLink.token, granularity, anchor)
+    void getTrafficDetail(firebaseUser, selectedLink.token, granularity, anchor)
       .then((nextDetail) => {
         if (active) setDetail(nextDetail);
       })
@@ -147,6 +154,39 @@ export function AdminTrafficAnalytics({ onBack }: { onBack: () => void }) {
   };
 
   const maxAnchor = tokyoAnchor(granularity);
+  const visibleLinks = links.filter((link) => link.kind === activeTab);
+
+  const createStandaloneLink = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!firebaseUser) return;
+    setCreating(true);
+    setCreateError(null);
+    setCreatedTrackingUrl(null);
+    setCopyNotice(null);
+    try {
+      const created = await generateTrackingLink(firebaseUser, destinationUrl, {
+        kind: 'standalone',
+        label,
+      });
+      setLinks(await getTrafficStats(firebaseUser));
+      setCreatedTrackingUrl(created.trackingUrl);
+      setLabel('');
+      setDestinationUrl('');
+    } catch (createLinkError) {
+      setCreateError(createLinkError instanceof Error ? createLinkError.message : '分析用リンクを作成できませんでした。');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const copyTrackingUrl = async (trackingUrl: string) => {
+    try {
+      await navigator.clipboard.writeText(trackingUrl);
+      setCopyNotice('計測URLをコピーしました。');
+    } catch {
+      setCopyNotice('コピーできませんでした。URLを選択してコピーしてください。');
+    }
+  };
 
   return (
     <div className="admin-traffic-analytics">
@@ -155,21 +195,42 @@ export function AdminTrafficAnalytics({ onBack }: { onBack: () => void }) {
         <button type="button" onClick={onBack}>管理項目へ戻る</button>
       </div>
       <p className="traffic-analytics-note">人数は匿名Cookieによるブラウザ単位の概算です。同じ期間内の再訪問と主要なBotは除外します。</p>
+      <div className="traffic-kind-tabs" role="tablist" aria-label="分析対象">
+        <button type="button" role="tab" aria-selected={activeTab === 'message'} onClick={() => setActiveTab('message')}>メッセージ</button>
+        <button type="button" role="tab" aria-selected={activeTab === 'standalone'} onClick={() => setActiveTab('standalone')}>分析用リンク</button>
+      </div>
+      {activeTab === 'standalone' ? (
+        <form className="traffic-link-create-form" onSubmit={createStandaloneLink}>
+          <h3>分析用リンクを追加</h3>
+          <p>X、Instagram、Discordなど、共有先ごとに専用URLを作成できます。</p>
+          <label htmlFor="traffic-link-label">表示名</label>
+          <input id="traffic-link-label" value={label} maxLength={80} required disabled={creating} onChange={(event) => setLabel(event.target.value)} placeholder="10月のInstagramプロフィール" />
+          <label htmlFor="traffic-link-destination">リンク先URL</label>
+          <input id="traffic-link-destination" type="url" value={destinationUrl} required disabled={creating} onChange={(event) => setDestinationUrl(event.target.value)} placeholder="https://yukimiworks.com/works/..." />
+          <button type="submit" className="pixel-button" disabled={creating}>{creating ? '生成中…' : '分析用リンクを生成'}</button>
+          {createError ? <p className="form-error" role="alert">{createError}</p> : null}
+          {createdTrackingUrl ? <div className="traffic-created-link" role="status"><span>{createdTrackingUrl}</span><button type="button" onClick={() => void copyTrackingUrl(createdTrackingUrl)}>コピー</button></div> : null}
+          {copyNotice ? <p className="traffic-copy-notice" role="status">{copyNotice}</p> : null}
+        </form>
+      ) : null}
       {loading ? <p>分析データを読み込んでいます…</p> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      {!loading && !error && links.length === 0 ? <p>計測リンクはまだありません。</p> : null}
+      {!loading && !error && visibleLinks.length === 0 ? <p>{activeTab === 'message' ? 'メッセージの計測リンクはまだありません。' : '分析用リンクはまだありません。'}</p> : null}
       <div className="traffic-link-list">
-        {links.map((link) => (
+        {visibleLinks.map((link) => (
           <article className="traffic-link-card" key={link.token}>
             <header>
               <div>
-                <p className="traffic-link-message">{link.messageBody || '投稿前または投稿との関連付け前のリンク'}</p>
+                <p className="traffic-link-message">{link.kind === 'standalone' ? link.label : link.messageBody || '投稿前または投稿との関連付け前のリンク'}</p>
                 <a href={link.destinationUrl} target="_blank" rel="noopener noreferrer">{link.destinationUrl}</a>
                 <p className="traffic-tracking-url">計測URL: {link.trackingUrl}</p>
               </div>
               <p className="traffic-total"><strong>{link.totalVisitors}</strong><span>人訪問</span></p>
             </header>
-            <button type="button" className="traffic-details-button" onClick={() => openDetail(link)}>詳細を見る</button>
+            <div className="traffic-link-card-actions">
+              <button type="button" onClick={() => void copyTrackingUrl(link.trackingUrl)}>計測URLをコピー</button>
+              <button type="button" className="traffic-details-button" onClick={() => openDetail(link)}>詳細を見る</button>
+            </div>
           </article>
         ))}
       </div>

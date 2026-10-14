@@ -171,6 +171,48 @@
 
 ---
 
+## 追加対応: 裏Portfolio詳細のOGP画像
+
+### 対応する仕様
+
+- 非R18の裏Portfolio詳細は、登録した作品画像をOGP画像に使用する
+- R18の裏Portfolio詳細は、作品画像を公開せず黒背景の中央にR18バッジを表示する
+- 裏ページのnoindexを維持する
+
+### 実装方針
+
+- Firebase Admin SDKで公開済み文書の区分とOGP用情報だけをサーバー側で解決する
+- 非R18は通常裏作品コレクションの画像だけをOGP専用Route Handlerから応答する
+- R18は画像パスを持たない索引だけを参照し、共通のR18画像をサーバーで生成する
+- クライアント描画の詳細ページは変更せず、同一ルートのlayoutから個別メタデータを追加する
+
+### 変更予定のファイルと理由
+
+- `SPEC.md`, `plan.md`: OGPの公開区分と実装計画を記録するため
+- `lib/firebase/backAlley.server.ts`: 通常裏作品とR18索引を安全に切り分けるため
+- `app/back-alley/portfolio/[id]/layout.tsx`: 作品別のOGP・Xカード・noindexを生成するため
+- `app/api/og/back-alley/portfolio/[id]/route.ts`: 非R18の登録画像またはR18共通画像を返すため
+
+### 影響範囲
+
+- `/back-alley/portfolio/[id]`のHTMLメタデータとOGP画像取得用API
+- 裏Portfolio本体の認証、画面表示、Storage Rulesは維持する
+
+### 検証方法
+
+- 非R18で登録画像、R18で共通黒画像のURLがメタデータに設定されることを確認する
+- R18用応答がR18 Storageの画像を読まないことを差分とコードパスで確認する
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+
+### 懸念点・制約
+
+- OGPはクローラから取得できる必要があるため、非R18の登録画像はOGP専用URLで公開応答する
+- Firebase Admin SDKの設定がない環境では実データの応答は確認できない
+
+---
+
 ## 追加対応: URL ID未入力時の自動採番
 
 ### 対応する仕様

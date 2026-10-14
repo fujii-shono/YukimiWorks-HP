@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ProtectedImage } from '@/components/back-alley/ProtectedImage';
+import { BackAlleyPortfolioImage } from '@/components/back-alley/BackAlleyPortfolioImage';
 import { useBackAlleyPortfolio } from '@/components/back-alley/useBackAlleyPortfolio';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { R18Gate } from '@/components/back-alley/R18Gate';
@@ -18,6 +18,6 @@ export default function BackAlleyPortfolioDetail({ params }: { params: { id: str
   if (!item.image) return <RetroPanel title="Portfolio"><p>作品を表示できません。</p></RetroPanel>;
   const media = item.interaction?.type === 'two-choice'
     ? <TwoChoiceR18Scene image={item.image} interaction={item.interaction} />
-    : <ProtectedImage path={item.image.path} alt={item.image.alt} />;
+    : <BackAlleyPortfolioImage path={item.image.path} alt={item.image.alt} title={item.title} />;
   return <RetroPanel title={item.title}><article className="back-alley-portfolio-detail">{media}{item.description ? <p>{item.description}</p> : null}<PortfolioDetailMeta date={formatJapaneseDateObject(item.publishedAt.toDate())} tags={item.tags} /><Link href="/back-alley/portfolio">一覧へ戻る</Link></article></RetroPanel>;
 }

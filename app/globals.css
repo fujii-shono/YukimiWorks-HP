@@ -113,6 +113,9 @@ body:has(.back-alley-root) {
   margin: 0 auto 18px;
   object-fit: contain;
 }
+.back-alley-portfolio-image-button { display: block; width: 100%; margin: 0 0 18px; padding: 0; color: inherit; background: transparent; border: 0; cursor: zoom-in; }
+.back-alley-portfolio-image-button > img { display: block; width: auto; height: auto; max-width: 100%; max-height: var(--portfolio-detail-media-max-height); margin: 0 auto; object-fit: contain; }
+.back-alley-portfolio-image-button:focus-visible { outline: 2px solid var(--site-focus); outline-offset: 4px; }
 .protected-image-status { display: grid; min-height: 120px; place-items: center; background: #0b0a0e; color: #aaa0b0; }
 .two-choice-r18 { display: grid; gap: 14px; width: min(100%, 720px); margin: 0 auto 18px; }
 .two-choice-r18-scene {
@@ -6399,7 +6402,7 @@ a.message-inline-link:focus-visible {
 .messages-image-modal {
   position: relative;
   width: min(860px, 100%);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
   background: var(--site-surface);
   border: 1px solid var(--site-border);
@@ -6427,7 +6430,7 @@ a.message-inline-link:focus-visible {
   display: block;
   width: 100%;
   height: auto;
-  max-height: calc(100vh - 190px);
+  max-height: calc(100dvh - 190px);
   object-fit: contain;
   background: color-mix(in srgb, var(--site-surface-soft) 80%, black);
 }
@@ -6439,6 +6442,59 @@ a.message-inline-link:focus-visible {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.75;
+}
+
+.messages-image-modal-details {
+  clear: both;
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px 22px;
+}
+
+.messages-image-modal-details h3,
+.messages-image-modal-details p {
+  margin: 0;
+}
+
+.messages-image-modal-details h3 {
+  color: var(--site-accent);
+  font-family: var(--font-pixel);
+  font-size: 1.15rem;
+  font-weight: 400;
+}
+
+.messages-image-modal-details p {
+  padding: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+
+.portfolio-image-modal .portfolio-modal-actions {
+  margin-top: 0;
+}
+
+.portfolio-image-modal-image-only {
+  width: min(1400px, 100%);
+}
+
+.portfolio-image-modal-image-only .messages-image-modal-image {
+  max-height: calc(100dvh - 72px);
+}
+
+.portfolio-detail-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: zoom-in;
+}
+
+.portfolio-detail-image-button:focus-visible {
+  outline: 2px solid var(--site-focus);
+  outline-offset: 4px;
 }
 
 .enacted-date {
@@ -6692,11 +6748,11 @@ a.message-inline-link:focus-visible {
   }
 
   .messages-image-modal {
-    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
   }
 
   .messages-image-modal-image {
-    max-height: calc(100vh - 170px);
+    max-height: calc(100dvh - 170px);
   }
 
   .counter-panel {

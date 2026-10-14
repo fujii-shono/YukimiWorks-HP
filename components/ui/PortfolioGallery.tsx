@@ -1,99 +1,16 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
-import { MessageBody } from '@/components/messages/MessageBody';
 import { PortfolioCardContent } from '@/components/ui/PortfolioCardContent';
-import { PortfolioDetailMeta } from '@/components/ui/PortfolioDetailMeta';
 import type { PortfolioItem } from '@/data/portfolio';
-import { formatJapaneseDate } from '@/lib/format';
 
 export function PortfolioGallery({ items }: { items: PortfolioItem[] }) {
-  const [selected, setSelected] = useState<PortfolioItem | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-
-  useEffect(() => {
-    if (!selected) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelected(null);
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selected]);
-
-  useEffect(() => {
-    setDetailsOpen(false);
-  }, [selected]);
-
-  useEffect(() => {
-    if (!selected) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [selected]);
-
-  useEffect(() => {
-    if (selected && !items.some((item) => item.id === selected.id)) setSelected(null);
-  }, [items, selected]);
-
   return (
-    <>
-      <div className="card-grid">
-        {items.map((item) => (
-          <button key={item.id} type="button" className="retro-card retro-card-button portfolio-card" onClick={() => setSelected(item)}>
-            <PortfolioCardContent media={<PortfolioMedia item={item} variant="card" className="portfolio-card-image" />} title={item.title} />
-          </button>
-        ))}
-      </div>
-      {selected ? (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={selected.title} onClick={() => setSelected(null)}>
-          <div className="modal-panel portfolio-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setSelected(null)} aria-label="閉じる">
-              ×
-            </button>
-            <div className="portfolio-modal-content">
-              <div className="portfolio-modal-image-wrap">
-                {/* HTML作品に画像用の `width: auto` / `max-width` を流用すると、モーダル幅が内容に引っ張られて縮む。
-                    画像と HTML でサイズ制御を分け、モーダルの幅は親が決める。 */}
-                <PortfolioMedia
-                  item={selected}
-                  variant="modal"
-                  className={selected.content.kind === 'image' ? 'modal-image portfolio-modal-image' : 'portfolio-html-modal'}
-                />
-              </div>
-              <div className="portfolio-modal-title-row">
-                <h3>{selected.title}</h3>
-                <button
-                  type="button"
-                  className="portfolio-accordion-toggle"
-                  aria-expanded={detailsOpen}
-                  onClick={() => setDetailsOpen((value) => !value)}
-                >
-                  ▼
-                </button>
-              </div>
-              {detailsOpen ? (
-                <div className="portfolio-modal-body">
-                  {selected.description ? <p className="modal-message"><MessageBody body={selected.description} /></p> : null}
-                  <PortfolioDetailMeta date={selected.date ? formatJapaneseDate(selected.date) : selected.year ? String(selected.year) : undefined} tags={selected.tags} />
-                  <div className="portfolio-modal-actions">
-                    <Link href={selected.href} className="pixel-button portfolio-browser-link">
-                      ブラウザで見る
-                    </Link>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </>
+    <div className="card-grid">
+      {items.map((item) => (
+        <Link key={item.id} href={item.href} className="retro-card portfolio-card">
+          <PortfolioCardContent media={<PortfolioMedia item={item} variant="card" className="portfolio-card-image" />} title={item.title} />
+        </Link>
+      ))}
+    </div>
   );
 }

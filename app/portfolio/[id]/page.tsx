@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Fragment } from 'react';
 import { notFound } from 'next/navigation';
-import { PortfolioMedia } from '@/components/portfolio/PortfolioMedia';
+import { PortfolioDetailMedia } from '@/components/portfolio/PortfolioDetailMedia';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { portfolioItems } from '@/data/portfolio';
@@ -101,11 +101,7 @@ export default async function PortfolioDetailPage({ params }: { params: { id: st
           <hr />
         </div>
         <div className="portfolio-detail-media">
-          <PortfolioMedia
-            item={item}
-            variant="modal"
-            className={item.content.kind === 'image' ? 'portfolio-detail-image' : 'portfolio-detail-html'}
-          />
+          <PortfolioDetailMedia item={item} />
         </div>
         <div className="detail-body portfolio-detail-body">
           {item.description ? <PortfolioDescription value={item.description} /> : null}

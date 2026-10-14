@@ -266,13 +266,21 @@ export function AccountControls() {
                           <h3>チケット購入</h3>
                           <div className="account-purchase-list">
                             <div className="account-purchase-row">
-                              <span>青チケット（有料作品見放題+コイン30枚）</span><span>500円</span>
+                              <span className="account-purchase-label">
+                                <Image src="/icons/user/blue-ticket.png" alt="" width={16} height={16} className="account-item-icon pixel-image" unoptimized />
+                                <span>青チケット（有料作品見放題+コイン30枚）</span>
+                              </span>
+                              <span>500円</span>
                               <button type="button" disabled={purchasing !== null || hasBlueTicket} onClick={() => void purchase('blue-ticket', '青チケット')}>
                                 {hasBlueTicket ? '購入済み' : '購入'}
                               </button>
                             </div>
                             <div className="account-purchase-row">
-                              <span>夜チケット（裏の作品見放題）</span><span>1000円</span>
+                              <span className="account-purchase-label">
+                                <Image src="/icons/user/yoru-ticket.png" alt="" width={16} height={16} className="account-item-icon pixel-image" unoptimized />
+                                <span>夜チケット（裏の作品見放題）</span>
+                              </span>
+                              <span>1000円</span>
                               <button type="button" disabled={purchasing !== null || hasNightTicket} onClick={() => void purchase('night-ticket', '夜チケット')}>
                                 {hasNightTicket ? '購入済み' : '購入'}
                               </button>

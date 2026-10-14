@@ -22,6 +22,7 @@ import { works } from '@/data/works';
 import { isSafeLinkHref } from '@/lib/format';
 import { cropImageToThumbnail } from '@/lib/image/crop';
 import { BACK_ALLEY_ID_PATTERN, deleteBackAlleyPortfolio, saveBackAlleyPortfolio, subscribeToBackAlleyPortfolio, syncBackAlleyR18Index } from '@/lib/firebase/backAlley';
+import { getNextNumericUrlId } from '@/lib/content/urlId';
 
 const labels: Record<ContentKind, string> = { portfolio: 'ポートフォリオ', works: '成果物', diary: '日記', news: 'ニュース' };
 const CONTENT_URL_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
@@ -271,19 +272,23 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     try {
       const requestedUrlId = form.urlId.trim();
       const existingId = editing?.id ?? editingBackAlley?.id;
-      const urlIdChanged = supportsCustomUrlId && requestedUrlId !== existingId;
+      const usedIds = new Set([
+        ...(kind === 'portfolio' ? staticContentIds.portfolio : kind === 'works' ? staticContentIds.works : []),
+        ...items.map((item) => item.id),
+        ...(kind === 'portfolio' ? backAlleyItems.map((item) => item.id) : []),
+      ]);
+      if (existingId) usedIds.delete(existingId);
+      const resolvedUrlId = supportsCustomUrlId && !requestedUrlId ? getNextNumericUrlId(usedIds) : requestedUrlId;
+      const urlIdChanged = supportsCustomUrlId && resolvedUrlId !== existingId;
       if (supportsCustomUrlId && (!existingId || urlIdChanged)) {
-        const pathPrefix = kind === 'works' ? '/works/' : '/portfolio/';
-        if (!requestedUrlId) throw new Error(`URL IDを入力してください。公開URLは「${pathPrefix}入力したID」になります。`);
-        if (!CONTENT_URL_ID_PATTERN.test(requestedUrlId)) {
+        if (!CONTENT_URL_ID_PATTERN.test(resolvedUrlId)) {
           throw new Error('URL IDは半角小文字の英数字とハイフンだけで入力してください（例: my-new-item）。先頭・末尾にハイフンは使えません。');
         }
-        const reservedIds = staticContentIds[kind];
-        if (reservedIds.has(requestedUrlId) || items.some((item) => item.id === requestedUrlId)) {
-          throw new Error(`URL ID「${requestedUrlId}」はすでに${labels[kind]}で使われています。「${requestedUrlId}-2」など別のIDを入力してください。`);
+        if (usedIds.has(resolvedUrlId)) {
+          throw new Error(`URL ID「${resolvedUrlId}」はすでに${labels[kind]}で使われています。「${resolvedUrlId}-2」など別のIDを入力してください。`);
         }
       }
-      const recordId = supportsCustomUrlId ? requestedUrlId : (editing?.id ?? crypto.randomUUID());
+      const recordId = supportsCustomUrlId ? resolvedUrlId : (editing?.id ?? crypto.randomUUID());
       if (requiresPrimary && !primary && !editingBackAlley?.image && !newPrimary) throw new Error('作品画像を選択してください。');
       if (kind === 'portfolio' && backAlley) {
         if (editing) throw new Error('既存の表作品は裏ページへ変更できません。裏ページ作品として新規追加してください。');
@@ -300,7 +305,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
           r18,
           imageFile: newPrimary ?? undefined,
         });
-        setNotice('Portfolioを保存しました。');
+        setNotice(`Portfolioを保存しました。${requestedUrlId ? '' : ` URL IDは「${recordId}」です。`}`);
         reset();
         setMode('list');
         return;
@@ -339,7 +344,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       await saveFirebaseContent(kind, recordId, value, !editing, editing?.id);
       const replacedPrimary = newPrimary && primary ? [primary] : [];
       await deleteContentMedia([...removedMedia, ...replacedPrimary]);
-      setNotice(`${labels[kind]}を保存しました。`);
+      setNotice(`${labels[kind]}を保存しました。${supportsCustomUrlId && !requestedUrlId ? ` URL IDは「${recordId}」です。` : ''}`);
       reset();
       setMode('list');
     } catch (cause) {
@@ -415,7 +420,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     <div className="admin-message-manager">
       <div className="admin-subpage-header"><h2>{editing || editingBackAlley ? `${labels[kind]}編集` : `新しい${labels[kind]}`}</h2><button type="button" onClick={() => { reset(); setMode('list'); }} disabled={busy || preparingPrimary}>一覧へ戻る</button></div>
       <form className="admin-message-form admin-content-form" onSubmit={submit}>
-        {supportsCustomUrlId ? <><label htmlFor="content-url-id">URL ID（/{kind === 'works' ? 'works' : 'portfolio'}/ の後ろ）</label><input id="content-url-id" value={form.urlId} maxLength={80} required disabled={Boolean(editingBackAlley)} autoCapitalize="none" spellCheck={false} onChange={(event) => update('urlId', event.target.value)} placeholder="my-new-item" /><p className="admin-content-thumbnail-note">半角小文字の英数字とハイフンを使用できます。変更すると以前のURLは使えなくなります。</p></> : null}
+        {supportsCustomUrlId ? <><label htmlFor="content-url-id">URL ID（/{kind === 'works' ? 'works' : 'portfolio'}/ の後ろ、任意）</label><input id="content-url-id" value={form.urlId} maxLength={80} disabled={Boolean(editingBackAlley)} autoCapitalize="none" spellCheck={false} onChange={(event) => update('urlId', event.target.value)} placeholder="空欄の場合は番号を自動付与" /><p className="admin-content-thumbnail-note">未入力で保存すると、未使用の番号を自動で付与します。手入力では半角小文字の英数字とハイフンを使用できます。変更すると以前のURLは使えなくなります。</p></> : null}
         <label htmlFor="content-title">タイトル</label><input id="content-title" value={form.title} maxLength={120} required onChange={(event) => update('title', event.target.value)} />
         {kind === 'portfolio' ? <><label htmlFor="content-description">説明</label><textarea id="content-description" value={form.description} rows={4} required onChange={(event) => update('description', event.target.value)} /></> : null}
         {supportsRichBody ? (

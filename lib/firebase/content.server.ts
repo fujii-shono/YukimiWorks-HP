@@ -101,8 +101,13 @@ export async function getAllPortfolioItems(): Promise<PortfolioItem[]> {
   const firebaseItems = documents.flatMap((document): PortfolioItem[] => {
     const data = document.data();
     const publishedAt = timestampDate(data.publishedAt);
-    if (!publishedAt || typeof data.title !== 'string' || typeof data.description !== 'string' || !isMedia(data.image) || data.image.type !== 'image') return [];
-    return [{ id: document.id, title: data.title, href: `/portfolio/${document.id}`, category: 'illustration', content: { kind: 'image', src: data.image.url, alt: data.image.alt || data.title }, description: data.description, date: tokyoDate(publishedAt), publishedAt: publishedAt.toISOString(), year: Number(tokyoDate(publishedAt).slice(0, 4)), tags: strings(data.tags), featured: data.featured === true, seoTitle: optionalString(data.seoTitle), seoDescription: optionalString(data.seoDescription), noIndex: data.noIndex === true }];
+    const media = isMedia(data.media) ? data.media : isMedia(data.image) && data.image.type === 'image' ? data.image : null;
+    const thumbnail = isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : null;
+    if (!publishedAt || typeof data.title !== 'string' || typeof data.description !== 'string' || !media || (media.type === 'video' && !thumbnail)) return [];
+    const content: PortfolioItem['content'] = media.type === 'video'
+      ? { kind: 'video', src: media.url, poster: thumbnail!.url, alt: media.alt || data.title }
+      : { kind: 'image', src: media.url, alt: media.alt || data.title };
+    return [{ id: document.id, title: data.title, href: `/portfolio/${document.id}`, category: 'illustration', content, description: data.description, date: tokyoDate(publishedAt), publishedAt: publishedAt.toISOString(), year: Number(tokyoDate(publishedAt).slice(0, 4)), tags: strings(data.tags), featured: data.featured === true, seoTitle: optionalString(data.seoTitle), seoDescription: optionalString(data.seoDescription), noIndex: data.noIndex === true }];
   });
   return mergeById(portfolioItems, firebaseItems, (item) => item.publishedAt ?? item.date ?? String(item.year ?? ''));
 }

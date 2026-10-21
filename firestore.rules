@@ -260,14 +260,34 @@ service cloud.firestore {
     match /portfolioItems/{itemId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['title', 'description', 'tags', 'image', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['title', 'description', 'tags', 'image', 'media', 'thumbnail', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
         && validContentCommon(request.resource.data)
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 5000
         && request.resource.data.tags is list
         && request.resource.data.tags.size() <= 30
-        && validContentMedia(request.resource.data.image)
-        && request.resource.data.image.type == 'image'
+        && (
+          (
+            'media' in request.resource.data
+            && validContentMedia(request.resource.data.media)
+            && (
+              request.resource.data.media.type == 'image'
+              || (
+                request.resource.data.media.type == 'video'
+                && 'thumbnail' in request.resource.data
+                && validContentMedia(request.resource.data.thumbnail)
+                && request.resource.data.thumbnail.type == 'image'
+              )
+            )
+            && (!('thumbnail' in request.resource.data) || request.resource.data.thumbnail == null || (validContentMedia(request.resource.data.thumbnail) && request.resource.data.thumbnail.type == 'image'))
+            && (!('image' in request.resource.data) || validContentMedia(request.resource.data.image))
+          )
+          || (
+            !('media' in request.resource.data)
+            && validContentMedia(request.resource.data.image)
+            && request.resource.data.image.type == 'image'
+          )
+        )
         && request.resource.data.featured is bool;
       allow delete: if isAdmin();
     }

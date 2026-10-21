@@ -165,7 +165,7 @@ YukimiWorksのコーポレートホームページ。
 └── 成果物詳細（画像・動画・タイトル・本文）
 
 /portfolio（ポートフォリオページ）
-└── イラスト作品を一覧表示し、画像を追加して公開可能
+└── イラスト・動画作品を一覧表示し、画像または動画を追加して公開可能
 
 /links（リンク一覧ページ）
 └── 全リンクを表示。トップ表示対象は同一データのフラグで管理
@@ -938,18 +938,20 @@ export const works: Work[] = [
 
 - 旧`Profile`を廃止し、イラスト作品を公開する`Portfolio`へ変更する
 - 共通サイトフレーム内に表示する
-- 画像をデータ配列へ追加するだけで作品を公開できる構成とする
-- 作品画像はローカルの`/public/portfolio/`またはCloudinary URLを使用できる
+- 画像または動画を追加するだけで作品を公開できる構成とする
+- 作品画像はローカルの`/public/portfolio/`またはCloudinary URLを使用できる。管理画面から追加する動画はFirebase Storageを使用する
 
 ### レイアウト
 
 - タイトルバー: `Portfolio`
 - 作品をレスポンシブなギャラリー形式で表示する
 - デスクトップ3列、タブレット2列、モバイル1列を基本とする
-- 各作品は画像、タイトル、説明、制作年、タグを表示できる
+- 各作品は画像または動画、タイトル、説明、制作年、タグを表示できる
+- 動画作品は詳細ページで`<video controls playsInline>`を使用し、自動再生しない
+- 動画作品は一覧、トップ、お知らせ、OGPに使用するサムネイル画像を必須とする
 - ポートフォリオ詳細の説明内に含まれるHTTP(S) URLは通常リンクとしてクリック可能にする。OGPカードは表示しない
 - 画像クリックで拡大モーダルを表示する。モーダルはEscキーと閉じるボタンで閉じられる
-- 一覧の拡大モーダルと個別ページのイラスト・HTML作品は、アスペクト比を維持したまま可能な限りブラウザの表示高さ内に収める。ブラウザUIによる表示領域の変化も反映する
+- 一覧の拡大モーダルと個別ページのイラスト・動画・HTML作品は、アスペクト比を維持したまま可能な限りブラウザの表示高さ内に収める。ブラウザUIによる表示領域の変化も反映する
 - 作品が0件の場合は「作品はまだありません」と表示する
 
 ### データ構造（`/data/portfolio.ts`）
@@ -958,8 +960,12 @@ export const works: Work[] = [
 export type PortfolioItem = {
   id: string;
   title: string;
-  image: string;
-  alt: string;
+  href: string;
+  category: 'illustration' | 'html-art' | 'game';
+  content:
+    | { kind: 'image'; src: string; alt: string }
+    | { kind: 'video'; src: string; poster: string; alt: string }
+    | { kind: 'html'; componentId: string; thumbnail?: string; width?: number; height?: number };
   description?: string;
   year?: number;
   tags?: string[];
@@ -970,19 +976,26 @@ export const portfolioItems: PortfolioItem[] = [
   {
     id: 'sample-illustration-01',
     title: 'サンプルイラスト',
-    image: '/portfolio/placeholder.svg',
-    alt: 'サンプルイラスト',
+    href: '/portfolio/sample-illustration-01',
+    category: 'illustration',
+    content: {
+      kind: 'image',
+      src: '/portfolio/placeholder.svg',
+      alt: 'サンプルイラスト',
+    },
     description: '後から実際の作品へ差し替えます。',
     tags: ['イラスト'],
   },
 ];
 ```
 
-### 画像追加手順
+### メディア追加手順
 
 1. `/public/portfolio/`へ画像を配置する、またはCloudinaryへアップロードする
 2. `/data/portfolio.ts`へ作品オブジェクトを追記する
 3. 必要に応じて`next.config.js`のリモート画像許可設定を確認する
+
+管理画面からは画像または動画を選択してFirebase Storageへアップロードできる。画像は1件10MB、動画は1件100MBを上限とする。動画選択時は画像のサムネイル登録を必須とする。
 
 ---
 
@@ -2079,8 +2092,8 @@ yukimiworks-hp/
 - コンテンツの公開日時は日本時間で指定し、未来の場合は指定時刻まで公開ページ、トップのプレビュー、What's Newへ表示しない
 - Firebase追加分も各一覧・詳細ページ、トップのPortfolio、Works・Portfolioの自動ニュース、日記更新、サイドバーのWhat's Newへ反映する
 - Firebase追加分の詳細ページにもtitle、meta description、OGP、canonicalを生成し、任意でSEOタイトル、SEO説明、noindexを設定できる
-- ポートフォリオの管理画面追加分は通常画像のみとし、HTMLアートとゲームは引き続きコード内で管理する
-- 管理画面のポートフォリオ一覧は、登録済み画像を小さなプレビューとして各項目に表示する
+- ポートフォリオの管理画面追加分は通常画像または動画とし、HTMLアートとゲームは引き続きコード内で管理する。動画には一覧・OGP用のサムネイル画像を必須とする
+- 管理画面のポートフォリオ一覧は、登録済み画像または動画サムネイルを小さなプレビューとして各項目に表示する
 - 管理画面の日記一覧は、本文の文章ブロックから先頭100文字までを抜粋表示する
 - 成果物、日記、ニュースは本文用の画像・動画を登録できる。本文は文章・表示テキスト付きリンク・メディアの順序付きブロックとし、ブロックを上下移動してメディアを本文途中へ配置できる。成果物とニュースはサムネイル画像、日記は任意のアイキャッチ画像も登録できる
 - 管理画面から登録する成果物・ニュースのサムネイルと日記のアイキャッチは、一覧カードと同じ16:9比率へ中央トリミングして保存し、ニュース・日記の詳細でも一覧カードと同じ最大幅で表示する。ポートフォリオの作品画像と本文メディアはトリミングせず、本文メディアは詳細で通常どおり表示する

@@ -37,6 +37,41 @@ export function PortfolioMedia({ item, variant, className }: PortfolioMediaProps
     );
   }
 
+  if (item.content.kind === 'video') {
+    const outerClassName = cn('portfolio-media-shell', `portfolio-media-shell-${variant}`, className);
+    const { width, height } = imageSizes[variant];
+
+    if (variant !== 'modal') {
+      return (
+        <div className={outerClassName}>
+          <SleepWarningImage
+            src={item.content.poster}
+            alt={`${item.title}の動画サムネイル`}
+            width={width}
+            height={height}
+            className="portfolio-media-image"
+            unoptimized
+          />
+          <span className="portfolio-video-badge" aria-hidden="true">動画</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className={outerClassName}>
+        <video
+          src={item.content.src}
+          poster={item.content.poster}
+          aria-label={item.content.alt}
+          className="portfolio-media-video"
+          controls
+          playsInline
+          preload="metadata"
+        />
+      </div>
+    );
+  }
+
   const hasThumbnail = item.content.thumbnail?.trim().length ? true : false;
   const Renderer = portfolioHtmlComponents[item.content.componentId];
   const outerClassName = cn(

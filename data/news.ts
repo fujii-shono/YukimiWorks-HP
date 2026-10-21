@@ -230,6 +230,7 @@ function createWorkNews(items: typeof works): News[] {
 
 const getPortfolioThumbnail = (item: (typeof portfolioItems)[number]) => {
   if (item.content.kind === 'image') return item.content.src;
+  if (item.content.kind === 'video') return item.content.poster;
   return item.content.thumbnail ?? '';
 };
 

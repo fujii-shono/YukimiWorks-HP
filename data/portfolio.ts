@@ -16,6 +16,13 @@ export type PortfolioImageContent = {
   alt: string;
 };
 
+export type PortfolioVideoContent = {
+  kind: 'video';
+  src: string;
+  poster: string;
+  alt: string;
+};
+
 export type PortfolioHtmlContent = {
   kind: 'html';
   componentId: PortfolioHtmlComponentId;
@@ -25,7 +32,7 @@ export type PortfolioHtmlContent = {
   fitHeightToContent?: boolean;
 };
 
-export type PortfolioContent = PortfolioImageContent | PortfolioHtmlContent;
+export type PortfolioContent = PortfolioImageContent | PortfolioVideoContent | PortfolioHtmlContent;
 
 export type PortfolioItem = {
   id: string;

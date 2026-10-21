@@ -92,8 +92,10 @@ function parseContent<K extends ContentKind>(kind: K, snapshot: QueryDocumentSna
   if (!base) return null;
 
   if (kind === 'portfolio') {
-    if (typeof data.description !== 'string' || !Array.isArray(data.tags) || !isMedia(data.image) || data.image.type !== 'image') return null;
-    return { ...base, description: data.description, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), image: data.image, featured: data.featured === true } as FirebaseContentByKind[K];
+    const media = isMedia(data.media) ? data.media : isMedia(data.image) && data.image.type === 'image' ? data.image : null;
+    const thumbnail = isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined;
+    if (typeof data.description !== 'string' || !Array.isArray(data.tags) || !media || (media.type === 'video' && !thumbnail)) return null;
+    return { ...base, description: data.description, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), media, thumbnail, featured: data.featured === true } as FirebaseContentByKind[K];
   }
   if (kind === 'works') {
     if (typeof data.body !== 'string' || !['contents', 'tools', 'apps'].includes(data.category) || !Array.isArray(data.tags) || !Array.isArray(data.media)) return null;
@@ -173,11 +175,12 @@ export async function saveFirebaseContent(kind: ContentKind, id: string | undefi
       const migratedValue: Record<string, unknown> = { ...previousSnapshot.data(), ...storedValue };
       if (kind === 'news') delete migratedValue.summary;
       if (kind === 'works') delete migratedValue.description;
+      if (kind === 'portfolio') delete migratedValue.image;
       transaction.set(recordRef, migratedValue);
       transaction.delete(previousRef);
     });
   } else {
-    await setDoc(recordRef, { ...storedValue, ...(kind === 'news' ? { summary: deleteField() } : {}), ...(kind === 'works' ? { description: deleteField() } : {}) }, { merge: true });
+    await setDoc(recordRef, { ...storedValue, ...(kind === 'news' ? { summary: deleteField() } : {}), ...(kind === 'works' ? { description: deleteField() } : {}), ...(kind === 'portfolio' ? { image: deleteField() } : {}) }, { merge: true });
   }
   return recordRef.id;
 }
@@ -190,7 +193,11 @@ export async function deleteFirebaseContent(kind: ContentKind, item: FirebaseCon
 }
 
 export function getContentMedia(kind: ContentKind, item: FirebaseContentByKind[ContentKind]): FirebaseContentMedia[] {
-  if (kind === 'portfolio') return [(item as FirebasePortfolioItem).image];
+  if (kind === 'portfolio') {
+    const portfolio = item as FirebasePortfolioItem;
+    return [portfolio.media, ...(portfolio.thumbnail ? [portfolio.thumbnail] : [])]
+      .filter((media, index, all) => all.findIndex((candidate) => candidate.path === media.path) === index);
+  }
   if (kind === 'diary') {
     const diary = item as FirebaseDiaryEntry;
     const bodyMedia = diary.bodySegments.flatMap((segment) => segment.type === 'media' ? [segment.media] : []);

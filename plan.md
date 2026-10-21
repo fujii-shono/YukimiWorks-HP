@@ -1,5 +1,46 @@
 # 裏ページ・成人確認・非公開素材対応
 
+## 追加対応: 通常Portfolioの動画アップロード
+
+### 対応する仕様
+
+- 管理画面から通常Portfolio作品として画像または動画を登録できる
+- 動画は1本100MBまでとし、一覧・トップ・OGP用のサムネイル画像を必須とする
+- 詳細ページではブラウザ標準の操作ボタン付きで動画を再生できる
+- 既存の画像Portfolio、HTMLアート、ゲーム、裏Portfolioの表示は維持する
+
+### 実装方針
+
+- Firestoreは既存の`image`を後方互換で読み取りつつ、新規・編集保存では`media`と任意の`thumbnail`を保存する
+- 画像作品は作品メディア自体をサムネイルに使い、動画作品だけ別の画像を必須とする
+- `PortfolioContent`に`video`を追加し、カードではポスター画像、詳細では`<video controls playsInline>`を表示する
+- Storage / Firestore Rulesは通常Portfolioのみ動画とサムネイルを許可し、裏Portfolioの画像専用仕様は変更しない
+
+### 変更予定のファイルと理由
+
+- `SPEC.md`, `plan.md`: 動画とサムネイルの正式仕様を記録するため
+- `components/admin/AdminContentManager.tsx`: 動画本体とサムネイルの選択・編集・削除を行うため
+- `lib/firebase/types.ts`, `lib/firebase/content.ts`, `lib/firebase/content.server.ts`: 保存データと公開データを画像・動画両方に対応させるため
+- `data/portfolio.ts`, `data/news.ts`, `components/portfolio/**`, `app/portfolio/[id]/page.tsx`, `app/globals.css`: カード、詳細、自動ニュース、OGPを動画作品に対応させるため
+- `firestore.rules`, `storage.rules`: 管理者による動画保存を許可し、データ形式と容量・MIME制限を強制するため
+
+### 影響範囲
+
+- 通常Portfolioの管理画面、一覧、トッププレビュー、詳細、自動ニュース、SEOメタデータ
+- Firebaseの`portfolioItems`と`content/portfolio/`配下
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- 既存画像作品の後方互換読み取りと、動画作品の一覧・詳細表示を確認する
+
+### 懸念点・制約
+
+- Firebase Rulesはデプロイ後に本番へ反映される
+- OGPは動画本体ではなく登録サムネイル画像を使う
+
 ## 追加対応: Portfolio作品のブラウザ高さへの収まり
 
 ### 対応する仕様

@@ -94,8 +94,10 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
   const [editingBackAlley, setEditingBackAlley] = useState<FirebaseBackAlleyPortfolioItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [primary, setPrimary] = useState<FirebaseContentMedia | undefined>();
+  const [portfolioThumbnail, setPortfolioThumbnail] = useState<FirebaseContentMedia | undefined>();
   const [bodyBlocks, setBodyBlocks] = useState<AdminBodyBlock[]>(initialBodyBlocks);
   const [newPrimary, setNewPrimary] = useState<File | null>(null);
+  const [newPortfolioThumbnail, setNewPortfolioThumbnail] = useState<File | null>(null);
   const [removedMedia, setRemovedMedia] = useState<FirebaseContentMedia[]>([]);
   const [mode, setMode] = useState<'list' | 'form'>('list');
   const [busy, setBusy] = useState(false);
@@ -128,8 +130,10 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     setEditingBackAlley(null);
     setForm(emptyForm());
     setPrimary(undefined);
+    setPortfolioThumbnail(undefined);
     setBodyBlocks(initialBodyBlocks());
     setNewPrimary(null);
+    setNewPortfolioThumbnail(null);
     setRemovedMedia([]);
     setBackAlley(false);
     setR18(false);
@@ -155,7 +159,8 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     if (kind === 'portfolio') {
       const record = item as FirebasePortfolioItem;
       setForm({ ...emptyForm(), ...common, description: record.description, tags: record.tags.join(', '), featured: record.featured });
-      setPrimary(record.image);
+      setPrimary(record.media);
+      setPortfolioThumbnail(record.thumbnail);
       setBodyBlocks(initialBodyBlocks());
     } else if (kind === 'works') {
       const record = item as FirebaseWork;
@@ -174,6 +179,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       setBodyBlocks(getBodyBlocks(record));
     }
     setNewPrimary(null);
+    setNewPortfolioThumbnail(null);
     setRemovedMedia([]);
     setError(null);
     setMode('form');
@@ -184,8 +190,10 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     setEditingBackAlley(item);
     setForm({ ...emptyForm(), urlId: item.id, title: item.title, description: item.description, tags: item.tags.join(', '), publishedAt: toTokyoInput(item.publishedAt.toDate()), featured: item.featured });
     setPrimary(undefined);
+    setPortfolioThumbnail(undefined);
     setBodyBlocks(initialBodyBlocks());
     setNewPrimary(null);
+    setNewPortfolioThumbnail(null);
     setRemovedMedia([]);
     setBackAlley(true);
     setR18(item.r18);
@@ -199,15 +207,26 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     if (!file) return setNewPrimary(null);
     setPreparingPrimary(true);
     try {
-      validateContentFiles([file], 0, true);
+      validateContentFiles([file], 0, kind !== 'portfolio' || backAlley);
       const preparedFile = kind === 'portfolio' ? file : await cropImageToThumbnail(file);
-      validateContentFiles([preparedFile], 0, true);
+      validateContentFiles([preparedFile], 0, kind !== 'portfolio' || backAlley);
       setNewPrimary(preparedFile);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'ファイルを選択できませんでした。');
     } finally {
       setPreparingPrimary(false);
+    }
+  };
+
+  const choosePortfolioThumbnail = (file: File | undefined) => {
+    if (!file) return setNewPortfolioThumbnail(null);
+    try {
+      validateContentFiles([file], 0, true);
+      setNewPortfolioThumbnail(file);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'サムネイル画像を選択できませんでした。');
     }
   };
 
@@ -230,6 +249,11 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
   const removeExisting = (target: FirebaseContentMedia) => {
     setRemovedMedia((current) => [...current, target]);
     setPrimary(undefined);
+  };
+
+  const removePortfolioThumbnail = (target: FirebaseContentMedia) => {
+    setRemovedMedia((current) => [...current, target]);
+    setPortfolioThumbnail(undefined);
   };
 
   const addBodyBlock = (type: AdminBodyBlock['type']) => {
@@ -289,10 +313,11 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         }
       }
       const recordId = supportsCustomUrlId ? resolvedUrlId : (editing?.id ?? crypto.randomUUID());
-      if (requiresPrimary && !primary && !editingBackAlley?.image && !newPrimary) throw new Error('作品画像を選択してください。');
+      if (requiresPrimary && !primary && !editingBackAlley?.image && !newPrimary) throw new Error('作品ファイルを選択してください。');
       if (kind === 'portfolio' && backAlley) {
         if (editing) throw new Error('既存の表作品は裏ページへ変更できません。裏ページ作品として新規追加してください。');
         if (!BACK_ALLEY_ID_PATTERN.test(recordId)) throw new Error('URL IDは半角小文字の英数字とハイフンで入力してください。');
+        if (newPrimary?.type.startsWith('video/')) throw new Error('裏ページ作品は画像だけ登録できます。');
         if (!newPrimary && (!editingBackAlley || editingBackAlley.r18 !== r18)) throw new Error('作品画像を選択してください。');
         await saveBackAlleyPortfolio({
           id: recordId,
@@ -310,9 +335,19 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         setMode('list');
         return;
       }
-      const uploadedPrimary = newPrimary ? await uploadContentFiles(kind, recordId, [newPrimary], true) : [];
+      const uploadedPrimary = newPrimary ? await uploadContentFiles(kind, recordId, [newPrimary], kind !== 'portfolio') : [];
       uploaded.push(...uploadedPrimary);
-      const resolvedPrimary = uploadedPrimary[0] ? { ...uploadedPrimary[0], alt: `${form.title}の画像` } : primary;
+      const resolvedPrimary = uploadedPrimary[0] ? { ...uploadedPrimary[0], alt: `${form.title}の${uploadedPrimary[0].type === 'video' ? '動画' : '画像'}` } : primary;
+      const uploadedPortfolioThumbnail = kind === 'portfolio' && resolvedPrimary?.type === 'video' && newPortfolioThumbnail
+        ? await uploadContentFiles(kind, recordId, [newPortfolioThumbnail], true)
+        : [];
+      uploaded.push(...uploadedPortfolioThumbnail);
+      const resolvedPortfolioThumbnail = uploadedPortfolioThumbnail[0]
+        ? { ...uploadedPortfolioThumbnail[0], alt: `${form.title}の動画サムネイル` }
+        : portfolioThumbnail;
+      if (kind === 'portfolio' && resolvedPrimary?.type === 'video' && !resolvedPortfolioThumbnail) {
+        throw new Error('動画作品にはサムネイル画像が必要です。');
+      }
       const resolvedBodySegments: FirebaseContentBodySegment[] = [];
       for (const block of bodyBlocks) {
         if (block.type === 'text') {
@@ -337,13 +372,15 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       const fallbackBody = resolvedBodySegments.flatMap((segment) => segment.type === 'text' ? [segment.value] : []).join('\n\n');
       const common = { title: form.title, publishedAt: fromTokyoInput(form.publishedAt), seoTitle: form.seoTitle.trim() || null, seoDescription: form.seoDescription.trim() || null, noIndex: form.noIndex };
       let value: Record<string, unknown> & { title: string; publishedAt: Date };
-      if (kind === 'portfolio') value = { ...common, description: form.description.trim(), tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), image: resolvedPrimary, featured: form.featured };
+      if (kind === 'portfolio') value = { ...common, description: form.description.trim(), tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), media: resolvedPrimary, thumbnail: resolvedPrimary?.type === 'video' ? resolvedPortfolioThumbnail : null, featured: form.featured };
       else if (kind === 'works') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), thumbnail: resolvedPrimary ?? null, media: resolvedMedia, url: null, featured: form.featured };
       else if (kind === 'diary') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, eyecatch: resolvedPrimary ?? null };
       else value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, thumbnail: resolvedPrimary ?? null, media: resolvedMedia, featured: form.featured };
       await saveFirebaseContent(kind, recordId, value, !editing, editing?.id);
       const replacedPrimary = newPrimary && primary ? [primary] : [];
-      await deleteContentMedia([...removedMedia, ...replacedPrimary]);
+      const replacedPortfolioThumbnail = newPortfolioThumbnail && portfolioThumbnail ? [portfolioThumbnail] : [];
+      const unusedPortfolioThumbnail = kind === 'portfolio' && resolvedPrimary?.type === 'image' && portfolioThumbnail ? [portfolioThumbnail] : [];
+      await deleteContentMedia([...removedMedia, ...replacedPrimary, ...replacedPortfolioThumbnail, ...unusedPortfolioThumbnail]);
       setNotice(`${labels[kind]}を保存しました。${supportsCustomUrlId && !requestedUrlId ? ` URL IDは「${recordId}」です。` : ''}`);
       reset();
       setMode('list');
@@ -394,7 +431,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         {kind === 'portfolio' ? [...items, ...backAlleyItems].sort((a, b) => b.publishedAt.toMillis() - a.publishedAt.toMillis()).map((item) => {
           const isBackAlley = 'r18' in item;
           return <article key={`${isBackAlley ? 'back' : 'front'}-${item.id}`} className="admin-portfolio-list-item">
-            {isBackAlley ? item.image ? <ProtectedImage path={item.image.path} alt="" className="admin-portfolio-list-image" /> : null : <Image src={(item as FirebasePortfolioItem).image.url} alt="" width={56} height={56} className="admin-portfolio-list-image" unoptimized />}
+            {isBackAlley ? item.image ? <ProtectedImage path={item.image.path} alt="" className="admin-portfolio-list-image" /> : null : (() => { const record = item as FirebasePortfolioItem; const preview = record.media.type === 'image' ? record.media : record.thumbnail; return preview ? <Image src={preview.url} alt="" width={56} height={56} className="admin-portfolio-list-image" unoptimized /> : null; })()}
             <div className="admin-portfolio-list-labels">{isBackAlley ? <span>裏</span> : null}{isBackAlley && item.r18 ? <span>R18</span> : null}</div>
             <time>{item.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</time>
             <p>{item.title}</p>
@@ -465,15 +502,16 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         {categoryOptions.length ? <><label htmlFor="content-category">カテゴリ</label><select id="content-category" value={form.category} required onChange={(event) => update('category', event.target.value)}><option value="">選択してください</option>{categoryOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></> : null}
         {kind === 'portfolio' || kind === 'works' ? <><label htmlFor="content-tags">タグ（カンマ区切り）</label><input id="content-tags" value={form.tags} onChange={(event) => update('tags', event.target.value)} /></> : null}
         <label htmlFor="content-published-at">公開日時（日本時間）</label><input id="content-published-at" type="datetime-local" value={form.publishedAt} required onChange={(event) => update('publishedAt', event.target.value)} />
-        <label htmlFor="content-primary">{kind === 'portfolio' ? '作品画像' : kind === 'diary' ? 'アイキャッチ（任意）' : 'サムネイル（任意）'}</label><input id="content-primary" type="file" accept="image/*" required={requiresPrimary && !primary && !editingBackAlley?.image} disabled={busy || preparingPrimary} onChange={(event) => void choosePrimary(event.target.files?.[0])} />
+        <label htmlFor="content-primary">{kind === 'portfolio' ? backAlley ? '作品画像' : '作品ファイル（画像・動画）' : kind === 'diary' ? 'アイキャッチ（任意）' : 'サムネイル（任意）'}</label><input id="content-primary" type="file" accept={kind === 'portfolio' && !backAlley ? 'image/*,video/*' : 'image/*'} required={requiresPrimary && !primary && !editingBackAlley?.image} disabled={busy || preparingPrimary} onChange={(event) => void choosePrimary(event.target.files?.[0])} />
         {kind !== 'portfolio' ? <p className="admin-content-thumbnail-note">アイキャッチ・サムネイルは16:9で中央トリミングして保存します。本文メディアは元画像のままです。</p> : null}
-        {primary ? <div className="admin-media-row"><a href={primary.url} target="_blank" rel="noreferrer">登録済み画像</a><button type="button" onClick={() => removeExisting(primary)}>削除</button></div> : null}
+        {primary ? <div className="admin-media-row"><a href={primary.url} target="_blank" rel="noreferrer">登録済み{primary.type === 'video' ? '動画' : '画像'}</a><button type="button" onClick={() => removeExisting(primary)}>削除</button></div> : null}
         {editingBackAlley?.image ? <ProtectedImage path={editingBackAlley.image.path} alt={editingBackAlley.image.alt} /> : null}
-        {newPrimary ? <p>{preparingPrimary ? '画像を準備中…' : newPrimary.name}</p> : null}
+        {newPrimary ? <p>{preparingPrimary ? 'ファイルを準備中…' : newPrimary.name}</p> : null}
+        {kind === 'portfolio' && !backAlley && (newPrimary?.type.startsWith('video/') || (!newPrimary && primary?.type === 'video')) ? <><label htmlFor="content-portfolio-thumbnail">動画サムネイル画像</label><input id="content-portfolio-thumbnail" type="file" accept="image/*" required={!portfolioThumbnail && !newPortfolioThumbnail} disabled={busy} onChange={(event) => choosePortfolioThumbnail(event.target.files?.[0])} /><p className="admin-content-thumbnail-note">一覧・トップ・SNS共有で表示する画像です。</p>{portfolioThumbnail ? <div className="admin-media-row"><a href={portfolioThumbnail.url} target="_blank" rel="noreferrer">登録済みサムネイル</a><button type="button" onClick={() => removePortfolioThumbnail(portfolioThumbnail)}>削除</button></div> : null}{newPortfolioThumbnail ? <p>{newPortfolioThumbnail.name}</p> : null}</> : null}
         {kind === 'portfolio' && !editing ? <><label className="admin-x-post-toggle"><input type="checkbox" checked={backAlley} onChange={(event) => { setBackAlley(event.target.checked); if (!event.target.checked) setR18(false); }} />裏ページ作品にする</label><label className="admin-x-post-toggle"><input type="checkbox" checked={r18} onChange={(event) => { setR18(event.target.checked); if (event.target.checked) setBackAlley(true); }} />R18作品にする</label></> : null}
         {kind !== 'diary' ? <label className="admin-x-post-toggle"><input type="checkbox" checked={form.featured} onChange={(event) => update('featured', event.target.checked)} />注目表示</label> : null}
         {!(kind === 'portfolio' && backAlley) ? <details><summary>SEO設定（任意）</summary><div className="admin-content-seo"><label htmlFor="content-seo-title">SEOタイトル</label><input id="content-seo-title" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} /><label htmlFor="content-seo-description">SEO説明</label><textarea id="content-seo-description" rows={3} value={form.seoDescription} onChange={(event) => update('seoDescription', event.target.value)} /><label className="admin-x-post-toggle"><input type="checkbox" checked={form.noIndex} onChange={(event) => update('noIndex', event.target.checked)} />検索結果に掲載しない</label></div></details> : null}
-        {error ? <p className="form-error">{error}</p> : null}<div className="admin-form-actions"><button type="submit" className="pixel-button" disabled={busy || preparingPrimary}>{busy ? '保存中…' : preparingPrimary ? '画像を準備中…' : '保存'}</button></div>
+        {error ? <p className="form-error">{error}</p> : null}<div className="admin-form-actions"><button type="submit" className="pixel-button" disabled={busy || preparingPrimary}>{busy ? '保存中…' : preparingPrimary ? 'ファイルを準備中…' : '保存'}</button></div>
       </form>
     </div>
   );

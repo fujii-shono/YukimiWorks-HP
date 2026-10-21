@@ -90,7 +90,8 @@ export type FirebasePortfolioItem = {
   title: string;
   description: string;
   tags: string[];
-  image: FirebaseContentMedia;
+  media: FirebaseContentMedia;
+  thumbnail?: FirebaseContentMedia;
   publishedAt: Timestamp;
   featured: boolean;
   seoTitle?: string;

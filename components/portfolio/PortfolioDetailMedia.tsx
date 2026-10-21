@@ -23,7 +23,11 @@ export function PortfolioDetailMedia({ item }: { item: PortfolioItem }) {
     };
   }, [open]);
 
-  if (item.content.kind !== 'image') {
+  if (item.content.kind === 'video') {
+    return <PortfolioMedia item={item} variant="modal" className="portfolio-detail-video" />;
+  }
+
+  if (item.content.kind === 'html') {
     return <PortfolioMedia item={item} variant="modal" className="portfolio-detail-html" />;
   }
 

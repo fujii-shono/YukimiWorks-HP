@@ -1919,11 +1919,24 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
 }
 
 .portfolio-media-shell {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   background: var(--site-surface);
+}
+
+.portfolio-video-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  color: #fff;
+  background: rgba(23, 37, 84, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  font-size: 0.7rem;
+  line-height: 1.35;
 }
 
 .portfolio-media-shell-preview {
@@ -1972,6 +1985,15 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   height: auto;
   max-height: calc(100vh - 200px);
   object-fit: contain;
+}
+
+.portfolio-media-video {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--portfolio-media-max-height, calc(100dvh - 220px));
+  background: #000;
 }
 
 .portfolio-media-html {
@@ -5103,6 +5125,11 @@ html:has(.acrylic-demo-page) body {
   width: 100%;
   max-width: 100%;
   justify-content: center;
+  margin: 0 auto;
+}
+
+.portfolio-detail-video {
+  width: 100%;
   margin: 0 auto;
 }
 

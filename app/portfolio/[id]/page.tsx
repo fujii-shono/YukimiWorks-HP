@@ -38,8 +38,9 @@ export function generateStaticParams() {
   return portfolioItems.map((item) => ({ id: item.id }));
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const item = (await getAllPortfolioItems()).find((entry) => entry.id === params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const item = (await getAllPortfolioItems()).find((entry) => entry.id === id);
   if (!item) return {};
 
   const title = item.seoTitle ?? `${item.title} | YukimiWorks`;
@@ -86,8 +87,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default async function PortfolioDetailPage({ params }: { params: { id: string } }) {
-  const item = (await getAllPortfolioItems()).find((entry) => entry.id === params.id);
+export default async function PortfolioDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const item = (await getAllPortfolioItems()).find((entry) => entry.id === id);
   if (!item) notFound();
 
   return (

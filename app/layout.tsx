@@ -121,8 +121,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" data-theme="day" data-event="none">
-      <body className={`${dotGothic.className} ${dotGothic.variable}`}>
+    <html lang="ja" data-theme="day" data-event="none" suppressHydrationWarning>
+      <body className={`${dotGothic.className} ${dotGothic.variable}`} suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
         <FirebaseAuthProvider>
           {children}

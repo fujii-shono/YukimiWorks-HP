@@ -4,8 +4,9 @@ import { getBackAlleyOgpData } from '@/lib/firebase/backAlley.server';
 
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const item = await getBackAlleyOgpData(params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const item = await getBackAlleyOgpData(id);
   if (!item) return { robots: { index: false, follow: false, nocache: true } };
 
   const title = `${item.title} | YukimiWorks`;

@@ -12,11 +12,12 @@ export const dynamic = 'force-dynamic';
 export default async function WorksPage({
   searchParams,
 }: {
-  searchParams?: { category?: string };
+  searchParams?: Promise<{ category?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const works = await getAllWorks();
-  const validCategory = allCategories.includes(searchParams?.category as WorkCategory)
-    ? (searchParams?.category as WorkCategory)
+  const validCategory = allCategories.includes(resolvedSearchParams?.category as WorkCategory)
+    ? (resolvedSearchParams?.category as WorkCategory)
     : null;
   const visibleCategories = allCategories.filter((category) => works.some((work) => work.category === category));
   const filteredWorks = validCategory ? works.filter((work) => work.category === validCategory) : works;

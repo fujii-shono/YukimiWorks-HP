@@ -2802,3 +2802,43 @@
 - Firebase Admin SDKが使用できない環境では実データの転送・集計の手動確認は行えない
 
 ---
+# Next.js 2026年10月セキュリティ更新
+
+## 対応する仕様
+
+- 2026年10月14日公開の Next.js 公式セキュリティ更新を取り込む
+- 現行の App Router 構成と既存機能を維持する
+- Next.js が使用する `sharp` を修正済みの 0.35.5 以上にする
+
+## 実装方針
+
+- サポート終了済みの Next.js 14.2.30 から、影響を抑えつつ修正を取り込める Maintenance LTS の 15.5.28 へ更新する
+- React / React DOM と型定義の互換性を確認し、`eslint-config-next` を Next.js と同じ 15.5.28 へ揃える
+- Next.js 15 で Promise 化された `params` / `searchParams` などの API 呼び出しを必要な範囲で移行する
+- `next lint` は Next.js 15 で使用可能なため、検証後に必要がなければスクリプトを維持する
+
+## 変更予定のファイルと理由
+
+- `package.json`, `package-lock.json`: Next.js と関連依存関係を修正済み版へ更新するため
+- `SPEC.md`: 実際のフレームワーク主要バージョンと仕様を一致させるため
+- `app/**`: Next.js 15 のルート型と動的 API の変更に必要な場合のみ対応するため
+
+## 影響範囲
+
+- App Router のページ、レイアウト、Route Handler、メタデータ生成
+- React のサーバー／クライアントコンポーネント
+- 本番ビルドと lint / TypeScript 検証
+
+## 検証方法
+
+- `npm ls next react react-dom sharp`
+- `npm audit --omit=dev`
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- 開発サーバーで主要ページと API の応答を確認する
+
+## 懸念点・制約
+
+- Next.js 14 から 15 へのメジャー更新のため、非同期化されたルート API に局所的な移行が必要になる可能性がある
+- 外部サービスの本番送信や Firebase Rules のデプロイは行わない

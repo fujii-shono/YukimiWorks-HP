@@ -15,8 +15,9 @@ export function generateStaticParams() {
   return manualNews.map((article) => ({ id: article.id }));
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const article = (await getAllManualNews()).find((entry) => entry.id === params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const article = (await getAllManualNews()).find((entry) => entry.id === id);
   if (!article) return {};
 
   const title = article.seoTitle ?? `${article.title} | YukimiWorks`;
@@ -48,8 +49,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default async function NewsDetailPage({ params }: { params: { id: string } }) {
-  const article = (await getAllManualNews()).find((entry) => entry.id === params.id);
+export default async function NewsDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const article = (await getAllManualNews()).find((entry) => entry.id === id);
   if (!article) notFound();
 
   const ogImage = article.ogImage

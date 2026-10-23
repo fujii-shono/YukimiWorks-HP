@@ -5,7 +5,7 @@ import { getFirebaseAdminServices, requireFirebaseAdmin } from '@/lib/firebase/a
 
 export const runtime = 'nodejs';
 
-type RouteContext = { params: { messageId: string } };
+type RouteContext = { params: Promise<{ messageId: string }> };
 
 async function parseReplyBody(request: Request) {
   const payload = (await request.json().catch(() => null)) as { body?: unknown } | null;
@@ -44,6 +44,7 @@ function replyErrorResponse(error: unknown) {
 
 export async function POST(request: Request, { params }: RouteContext) {
   try {
+    const { messageId } = await params;
     const admin = await requireFirebaseAdmin(request);
     const body = await parseReplyBody(request);
 
@@ -51,11 +52,11 @@ export async function POST(request: Request, { params }: RouteContext) {
     const adminProfile = await db.collection('users').doc(admin.uid).get();
     const authorName = adminProfile.data()?.displayName;
     const reply = await saveBokinSupportReply(
-      params.messageId,
+      messageId,
       body,
       typeof authorName === 'string' ? authorName : '',
     );
-    return NextResponse.json({ messageId: params.messageId, reply });
+    return NextResponse.json({ messageId, reply });
   } catch (error) {
     return replyErrorResponse(error);
   }
@@ -63,17 +64,18 @@ export async function POST(request: Request, { params }: RouteContext) {
 
 export async function PUT(request: Request, { params }: RouteContext) {
   try {
+    const { messageId } = await params;
     const admin = await requireFirebaseAdmin(request);
     const body = await parseReplyBody(request);
     const { db } = getFirebaseAdminServices();
     const adminProfile = await db.collection('users').doc(admin.uid).get();
     const authorName = adminProfile.data()?.displayName;
     const reply = await updateBokinSupportReply(
-      params.messageId,
+      messageId,
       body,
       typeof authorName === 'string' ? authorName : '',
     );
-    return NextResponse.json({ messageId: params.messageId, reply });
+    return NextResponse.json({ messageId, reply });
   } catch (error) {
     return replyErrorResponse(error);
   }

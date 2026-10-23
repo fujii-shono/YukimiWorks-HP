@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { BackAlleyPortfolioImage } from '@/components/back-alley/BackAlleyPortfolioImage';
 import { useBackAlleyPortfolio } from '@/components/back-alley/useBackAlleyPortfolio';
 import { RetroPanel } from '@/components/panels/RetroPanel';
@@ -9,7 +10,8 @@ import { TwoChoiceR18Scene } from '@/components/back-alley/TwoChoiceR18Scene';
 import { PortfolioDetailMeta } from '@/components/ui/PortfolioDetailMeta';
 import { formatJapaneseDateObject } from '@/lib/format';
 
-export default function BackAlleyPortfolioDetail({ params }: { params: { id: string } }) {
+export default function BackAlleyPortfolioDetail() {
+  const params = useParams<{ id: string }>();
   const { items, loading } = useBackAlleyPortfolio();
   const item = items.find((entry) => entry.id === params.id);
   if (loading) return <RetroPanel title="Portfolio"><p>読み込み中…</p></RetroPanel>;

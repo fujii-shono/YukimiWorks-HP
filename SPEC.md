@@ -15,7 +15,7 @@ YukimiWorksのコーポレートホームページ。
 
 | 項目 | 選定 |
 |------|------|
-| フレームワーク | Next.js 14（App Router） |
+| フレームワーク | Next.js 15（App Router） |
 | スタイリング | Tailwind CSS + CSS Modules（アニメーション等） |
 | アニメーション | Framer Motion |
 | フォーム | React Hook Form + Zod（バリデーション） |

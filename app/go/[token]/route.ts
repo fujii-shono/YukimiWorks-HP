@@ -22,8 +22,9 @@ function redirect(destination: string, visitorId?: string) {
   return response;
 }
 
-export async function GET(request: Request, { params }: { params: { token: string } }) {
-  const destination = await getTrackingDestination(params.token);
+export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  const destination = await getTrackingDestination(token);
   if (!destination) return NextResponse.redirect(new URL('/', request.url), 307);
 
   const userAgent = request.headers.get('user-agent') || '';
@@ -42,14 +43,15 @@ export async function GET(request: Request, { params }: { params: { token: strin
   const currentVisitorId = request.headers.get('cookie')?.match(/(?:^|;\s*)yw_x_visitor=([^;]+)/)?.[1];
   const visitorId = currentVisitorId && /^[A-Za-z0-9-]{20,64}$/.test(currentVisitorId) ? currentVisitorId : randomUUID();
   try {
-    await recordTrackingVisit(params.token, visitorId);
+    await recordTrackingVisit(token, visitorId);
   } catch (error) {
     console.error('[tracking] Failed to record an anonymous visit.', error);
   }
   return redirect(destination, currentVisitorId ? undefined : visitorId);
 }
 
-export async function HEAD(request: Request, context: { params: { token: string } }) {
-  const destination = await getTrackingDestination(context.params.token);
+export async function HEAD(request: Request, context: { params: Promise<{ token: string }> }) {
+  const { token } = await context.params;
+  const destination = await getTrackingDestination(token);
   return NextResponse.redirect(destination || new URL('/', request.url), 307);
 }

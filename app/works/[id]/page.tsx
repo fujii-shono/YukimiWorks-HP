@@ -17,8 +17,9 @@ export function generateStaticParams() {
   return works.map((work) => ({ id: work.id }));
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const work = (await getAllWorks()).find((item) => item.id === params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const work = (await getAllWorks()).find((item) => item.id === id);
   if (!work) return {};
 
   const title = work.seoTitle ?? `${work.title} | YukimiWorks`;
@@ -59,8 +60,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default async function WorkDetailPage({ params }: { params: { id: string } }) {
-  const work = (await getAllWorks()).find((item) => item.id === params.id);
+export default async function WorkDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const work = (await getAllWorks()).find((item) => item.id === id);
   if (!work) notFound();
   const weeklyOdai = work.id === 'odai-maker' ? await getCurrentWeeklyOdai() : null;
   const thumbnail = work.thumbnail.trim();

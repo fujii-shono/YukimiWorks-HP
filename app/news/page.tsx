@@ -12,11 +12,12 @@ export const dynamic = 'force-dynamic';
 export default async function NewsPage({
   searchParams,
 }: {
-  searchParams?: { category?: string };
+  searchParams?: Promise<{ category?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const newsItems = await getAllNewsItems();
-  const validCategory = allCategories.includes(searchParams?.category as NewsCategory)
-    ? (searchParams?.category as NewsCategory)
+  const validCategory = allCategories.includes(resolvedSearchParams?.category as NewsCategory)
+    ? (resolvedSearchParams?.category as NewsCategory)
     : null;
   const visibleCategories = allCategories.filter((category) => newsItems.some((item) => item.category === category));
   const filteredNews = validCategory ? newsItems.filter((item) => item.category === validCategory) : newsItems;

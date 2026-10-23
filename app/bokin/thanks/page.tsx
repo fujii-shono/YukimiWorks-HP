@@ -66,11 +66,11 @@ async function getPaidDonationSession(sessionId: string) {
 export default async function BokinThanksPage({
   searchParams,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     session_id?: string;
-  };
+  }>;
 }) {
-  const sessionId = searchParams.session_id;
+  const sessionId = (await searchParams).session_id;
   if (!sessionId) redirect('/bokin');
 
   const session = await getPaidDonationSession(sessionId);

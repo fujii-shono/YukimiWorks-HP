@@ -16,9 +16,10 @@ import { getAllDiaryEntries } from '@/lib/firebase/content.server';
 const allCategories: DiaryCategory[] = ['chat', 'report', 'development', 'behind-the-scenes', 'content-creation-tips'];
 export const dynamic = 'force-dynamic';
 
-export default async function DiaryPage({ searchParams }: { searchParams?: { category?: string } }) {
-  const validCategory = allCategories.includes(searchParams?.category as DiaryCategory)
-    ? (searchParams?.category as DiaryCategory)
+export default async function DiaryPage({ searchParams }: { searchParams?: Promise<{ category?: string }> }) {
+  const resolvedSearchParams = await searchParams;
+  const validCategory = allCategories.includes(resolvedSearchParams?.category as DiaryCategory)
+    ? (resolvedSearchParams?.category as DiaryCategory)
     : null;
   const publishedEntries = await getAllDiaryEntries();
   const filteredEntries = validCategory ? publishedEntries.filter((entry) => entry.category === validCategory) : publishedEntries;

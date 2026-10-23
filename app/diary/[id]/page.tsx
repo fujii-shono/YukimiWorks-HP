@@ -33,8 +33,9 @@ export function generateStaticParams() {
   return diaryEntries.filter((entry) => isDiaryPublished(entry)).map((entry) => ({ id: getDiaryId(entry) }));
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const entry = (await getAllDiaryEntries()).find((item) => getDiaryId(item) === params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const entry = (await getAllDiaryEntries()).find((item) => getDiaryId(item) === id);
   if (!entry || !isDiaryPublished(entry)) return {};
 
   const title = entry.seoTitle ?? `${entry.title} | YukimiWorks`;
@@ -65,8 +66,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-export default async function DiaryDetailPage({ params }: { params: { id: string } }) {
-  const entry = (await getAllDiaryEntries()).find((item) => getDiaryId(item) === params.id);
+export default async function DiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const entry = (await getAllDiaryEntries()).find((item) => getDiaryId(item) === id);
   if (!entry || !isDiaryPublished(entry)) notFound();
 
   const eyecatch = getDiaryEyecatch(entry);

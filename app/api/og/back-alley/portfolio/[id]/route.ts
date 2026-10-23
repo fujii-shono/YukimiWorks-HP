@@ -19,8 +19,9 @@ async function createR18Image() {
   return sharp(badge).png().toBuffer();
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
-  const item = await getBackAlleyOgpData(params.id);
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const item = await getBackAlleyOgpData(id);
   if (!item) return new NextResponse(null, { status: 404 });
 
   try {

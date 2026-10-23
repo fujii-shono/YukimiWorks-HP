@@ -12,11 +12,12 @@ export const dynamic = 'force-dynamic';
 export default async function PortfolioPage({
   searchParams,
 }: {
-  searchParams?: { category?: string };
+  searchParams?: Promise<{ category?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const portfolioItems = await getAllPortfolioItems();
-  const validCategory = allCategories.includes(searchParams?.category as PortfolioCategory)
-    ? (searchParams?.category as PortfolioCategory)
+  const validCategory = allCategories.includes(resolvedSearchParams?.category as PortfolioCategory)
+    ? (resolvedSearchParams?.category as PortfolioCategory)
     : null;
   const visibleCategories = allCategories.filter((category) => portfolioItems.some((item) => item.category === category));
   const filteredItems = validCategory ? portfolioItems.filter((item) => item.category === validCategory) : portfolioItems;

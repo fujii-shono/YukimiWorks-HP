@@ -13,6 +13,8 @@ import type { AccountPurchaseProduct } from '@/lib/accountPurchaseProducts';
 import { getFirebaseServices, isFirebaseConfigured } from '@/lib/firebase/client';
 import type { SiteUser, UserTicket } from '@/lib/firebase/types';
 
+const FIREBASE_INITIALIZATION_TIMEOUT_MS = 10_000;
+
 type AuthContextValue = {
   firebaseUser: User | null;
   profile: SiteUser | null;
@@ -22,6 +24,7 @@ type AuthContextValue = {
   error: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  retryFirebaseConnection: () => void;
   updateDisplayName: (displayName: string) => Promise<void>;
   updateBackAlleyConfirmation: (confirmed: boolean) => Promise<void>;
   updateAdultConfirmation: (confirmed: boolean) => Promise<void>;
@@ -94,21 +97,57 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(configured);
   const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
 
   useEffect(() => {
-    const services = getFirebaseServices();
-    if (!services) {
+    let active = true;
+    let receivedState = false;
+    let unsubscribe = () => {};
+    const timeout = window.setTimeout(() => {
+      if (!active || receivedState) return;
       setLoading(false);
-      return;
+      setError('ログイン状態を確認できませんでした。通信状態を確認して、もう一度お試しください。');
+    }, FIREBASE_INITIALIZATION_TIMEOUT_MS);
+
+    try {
+      const services = getFirebaseServices();
+      if (!services) {
+        window.clearTimeout(timeout);
+        setLoading(false);
+        return () => { active = false; };
+      }
+
+      unsubscribe = onAuthStateChanged(
+        services.auth,
+        (user) => {
+          if (!active) return;
+          receivedState = true;
+          window.clearTimeout(timeout);
+          setFirebaseUser(user);
+          setProfile(null);
+          setError(null);
+          setLoading(false);
+        },
+        () => {
+          if (!active) return;
+          receivedState = true;
+          window.clearTimeout(timeout);
+          setLoading(false);
+          setError('ログイン状態を確認できませんでした。通信状態を確認して、もう一度お試しください。');
+        },
+      );
+    } catch {
+      window.clearTimeout(timeout);
+      setLoading(false);
+      setError('ログイン機能を初期化できませんでした。通信状態を確認して、もう一度お試しください。');
     }
 
-    return onAuthStateChanged(services.auth, (user) => {
-      setFirebaseUser(user);
-      setProfile(null);
-      setError(null);
-      setLoading(false);
-    });
-  }, []);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      unsubscribe();
+    };
+  }, [connectionAttempt]);
 
   useEffect(() => {
     const services = getFirebaseServices();
@@ -121,6 +160,11 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     let active = true;
     let unsubscribeProfile = () => {};
     setProfileLoading(true);
+    const timeout = window.setTimeout(() => {
+      if (!active) return;
+      setProfileLoading(false);
+      setError('ユーザー情報を確認できませんでした。通信状態を確認して、もう一度お試しください。');
+    }, FIREBASE_INITIALIZATION_TIMEOUT_MS);
 
     void ensureUserProfile(firebaseUser)
       .then(() => {
@@ -131,10 +175,13 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
             const data = snapshot.data();
             setProfile(parseSiteUser(data));
             setProfileLoading(false);
+            window.clearTimeout(timeout);
+            setError(null);
           },
           () => {
             setError('ユーザー情報を読み込めませんでした。');
             setProfileLoading(false);
+            window.clearTimeout(timeout);
           },
         );
       })
@@ -142,13 +189,21 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         if (!active) return;
         setError('ユーザー情報を作成できませんでした。');
         setProfileLoading(false);
+        window.clearTimeout(timeout);
       });
 
     return () => {
       active = false;
+      window.clearTimeout(timeout);
       unsubscribeProfile();
     };
-  }, [firebaseUser]);
+  }, [connectionAttempt, firebaseUser]);
+
+  const retryFirebaseConnection = useCallback(() => {
+    setError(null);
+    setLoading(configured);
+    setConnectionAttempt((attempt) => attempt + 1);
+  }, [configured]);
 
   const signIn = useCallback(async () => {
     const services = getFirebaseServices();
@@ -164,7 +219,9 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       await signInWithPopup(services.auth, provider);
     } catch (signInError) {
       const code = typeof signInError === 'object' && signInError && 'code' in signInError ? String(signInError.code) : '';
-      if (code !== 'auth/popup-closed-by-user') setError('Googleログインに失敗しました。もう一度お試しください。');
+      if (code !== 'auth/popup-closed-by-user') {
+        setError(code === 'auth/network-request-failed' ? 'ログイン通信に失敗しました。通信状態を確認して、もう一度お試しください。' : 'Googleログインに失敗しました。もう一度お試しください。');
+      }
     }
   }, []);
 
@@ -253,13 +310,14 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       error,
       signIn,
       signOut,
+      retryFirebaseConnection,
       updateDisplayName,
       updateBackAlleyConfirmation,
       updateAdultConfirmation,
       purchaseProduct,
       openBillingPortal,
     }),
-    [configured, error, firebaseUser, loading, openBillingPortal, profile, profileLoading, purchaseProduct, signIn, signOut, updateAdultConfirmation, updateBackAlleyConfirmation, updateDisplayName],
+    [configured, error, firebaseUser, loading, openBillingPortal, profile, profileLoading, purchaseProduct, retryFirebaseConnection, signIn, signOut, updateAdultConfirmation, updateBackAlleyConfirmation, updateDisplayName],
   );
 
   return <FirebaseAuthContext.Provider value={value}>{children}</FirebaseAuthContext.Provider>;

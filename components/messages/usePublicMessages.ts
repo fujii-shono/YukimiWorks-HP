@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { messagePosts, type MessagePost, type MessageSupportReply } from '@/data/messages';
 import { getProtectedMediaUrl, subscribeToFirebaseMessages } from '@/lib/firebase/messages';
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
@@ -36,6 +36,7 @@ export function parseJapaneseDateTime(value: string) {
 
 export const MESSAGE_SAVED_EVENT = 'yukimi-message-saved';
 export const SUPPORT_REPLY_SAVED_EVENT = 'yukimi-support-reply-saved';
+const FIRESTORE_SUBSCRIPTION_TIMEOUT_MS = 10_000;
 
 export function formatFirebaseDate(date: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -85,6 +86,13 @@ export function usePublicMessages(includeBackAlley = false) {
   const [now, setNow] = useState<Date | null>(null);
   const [donationPosts, setDonationPosts] = useState<MessagePost[]>([]);
   const [firebasePosts, setFirebasePosts] = useState<MessagePost[]>([]);
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  const [firebaseAttempt, setFirebaseAttempt] = useState(0);
+
+  const retryFirebaseMessages = useCallback(() => {
+    setFirebaseError(null);
+    setFirebaseAttempt((attempt) => attempt + 1);
+  }, []);
 
   useEffect(() => {
     setNow(new Date());
@@ -143,7 +151,15 @@ export function usePublicMessages(includeBackAlley = false) {
   useEffect(() => {
     const objectUrls: string[] = [];
     let active = true;
+    let receivedMessages = false;
+    const timeout = window.setTimeout(() => {
+      if (!active || receivedMessages) return;
+      setFirebaseError('メッセージを読み込めませんでした。通信状態を確認して、再読み込みしてください。');
+    }, FIRESTORE_SUBSCRIPTION_TIMEOUT_MS);
     const unsubscribe = subscribeToFirebaseMessages((messages) => {
+      receivedMessages = true;
+      window.clearTimeout(timeout);
+      setFirebaseError(null);
       void Promise.all(messages.map(async (message) => ({
           id: message.id,
           publishedAt: formatFirebaseDate(message.publishedAt.toDate()),
@@ -156,10 +172,20 @@ export function usePublicMessages(includeBackAlley = false) {
             objectUrls.push(src);
             return { src, alt: image.alt };
           })),
-        }))).then((posts) => { if (active) setFirebasePosts(posts); }).catch(() => undefined);
-    }, undefined, includeBackAlley, includeBackAlley && profile?.adultConfirmed === true);
-    return () => { active = false; unsubscribe(); objectUrls.forEach((url) => URL.revokeObjectURL(url)); };
-  }, [includeBackAlley, profile?.adultConfirmed]);
+        }))).then((posts) => { if (active) setFirebasePosts(posts); }).catch(() => {
+          if (active) setFirebaseError('メッセージの画像を読み込めませんでした。通信状態を確認して、再読み込みしてください。');
+        });
+    }, () => {
+      window.clearTimeout(timeout);
+      setFirebaseError('メッセージを読み込めませんでした。通信状態を確認して、再読み込みしてください。');
+    }, includeBackAlley, includeBackAlley && profile?.adultConfirmed === true);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      unsubscribe();
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [firebaseAttempt, includeBackAlley, profile?.adultConfirmed]);
 
   useEffect(() => {
     const onMessageSaved = (event: Event) => {
@@ -182,5 +208,5 @@ export function usePublicMessages(includeBackAlley = false) {
       .sort((a, b) => parseJapaneseDateTime(b.publishedAt).getTime() - parseJapaneseDateTime(a.publishedAt).getTime());
   }, [donationPosts, firebasePosts, now]);
 
-  return { now, posts };
+  return { now, posts, firebaseError, retryFirebaseMessages };
 }

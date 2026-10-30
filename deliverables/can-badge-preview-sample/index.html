@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>缶バッジ3Dプレビュー サンプル</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./can-badge-preview.js" defer></script>
+  </head>
+  <body>
+    <main class="sample-page">
+      <section class="sample-panel" aria-labelledby="sample-title">
+        <header class="sample-heading">
+          <p class="sample-kicker">WebGL sample</p>
+          <h1 id="sample-title">缶バッジ3Dプレビュー</h1>
+          <p>画像を選択し、プレビューを左右にドラッグしてください。</p>
+        </header>
+
+        <div class="can-badge-tool" data-can-badge-preview>
+          <input
+            class="visually-hidden"
+            data-can-badge-input
+            type="file"
+            accept="image/*"
+          />
+          <p class="can-badge-tool-intro">左右にドラッグして缶バッジを回転できます</p>
+          <div class="can-badge-preview-wrap">
+            <div class="can-badge-preview" data-can-badge-drag-area>
+              <canvas
+                class="can-badge-canvas"
+                data-can-badge-canvas
+                aria-label="回転可能な3D缶バッジのプレビュー"
+                role="img"
+              ></canvas>
+              <p class="can-badge-webgl-error" data-can-badge-error hidden>
+                このブラウザでは3Dプレビューを表示できません。
+              </p>
+            </div>
+          </div>
+          <div class="can-badge-actions">
+            <button class="can-badge-file-button" data-can-badge-select type="button">
+              イラストを選択
+            </button>
+          </div>
+          <p class="can-badge-status" data-can-badge-status role="status" aria-live="polite">
+            イラストを選択すると前面に貼り付けます
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

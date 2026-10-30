@@ -1,5 +1,38 @@
 # 裏ページ・成人確認・非公開素材対応
 
+## 追加対応: SafariでのFirebase初期化・購読停止からの復旧
+
+### 対応する仕様
+
+- Firebase Authentication を利用したログインと、Firestore を正式データ元とするメッセージ表示を安定して提供する
+- 管理者だけでなく通常ユーザーも、認証またはメッセージ取得の一時的な失敗から再試行できる
+
+### 実装方針
+
+- 認証状態・ユーザープロフィールの初期化に上限時間を設け、未完了のまま操作を無期限に無効化しない
+- 失敗時は原因を隠さず画面に表示し、Firebase接続を再確認する導線を共通認証コンテキストへ置く
+- Firestoreメッセージ購読の失敗を公開画面でも表示し、再購読できるようにする
+
+### 変更予定のファイルと理由
+
+- `components/auth/FirebaseAuthProvider.tsx`, `components/auth/AccountControls.tsx`, `components/back-alley/BackAlleyGate.tsx`: 認証・プロフィール取得のタイムアウト、再試行、表示を共通化するため
+- `components/messages/usePublicMessages.ts`, `components/messages/MessagesView.tsx`, `components/ui/MessagePanel.tsx`: Firestore購読エラーの通知と再取得導線を提供するため
+
+### 影響範囲
+
+- 通常ページ、裏ページ、管理画面、公開メッセージにおけるFirebase接続失敗時の表示と復旧
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Firebase Emulator停止中に、ログイン・メッセージ画面が無期限ローディングにならず再試行可能なことを確認する
+
+### 懸念点・制約
+
+- Safari側の通信遮断やWebサイトデータ破損自体はサイトから強制修復できないため、失敗を検知して復旧可能にする
+
 ## 追加対応: 通常Portfolioの動画アップロード
 
 ### 対応する仕様
@@ -832,6 +865,46 @@
 
 - 前面へ読み込んだ画像テクスチャを縦横比を保って貼り付ける。前面メッシュ外には描画されないため、画像のはみ出しはカットされる
 - WebGLの深度値はカメラに近い前面を小さい値として扱い、裏面が前面を覆わないようにする
+
+---
+
+## 追加対応: 缶バッジ3Dプレビューの外部サイト移植サンプル
+
+### 対応する仕様
+
+- ユーザー依頼: プロジェクト内の缶バッジプレビューを外部サイトへ移植できるサンプルとしてZIP化する
+- 既存の試作仕様: 画像読み込み、WebGL描画、横ドラッグと慣性回転、前面・リム・背面の表現を維持する
+
+### 実装方針
+
+- Next.js、React、プロジェクト内の共通ユーティリティへの依存を外し、HTML・CSS・JavaScriptだけで動くサンプルにする
+- ページ内の `data-can-badge-preview` 要素ごとに初期化し、複数設置にも対応する
+- 画像はブラウザ内のみで読み込み、外部送信を行わない
+- READMEに起動方法、移植方法、DOM要件、ブラウザ条件を記載する
+
+### 変更予定のファイルと理由
+
+- `deliverables/can-badge-preview-sample/index.html`: 単体で確認できる導入例
+- `deliverables/can-badge-preview-sample/styles.css`: 移植対象の見た目とレスポンシブ定義
+- `deliverables/can-badge-preview-sample/can-badge-preview.js`: WebGLメッシュ、画像テクスチャ、ドラッグ・慣性回転の実装
+- `deliverables/can-badge-preview-sample/README.md`: 外部サイトへの組み込み手順
+- `deliverables/can-badge-preview-sample.zip`: 配布用アーカイブ
+
+### 影響範囲
+
+- `deliverables/` 配下の追加のみで、既存のページ、コンポーネント、API、データは変更しない
+
+### 検証方法
+
+- JavaScriptの構文チェック
+- ZIPの整合性と収録ファイルの確認
+- ローカルHTTPサーバー上で画像選択、ドラッグ回転、レスポンシブ表示、WebGLエラー表示を手動確認する
+- 既存プロジェクトの `npm run lint`、`npx tsc --noEmit --pretty false`、`npm run build`
+
+### 懸念点・制約・未確定事項
+
+- WebGLとJavaScriptが有効な現行ブラウザを必要とする
+- サンプルの背景は外部アセット依存を避けるためCSSで表現する
 
 ---
 

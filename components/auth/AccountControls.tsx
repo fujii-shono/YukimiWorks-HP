@@ -11,7 +11,7 @@ const OPEN_ACCOUNT_EVENT = 'yukimi:open-account';
 
 export function LoginEntryButton() {
   const pathname = usePathname();
-  const { firebaseUser, profile, loading, profileLoading } = useFirebaseAuth();
+  const { firebaseUser, profile, loading } = useFirebaseAuth();
   const adminHref = pathname.startsWith('/back-alley') ? '/back-alley/admin' : '/admin';
 
   if (!loading && firebaseUser && profile?.role === 'admin') {
@@ -26,7 +26,7 @@ export function LoginEntryButton() {
     <button
       type="button"
       className="sidebar-login-button"
-      disabled={loading || profileLoading}
+      disabled={loading}
       onClick={() => window.dispatchEvent(new CustomEvent(OPEN_ACCOUNT_EVENT, { detail: firebaseUser ? 'settings' : 'login' }))}
     >
       {firebaseUser ? 'アカウント' : 'ログイン'}
@@ -46,6 +46,7 @@ export function AccountControls() {
     error,
     signIn,
     signOut,
+    retryFirebaseConnection,
     updateDisplayName,
     updateAdultConfirmation,
     purchaseProduct,
@@ -203,6 +204,7 @@ export function AccountControls() {
                 <p>Googleアカウントでログインすると、名前・プラン・コイン情報をこのサイトで利用できます。</p>
                 {!configured ? <p className="form-error">Firebase の環境変数が未設定です。READMEをご確認ください。</p> : null}
                 {error ? <p className="form-error">{error}</p> : null}
+                {error && configured ? <button type="button" onClick={retryFirebaseConnection}>接続を再確認</button> : null}
                 <button type="button" className="pixel-button account-google-button" disabled={!configured || loading} onClick={() => void signIn()}>
                   Googleでログイン
                 </button>
@@ -210,8 +212,13 @@ export function AccountControls() {
             ) : (
               <>
                 <h2 id={titleId}>設定</h2>
-                {profileLoading || !profile ? (
+                {profileLoading ? (
                   <p>ユーザー情報を読み込んでいます…</p>
+                ) : !profile ? (
+                  <>
+                    <p className="form-error">{error || 'ユーザー情報を読み込めませんでした。'}</p>
+                    <button type="button" className="pixel-button" onClick={retryFirebaseConnection}>接続を再確認</button>
+                  </>
                 ) : (
                   <>
                     <form className="account-settings-form" onSubmit={submitName}>

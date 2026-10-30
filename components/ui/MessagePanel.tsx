@@ -14,7 +14,7 @@ export function MessagePanel({ includeBackAlley = false, href = '/messages' }: {
   const [rainbowShineActive, setRainbowShineActive] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string; body: string } | null>(null);
 
-  const { now, posts } = usePublicMessages(includeBackAlley);
+  const { now, posts, firebaseError, retryFirebaseMessages } = usePublicMessages(includeBackAlley);
 
   useEffect(() => {
     let activeTimer: number | null = null;
@@ -72,6 +72,12 @@ export function MessagePanel({ includeBackAlley = false, href = '/messages' }: {
         </span>
       </h2>
       <div className="message-panel-list" tabIndex={0}>
+        {firebaseError ? (
+          <div className="form-error" role="alert">
+            <p>{firebaseError}</p>
+            <button type="button" onClick={retryFirebaseMessages}>再試行</button>
+          </div>
+        ) : null}
         {visiblePosts.map((post, index) => {
           if (!now) return null;
 

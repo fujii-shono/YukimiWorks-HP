@@ -233,7 +233,7 @@ function SupportReplyModal({
 }
 
 export function MessagesView({ includeBackAlley = false }: { includeBackAlley?: boolean }) {
-  const { now, posts } = usePublicMessages(includeBackAlley);
+  const { now, posts, firebaseError, retryFirebaseMessages } = usePublicMessages(includeBackAlley);
   const { firebaseUser, loading, profile, profileLoading } = useFirebaseAuth();
   const [activeTab, setActiveTab] = useState<MessageTab>('messages');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -338,6 +338,12 @@ export function MessagesView({ includeBackAlley = false }: { includeBackAlley?: 
 
           <div id={`messages-panel-${activeTab}`} role="tabpanel" aria-labelledby={`messages-tab-${activeTab}`} className="messages-tab-panel">
             {!now ? <p className="empty-state">メッセージを読み込んでいます…</p> : null}
+            {firebaseError ? (
+              <div className="form-error" role="alert">
+                <p>{firebaseError}</p>
+                <button type="button" onClick={retryFirebaseMessages}>再試行</button>
+              </div>
+            ) : null}
 
             {now && activeTab !== 'media' && visiblePosts.length > 0 ? (
               <MessageFeed

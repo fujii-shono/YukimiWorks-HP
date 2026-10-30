@@ -6,11 +6,23 @@ import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 
 export function BackAlleyGate({ children, background }: { children: React.ReactNode; background: React.ReactNode }) {
   const router = useRouter();
-  const { firebaseUser, profile, loading, profileLoading, configured, error, signIn, updateBackAlleyConfirmation } = useFirebaseAuth();
+  const { firebaseUser, profile, loading, profileLoading, configured, error, signIn, retryFirebaseConnection, updateBackAlleyConfirmation } = useFirebaseAuth();
   const [saving, setSaving] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
   if (loading || profileLoading) return <>{background}<div className="modal-overlay back-alley-gate-overlay"><section className="modal-panel modal-panel-small" role="status"><p>ログイン情報を確認しています…</p></section></div></>;
+  if (firebaseUser && !profile) return (
+    <>{background}<div className="modal-overlay back-alley-gate-overlay">
+      <section className="modal-panel modal-panel-small" role="dialog" aria-modal="true" aria-labelledby="back-alley-profile-error-title">
+        <h1 id="back-alley-profile-error-title" className="window-title">裏ページ</h1>
+        <p className="form-error">{error || 'ユーザー情報を確認できませんでした。'}</p>
+        <div className="back-alley-gate-actions">
+          <button type="button" className="pixel-button" onClick={retryFirebaseConnection}>接続を再確認</button>
+          <button type="button" onClick={() => router.replace('/')}>戻る</button>
+        </div>
+      </section>
+    </div></>
+  );
   if (!firebaseUser) return (
     <>{background}<div className="modal-overlay back-alley-gate-overlay">
       <section className="modal-panel modal-panel-small" role="dialog" aria-modal="true" aria-labelledby="back-alley-login-title">
@@ -19,6 +31,7 @@ export function BackAlleyGate({ children, background }: { children: React.ReactN
         {!configured ? <p className="form-error">Firebaseが設定されていません。</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
         <div className="back-alley-gate-actions">
+          {error && configured ? <button type="button" onClick={retryFirebaseConnection}>接続を再確認</button> : null}
           <button type="button" className="pixel-button" disabled={!configured} onClick={() => void signIn()}>Googleでログイン</button>
           <button type="button" onClick={() => router.replace('/')}>ログインせずに戻る</button>
         </div>

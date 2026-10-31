@@ -97,7 +97,6 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(configured);
   const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connectionAttempt, setConnectionAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -147,7 +146,7 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       window.clearTimeout(timeout);
       unsubscribe();
     };
-  }, [connectionAttempt]);
+  }, []);
 
   useEffect(() => {
     const services = getFirebaseServices();
@@ -197,13 +196,11 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       window.clearTimeout(timeout);
       unsubscribeProfile();
     };
-  }, [connectionAttempt, firebaseUser]);
+  }, [firebaseUser]);
 
   const retryFirebaseConnection = useCallback(() => {
-    setError(null);
-    setLoading(configured);
-    setConnectionAttempt((attempt) => attempt + 1);
-  }, [configured]);
+    window.location.reload();
+  }, []);
 
   const signIn = useCallback(async () => {
     const services = getFirebaseServices();
@@ -216,7 +213,11 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      await signInWithPopup(services.auth, provider);
+      const credential = await signInWithPopup(services.auth, provider);
+      // SafariでAuth observerの通知が遅延しても、Popup成功結果を直ちに画面へ反映する。
+      setFirebaseUser(credential.user);
+      setProfile(null);
+      setLoading(false);
     } catch (signInError) {
       const code = typeof signInError === 'object' && signInError && 'code' in signInError ? String(signInError.code) : '';
       if (code !== 'auth/popup-closed-by-user') {

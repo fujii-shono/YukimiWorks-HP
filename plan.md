@@ -12,10 +12,13 @@
 - 認証状態・ユーザープロフィールの初期化に上限時間を設け、未完了のまま操作を無期限に無効化しない
 - 失敗時は原因を隠さず画面に表示し、Firebase接続を再確認する導線を共通認証コンテキストへ置く
 - Firestoreメッセージ購読の失敗を公開画面でも表示し、再購読できるようにする
+- Safariで無応答になる事例があるIndexedDBを認証永続化に使わず、`localStorage`、利用できない場合は`sessionStorage`へフォールバックする
+- Googleログイン成功時はAuth observerだけに依存せず、返されたユーザーを画面状態へ即時反映する
+- 接続再確認では同じFirebaseインスタンスを再利用せず、ページを再読み込みしてSDK全体を初期化し直す
 
 ### 変更予定のファイルと理由
 
-- `components/auth/FirebaseAuthProvider.tsx`, `components/auth/AccountControls.tsx`, `components/back-alley/BackAlleyGate.tsx`: 認証・プロフィール取得のタイムアウト、再試行、表示を共通化するため
+- `lib/firebase/client.ts`, `components/auth/FirebaseAuthProvider.tsx`, `components/auth/AccountControls.tsx`, `components/back-alley/BackAlleyGate.tsx`: Safari向けの認証永続化、認証・プロフィール取得のタイムアウト、再初期化、表示を共通化するため
 - `components/messages/usePublicMessages.ts`, `components/messages/MessagesView.tsx`, `components/ui/MessagePanel.tsx`: Firestore購読エラーの通知と再取得導線を提供するため
 
 ### 影響範囲
@@ -32,6 +35,7 @@
 ### 懸念点・制約
 
 - Safari側の通信遮断やWebサイトデータ破損自体はサイトから強制修復できないため、失敗を検知して復旧可能にする
+- 既定のIndexedDBにだけ残っている既存ログイン状態は初回反映時に引き継がれず、ユーザーは一度Googleログインをやり直す必要がある
 
 ## 追加対応: 通常Portfolioの動画アップロード
 

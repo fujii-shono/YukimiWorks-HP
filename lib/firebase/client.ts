@@ -1,7 +1,15 @@
 'use client';
 
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  browserSessionPersistence,
+  connectAuthEmulator,
+  getAuth,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage';
 
@@ -59,9 +67,23 @@ export function getFirebaseServices(): FirebaseServices | null {
   }
 
   const app = getApps().length > 0 ? getApp() : initializeApp(config);
+  let auth: Auth;
+  try {
+    // SafariでIndexedDBが無応答になるとAuth初期化全体が止まるため、
+    // 永続ログインはlocalStorage、利用できない環境ではsessionStorageへ保存する。
+    auth = initializeAuth(app, {
+      persistence: [browserLocalPersistence, browserSessionPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+    if (code !== 'auth/already-initialized') throw error;
+    // Next.jsの開発中にHMRでモジュールだけ再評価された場合は既存インスタンスを引き継ぐ。
+    auth = getAuth(app);
+  }
   const services = {
     app,
-    auth: getAuth(app),
+    auth,
     db: getFirestore(app),
     storage: getStorage(app),
   };

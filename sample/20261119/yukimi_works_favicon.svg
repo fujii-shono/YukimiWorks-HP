@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:bx="https://boxy-svg.com"
+  viewBox="0 0 500 500"
+  width="500"
+  height="500">
+
+  <defs>
+    <clipPath id="clip-0">
+      <rect x="305.597" y="30.478" width="89.376" height="99.186"
+            style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" />
+    </clipPath>
+    <clipPath id="clip-1">
+      <rect x="132.294" y="107.865" width="139.514" height="92.646"
+            style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" />
+    </clipPath>
+    <clipPath id="clip-2">
+      <rect x="234.75" y="112.224" width="130.794" height="86.106"
+            style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" />
+    </clipPath>
+    <clipPath id="clip-3">
+      <rect x="305.597" y="30.478" width="89.376" height="99.186"
+            style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" />
+    </clipPath>
+    <clipPath id="clip-4">
+      <rect x="132.294" y="107.865" width="139.514" height="92.646"
+            style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" />
+    </clipPath>
+    <clipPath id="clip-5">
+      <rect x="234.75" y="112.224" width="130.794" height="86.106"
+            style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" />
+    </clipPath>
+
+    <linearGradient
+      id="gradient-14"
+      bx:pinned="true"
+      gradientUnits="userSpaceOnUse"
+      x1="0"
+      y1="250"
+      x2="500"
+      y2="250"
+      spreadMethod="pad">
+      <stop offset="0" style="stop-color: #ec4899;" />
+      <stop offset="1" style="stop-color: #8b5cf6;" />
+    </linearGradient>
+
+    <bx:export>
+      <bx:file format="svg" path="無題.svg"/>
+    </bx:export>
+  </defs>
+
+  <rect x="0" y="0" width="500" height="500" rx="60" ry="60" fill="#fdfef9" />
+
+  <g>
+    <path
+      d="M 250.25 331.025 L 88.75 129.845 L 205.368 129.845 C 205.086 127.777 204.94 125.666 204.94 123.521 C 204.94 97.938 225.68 77.198 251.263 77.198 C 276.846 77.198 297.586 97.938 297.586 123.521 C 297.586 125.666 297.44 127.777 297.158 129.845 L 411.75 129.845 L 250.25 331.025 Z"
+      style="stroke-miterlimit: 7.4; stroke-width: 17px; fill: none; stroke: url(#gradient-14); paint-order: fill;" />
+
+    <path
+      d="M 142.267 198.058 L 358.078 199.148"
+      style="stroke-width: 17px; fill: none; stroke: url(#gradient-14); paint-order: fill;" />
+
+    <path
+      d="M 249.082 178.984 A 46.323 46.323 0 0 1 202.759 225.307 A 46.323 46.323 0 0 1 156.436 178.984 A 46.323 46.323 0 0 1 202.759 132.661 A 46.323 46.323 0 0 1 249.082 178.984 Z"
+      style="clip-path: url(#clip-1); stroke-width: 17px; fill: none; stroke: url(#gradient-14); paint-order: fill;" />
+
+    <path
+      d="M 348.813 180.619 A 46.323 46.323 0 0 1 302.49 226.942 A 46.323 46.323 0 0 1 256.167 180.619 A 46.323 46.323 0 0 1 302.49 134.296 A 46.323 46.323 0 0 1 348.813 180.619 Z"
+      style="clip-path: url(#clip-2); stroke-width: 17px; fill: none; stroke: url(#gradient-14); paint-order: fill;" />
+
+    <path
+      d="M 324.289 138.111 L 380.967 56.365"
+      style="clip-path: url(#clip-3); stroke-linecap: round; stroke-width: 17px; fill: none; stroke: url(#gradient-14);" />
+
+    <path
+      d="M 250.287 327.877 L 250.287 449.952"
+      style="stroke-width: 15px; fill: none; stroke: url(#gradient-14); paint-order: fill;" />
+
+    <path
+      d="M 180.53 446.682 L 321.134 446.682"
+      style="stroke-width: 15px; fill: none; stroke: url(#gradient-14); paint-order: fill;" />
+  </g>
+</svg>

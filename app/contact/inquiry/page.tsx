@@ -1,20 +1,27 @@
-import { SiteFrame } from '@/components/layout/SiteFrame';
-import { RetroPanel } from '@/components/panels/RetroPanel';
-import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
-import { InquiryForm } from '@/components/ui/InquiryForm';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { CorporateInquiryForm } from '@/components/corporate/CorporateInquiryForm';
+import { CorporateLayout } from '@/components/corporate/CorporateLayout';
+
+export const metadata: Metadata = {
+  title: 'その他のお問い合わせ | YukimiWorks',
+  description: 'YukimiWorksへのその他のお問い合わせ窓口です。',
+};
 
 export default function InquiryPage() {
   return (
-    <SiteFrame>
-      <section className="window-panel single-panel-body detail-panel">
-        <Link href="/contact" className="back-link">
-          &larr; お問い合わせトップへ戻る
-        </Link>
-        <div className="page-intro">
-          <h2>ご意見・ご要望</h2>
+    <CorporateLayout>
+      <div className="corporate-page-hero corporate-container">
+        <h1>その他のお問い合わせ</h1>
+      </div>
+      <section className="corporate-section corporate-section-soft">
+        <div className="corporate-container corporate-contact-form-container">
+          <Link href="/contact" className="corporate-back-link">お問い合わせへ戻る</Link>
+          <div className="corporate-form-card">
+            <CorporateInquiryForm type="general" />
+          </div>
         </div>
-        <InquiryForm />
       </section>
-    </SiteFrame>
+    </CorporateLayout>
   );
 }

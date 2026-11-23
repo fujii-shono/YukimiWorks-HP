@@ -1,49 +1,49 @@
-import { SiteFrame } from '@/components/layout/SiteFrame';
-import { RetroPanel } from '@/components/panels/RetroPanel';
-import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
-import { siteLinks } from '@/data/links';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { CorporateLayout } from '@/components/corporate/CorporateLayout';
 
-const hubItems = [
+export const metadata: Metadata = {
+  title: 'お問い合わせ | YukimiWorks',
+  description: '開発のご相談、サービス・アプリ、その他のお問い合わせ窓口です。',
+};
+
+const contactOptions = [
   {
-    title: 'ご意見・ご要望',
-    description: 'YukimiWorksへのご意見・ご要望はこちら',
-    href: '/contact/inquiry',
+    title: '開発のご相談',
+    description: 'システム開発、改修、AI導入、かかりつけ開発室のご相談',
+    href: '/contact/development',
   },
   {
-    title: 'アプリ・サービスに関するお問い合わせ',
-    description: 'YukimiWorksのアプリ・サービスへのご質問・ご要望はこちら',
+    title: 'サービス・アプリのお問い合わせ',
+    description: 'YukimiWorksのサービスやアプリに関するご質問・ご要望',
     href: '/contact/app',
   },
-];
+  {
+    title: 'その他のお問い合わせ',
+    description: '上記以外のお問い合わせ',
+    href: '/contact/inquiry',
+  },
+] as const;
 
 export default function ContactHubPage() {
-  const supportLinks = siteLinks.filter((link) => link.supportContact);
-
   return (
-    <SiteFrame>
-      <RetroPanel title="お問い合わせ / Contact" contentClassName="single-panel-body contact-hub-body">
-        <div className="contact-hub-list">
-          {hubItems.map((item) => (
-            <Link key={item.href} href={item.href} className="contact-hub-link">
+    <CorporateLayout>
+      <div className="corporate-page-hero corporate-container">
+        <h1>お問い合わせ</h1>
+      </div>
+      <section className="corporate-section corporate-section-soft">
+        <div className="corporate-container corporate-contact-option-list">
+          {contactOptions.map((option) => (
+            <Link key={option.href} href={option.href} className="corporate-contact-option">
               <div>
-                <strong>{item.title}</strong>
-                <p>{item.description}</p>
+                <h2>{option.title}</h2>
+                <p>{option.description}</p>
               </div>
-              <span aria-hidden="true">&rarr;</span>
+              <span aria-hidden="true">→</span>
             </Link>
           ))}
         </div>
-        <div className="support-links">
-          <h3>その他連絡先</h3>
-          <div className="support-links-row">
-            {supportLinks.map((link) => (
-              <Link key={link.id} href={link.url} target="_blank" rel="noopener noreferrer">
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </RetroPanel>
-    </SiteFrame>
+      </section>
+    </CorporateLayout>
   );
 }

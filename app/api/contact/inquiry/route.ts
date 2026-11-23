@@ -16,15 +16,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: '入力内容を確認してください。' }, { status: 400 });
   }
 
-  const { email, name, nameKana, message } = parsed.data;
+  const { email, name, nameKana, message, inquiryType } = parsed.data;
+  const isDevelopmentInquiry = inquiryType === 'development';
+  const inquiryLabel = isDevelopmentInquiry ? '開発相談' : 'その他お問い合わせ';
   const result = await sendMail({
     to,
-    subject: `【仕事のご依頼】${name || email} 様よりお問い合わせ`,
+    subject: `【${inquiryLabel}】${name || email} 様よりお問い合わせ`,
     html: `
       <p><strong>メール:</strong> ${escapeHtml(email)}</p>
       <p><strong>お名前・会社名:</strong> ${escapeHtml(name || '（未入力）')}</p>
       <p><strong>ふりがな:</strong> ${escapeHtml(nameKana || '（未入力）')}</p>
-      <p><strong>ご依頼内容:</strong><br>${escapeHtml(message)}</p>
+      <p><strong>${isDevelopmentInquiry ? 'ご相談内容' : 'お問い合わせ内容'}:</strong><br>${escapeHtml(message)}</p>
     `,
   });
 

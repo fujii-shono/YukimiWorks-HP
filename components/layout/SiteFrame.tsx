@@ -9,9 +9,11 @@ import { TimeThemeProvider } from '@/components/theme/TimeThemeProvider';
 export function SiteFrame({
   children,
   hideSidebar = false,
+  homeHref = '/circle',
 }: {
   children: React.ReactNode;
   hideSidebar?: boolean;
+  homeHref?: string;
 }) {
   return (
     <TimeThemeProvider>
@@ -20,7 +22,7 @@ export function SiteFrame({
         本文へ移動
       </a>
       <div className="page-shell">
-        <Header />
+        <Header homeHref={homeHref} />
         {hideSidebar ? (
           <main id="main" className="main-column standalone-main">
             {children}

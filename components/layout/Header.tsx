@@ -17,7 +17,8 @@ export function Header({ homeHref = '/', tagline: taglineOverride }: { homeHref?
   const siteTitle = event === 'sleep-warning' ? 'はやく　寝ろ' : 'YukimiWorks';
   const headerDecorationIcon =
     event === 'lunch' ? '/icons/food/contents.png' : event === 'snack' ? '/icons/sweets/apps.png' : null;
-  const headerContent = <><h1 id="site-title">{siteTitle}</h1><p className="tagline">{taglineOverride ?? tagline}</p></>;
+  const resolvedTagline = taglineOverride ?? tagline;
+  const headerContent = <><h1 id="site-title">{siteTitle}</h1>{resolvedTagline ? <p className="tagline">{resolvedTagline}</p> : null}</>;
 
   const resetDrag = () => {
     startXRef.current = null;

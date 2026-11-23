@@ -159,6 +159,14 @@ export function AccountControls() {
   const hasBlueTicket = profile?.tickets.includes('blue') || false;
   const hasNightTicket = profile?.tickets.includes('night') || false;
   const adminHref = pathname.startsWith('/back-alley') ? '/back-alley/admin' : '/admin';
+  const isCorporatePage =
+    pathname === '/' ||
+    pathname === '/about' ||
+    pathname === '/contact' ||
+    pathname.startsWith('/products') ||
+    pathname.startsWith('/kakaritsuke');
+
+  if (isCorporatePage) return null;
 
   return (
     <>

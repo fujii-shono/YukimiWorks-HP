@@ -1,72 +1,59 @@
-import { SiteFrame } from '@/components/layout/SiteFrame';
-import { RetroPanel } from '@/components/panels/RetroPanel';
+import type { Metadata } from 'next';
+import { CorporateBanner } from '@/components/corporate/CorporateBanner';
+import { CorporateLayout } from '@/components/corporate/CorporateLayout';
 
-const strengths = [
-  {
-    number: '01',
-    heading: 'つくる側から始まった会社',
-    body: 'YukimiWorksは、企画を語るだけでなく、実際に手を動かして作品やサービスを生み出してきたクリエイターが立ち上げた会社です。だからこそ、見た目の魅力だけでなく、制作の流れや仕上がりの質まで含めて考えます。',
-  },
-  {
-    number: '02',
-    heading: '制作現場を知っている',
-    body: '現場では、言葉のすれ違いひとつで進行が止まり、理想と実装の間に小さな負担が積み重なっていきます。YukimiWorksはその苦労を知っているから、つくる人の感覚を置き去りにせず、伝達や判断のズレまで見据えて伴走します。',
-  },
-  {
-    number: '03',
-    heading: 'アイデアを、完成まで',
-    body: 'アイデアや企画は出発点にすぎません。実際に世の中へ届けるには、形にし、磨き、最後まで完成させる責任が必要です。YukimiWorksは創作の前提を大切にし、思いつきで終わらせず、完成まで持っていくことに価値を置いています。',
-  },
-] as const;
+export const metadata: Metadata = {
+  title: '会社情報 | YukimiWorks',
+  description: '合同会社YukimiWorksの経営理念と会社情報です。',
+};
 
 export default function AboutPage() {
   return (
-    <SiteFrame>
-      <RetroPanel title="About" contentClassName="single-panel-body about-body">
-        <h1 className="about-catchphrase">もっと楽しく、もっと便利に</h1>
-        <div className="about-intro">
-          <p>
-            合同会社YukimiWorksは
-            <br />
-            クリエイターゆきみによって
-            <br />
-            立ち上げられた会社です。
-          </p>
-          <p>
-            YukimiWorksが大切にしているのは、
-            <br />
-            きれいな企画書ではなく、
-            <br />
-            実際に形になり、ちゃんと届くものづくりです。
-          </p>
+    <CorporateLayout>
+      <CorporateBanner decorative priority />
+
+      <section className="corporate-section corporate-philosophy" aria-labelledby="corporate-philosophy-title">
+        <div className="corporate-container corporate-philosophy-inner">
+          <div className="corporate-section-heading">
+            <h1 id="corporate-philosophy-title">経営理念</h1>
+          </div>
+          <div className="corporate-philosophy-message">
+            <h3>人を活かすIT・AIで、より良い未来へ。</h3>
+            <p>私たちは、小さな課題にも目を向け、</p>
+            <p>IT・AIを活用して日々の業務負担を軽減します。</p>
+            <p>人が本来の仕事に集中できる環境をつくり、</p>
+            <p>外部に依存せず、自社で運用できる仕組みを目指します。</p>
+            <p><strong>技術を通じて、人と組織の自立と成長に貢献します。</strong></p>
+          </div>
         </div>
-        <div className="about-strength-list">
-          {strengths.map((strength) => (
-            <section key={strength.number} className="about-strength-block" aria-labelledby={`about-strength-${strength.number}`}>
-              <div className="about-strength-heading">
-                <p className="about-strength-number">{strength.number}</p>
-                <h2 id={`about-strength-${strength.number}`}>{strength.heading}</h2>
-              </div>
-              <p className="about-strength-body">{strength.body}</p>
-            </section>
-          ))}
+      </section>
+
+      <section className="corporate-section corporate-section-soft" aria-labelledby="corporate-company-title">
+        <div className="corporate-container corporate-company-details">
+          <div className="corporate-section-heading">
+            <h2 id="corporate-company-title">会社情報</h2>
+          </div>
+          <dl className="corporate-company-list">
+            <div><dt>会社名</dt><dd>合同会社YukimiWorks</dd></div>
+            <div><dt>代表者</dt><dd>藤井 翔之</dd></div>
+            <div><dt>所在地</dt><dd>神奈川県横浜市西区浅間町1丁目4番3号 ウィザードビル402</dd></div>
+            <div><dt>設立年月日</dt><dd>2026年1月29日</dd></div>
+            <div>
+              <dt>事業内容</dt>
+              <dd>
+                <ul className="corporate-company-business-list">
+                  <li>Webアプリケーション開発</li>
+                  <li>モバイルアプリケーション開発</li>
+                  <li>AIシステムの企画・開発</li>
+                  <li>業務システムの受託開発</li>
+                  <li>Webサイトの企画・制作</li>
+                </ul>
+              </dd>
+            </div>
+            <div><dt>法人番号</dt><dd>2020003030288</dd></div>
+          </dl>
         </div>
-        <div className="about-closing">
-          <p>
-            企画だけで終わらせない。
-            <br />
-            現場だけに苦労を押しつけない。
-            <br />
-            そして、完成するところまで諦めない。
-          </p>
-          <p>それがYukimiWorksのものづくりです。</p>
-          <p>
-            神奈川県横浜市西区浅間町1丁目4番3号ウィザードビル402
-            <br />
-            代表者 ゆきみ
-          </p>
-        </div>
-      </RetroPanel>
-    </SiteFrame>
+      </section>
+    </CorporateLayout>
   );
 }

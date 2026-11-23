@@ -10,7 +10,8 @@ export const inquirySchema = z.object({
   email: emailField,
   name: z.string().optional(),
   nameKana: z.string().optional(),
-  message: z.string().min(1, 'ご依頼内容を入力してください。'),
+  message: z.string().min(1, '内容を入力してください。'),
+  inquiryType: z.enum(['development', 'general']).optional(),
 });
 
 export const appInquirySchema = z.object({

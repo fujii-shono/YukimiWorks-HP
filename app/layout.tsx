@@ -97,21 +97,21 @@ const themeBootstrapScript = `
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.siteUrl),
-  title: 'YukimiWorks | アプリ・コンテンツ制作',
+  title: 'YukimiWorks | 自社プロダクト・開発支援',
   description: siteConfig.description,
   icons: {
-    icon: '/logo/yukimi_works_favicon.png',
+    icon: '/brand/yukimi-works-favicon.svg',
   },
   openGraph: {
-    title: 'YukimiWorks | アプリ・コンテンツ制作',
+    title: 'YukimiWorks | 自社プロダクト・開発支援',
     description: siteConfig.description,
-    images: [{ url: '/logo/open_graph.png' }],
+    images: [{ url: '/brand/corporate-hero.webp' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'YukimiWorks | アプリ・コンテンツ制作',
+    title: 'YukimiWorks | 自社プロダクト・開発支援',
     description: siteConfig.description,
-    images: ['/logo/open_graph.png'],
+    images: ['/brand/corporate-hero.webp'],
   },
 };
 

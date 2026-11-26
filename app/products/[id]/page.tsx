@@ -55,6 +55,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               </ul>
             </section>
             <span className="corporate-product-category">{product.category}</span>
+            {product.supportedSocialNetworks ? (
+              <section>
+                <h2>対応SNS</h2>
+                <ul>
+                  {product.supportedSocialNetworks.map((socialNetwork) => <li key={socialNetwork}>{socialNetwork}</li>)}
+                </ul>
+              </section>
+            ) : null}
           </div>
         </div>
       </article>

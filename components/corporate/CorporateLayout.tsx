@@ -32,6 +32,28 @@ export function CorporateLayout({ children }: { children: React.ReactNode }) {
               お問い合わせ
             </Link>
           </nav>
+          <div className="corporate-mobile-header-actions">
+            <Link href="/contact" className="corporate-mobile-contact">
+              お問い合わせ
+            </Link>
+            <details className="corporate-mobile-menu">
+              <summary>
+                <span className="corporate-hamburger-icon" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                <span className="visually-hidden">メニュー</span>
+              </summary>
+              <nav className="corporate-mobile-menu-panel" aria-label="企業サイトモバイルメニュー">
+                {navigation.map((item) => (
+                  <Link key={item.href} href={item.href}>
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            </details>
+          </div>
         </div>
       </header>
       <main id="corporate-main">{children}</main>

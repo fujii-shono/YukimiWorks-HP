@@ -5,6 +5,7 @@ export type CorporateProduct = {
   summary: string;
   challenge: string;
   capabilities: string[];
+  supportedSocialNetworks?: string[];
   thumbnail?: string;
   thumbnailWidth?: number;
   thumbnailHeight?: number;
@@ -39,6 +40,7 @@ export const corporateProducts: CorporateProduct[] = [
       '予約投稿はSNSごとに処理し、投稿結果を個別に記録します。一時的な失敗に備え、再試行の仕組みも備えています。',
       '制作実績はポートフォリオにまとめて公開でき、画像に透かしを入れた状態で発信できます。',
     ],
+    supportedSocialNetworks: ['X', 'Instagram', 'Threads', 'Bluesky', 'Misskey'],
     thumbnail: '/products/portlink-thumbnail.png',
     thumbnailWidth: 1200,
     thumbnailHeight: 630,

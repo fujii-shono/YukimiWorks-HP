@@ -3249,7 +3249,7 @@
 
 ## 2026年11月26日 PORTLINK対応SNSの追加
 
-- PORTLINKの個別LP最下部に「対応SNS」を追加する
+- PORTLINKの個別LPで、カテゴリバッジの直前に「対応SNS」を追加する
 - 正式表記で`X`、`Instagram`、`Threads`、`Bluesky`、`Misskey`を箇条書きにする
 - `data/corporateProducts.ts`に任意の対応SNS配列を追加し、共通個別LPがデータのある製品だけを表示する
 - 型チェック、lint、production buildと、PORTLINK以外に該当セクションが出ないことを検証する

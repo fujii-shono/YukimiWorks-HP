@@ -54,7 +54,6 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 {product.capabilities.map((capability) => <li key={capability}>{capability}</li>)}
               </ul>
             </section>
-            <span className="corporate-product-category">{product.category}</span>
             {product.supportedSocialNetworks ? (
               <section>
                 <h2>対応SNS</h2>
@@ -63,6 +62,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 </ul>
               </section>
             ) : null}
+            <span className="corporate-product-category">{product.category}</span>
           </div>
         </div>
       </article>

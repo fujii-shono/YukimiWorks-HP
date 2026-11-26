@@ -10,10 +10,14 @@ export function SiteFrame({
   children,
   hideSidebar = false,
   homeHref = '/circle',
+  siteTitle = '溶けたアイス',
+  siteEyebrow = '同人サークル',
 }: {
   children: React.ReactNode;
   hideSidebar?: boolean;
   homeHref?: string;
+  siteTitle?: string;
+  siteEyebrow?: string;
 }) {
   return (
     <TimeThemeProvider>
@@ -22,7 +26,7 @@ export function SiteFrame({
         本文へ移動
       </a>
       <div className="page-shell">
-        <Header homeHref={homeHref} />
+        <Header homeHref={homeHref} title={siteTitle} eyebrow={siteEyebrow} />
         {hideSidebar ? (
           <main id="main" className="main-column standalone-main">
             {children}

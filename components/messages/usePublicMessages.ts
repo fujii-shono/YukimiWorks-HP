@@ -82,7 +82,7 @@ export function publishSupportReply(messageId: string, reply: MessageSupportRepl
 }
 
 export function usePublicMessages(includeBackAlley = false) {
-  const { profile } = useFirebaseAuth();
+  const { firebaseUser, profile } = useFirebaseAuth();
   const [now, setNow] = useState<Date | null>(null);
   const [donationPosts, setDonationPosts] = useState<MessagePost[]>([]);
   const [firebasePosts, setFirebasePosts] = useState<MessagePost[]>([]);
@@ -178,14 +178,14 @@ export function usePublicMessages(includeBackAlley = false) {
     }, () => {
       window.clearTimeout(timeout);
       setFirebaseError('メッセージを読み込めませんでした。通信状態を確認して、再読み込みしてください。');
-    }, includeBackAlley, includeBackAlley && profile?.adultConfirmed === true);
+    }, includeBackAlley, Boolean(firebaseUser && profile?.adultConfirmed));
     return () => {
       active = false;
       window.clearTimeout(timeout);
       unsubscribe();
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [firebaseAttempt, includeBackAlley, profile?.adultConfirmed]);
+  }, [firebaseAttempt, firebaseUser, includeBackAlley, profile?.adultConfirmed]);
 
   useEffect(() => {
     const onMessageSaved = (event: Event) => {

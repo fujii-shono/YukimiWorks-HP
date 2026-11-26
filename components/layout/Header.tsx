@@ -6,7 +6,17 @@ import { useRef, useState } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { RestrictedLink } from '@/components/ui/RestrictedLink';
 
-export function Header({ homeHref = '/', tagline: taglineOverride }: { homeHref?: string; tagline?: string }) {
+export function Header({
+  homeHref = '/',
+  tagline: taglineOverride,
+  title = 'YukimiWorks',
+  eyebrow,
+}: {
+  homeHref?: string;
+  tagline?: string;
+  title?: string;
+  eyebrow?: string;
+}) {
   const { event, tagline, absent, canPeek, peekActive, triggerPeek, peekImageSrc, showPeekBubble } = useTimeTheme();
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -14,11 +24,11 @@ export function Header({ homeHref = '/', tagline: taglineOverride }: { homeHref?
   const visibleCharacterWidth = dragOffset * 3;
   const DRAG_LIMIT = 100;
   const TRIGGER_THRESHOLD = 50;
-  const siteTitle = event === 'sleep-warning' ? 'はやく　寝ろ' : 'YukimiWorks';
+  const siteTitle = event === 'sleep-warning' ? 'はやく　寝ろ' : title;
   const headerDecorationIcon =
     event === 'lunch' ? '/icons/food/contents.png' : event === 'snack' ? '/icons/sweets/apps.png' : null;
   const resolvedTagline = taglineOverride ?? tagline;
-  const headerContent = <><h1 id="site-title">{siteTitle}</h1>{resolvedTagline ? <p className="tagline">{resolvedTagline}</p> : null}</>;
+  const headerContent = <>{eyebrow ? <p className="site-eyebrow">{eyebrow}</p> : null}<h1 id="site-title">{siteTitle}</h1>{resolvedTagline ? <p className="tagline">{resolvedTagline}</p> : null}</>;
 
   const resetDrag = () => {
     startXRef.current = null;
@@ -107,9 +117,9 @@ export function Header({ homeHref = '/', tagline: taglineOverride }: { homeHref?
         </div>
         <div className="hero-banner-panel hero-banner-panel-center">
           {homeHref === '/' ? (
-            <RestrictedLink href={homeHref} className="hero-link" aria-label="YukimiWorks トップページへ移動">{headerContent}</RestrictedLink>
+            <RestrictedLink href={homeHref} className="hero-link" aria-label={`${title} トップページへ移動`}>{headerContent}</RestrictedLink>
           ) : (
-            <NextLink href={homeHref} className="hero-link" aria-label="YukimiWorks トップページへ移動">{headerContent}</NextLink>
+            <NextLink href={homeHref} className="hero-link" aria-label={`${title} トップページへ移動`}>{headerContent}</NextLink>
           )}
           <div className="dotted-rule" aria-hidden="true" />
         </div>

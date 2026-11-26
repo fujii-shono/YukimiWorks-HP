@@ -15,24 +15,32 @@ export function CorporateProductList({ layout = 'carousel' }: CorporateProductLi
       tabIndex={layout === 'carousel' ? 0 : undefined}
     >
       {corporateProducts.map((product) => (
-        <article key={product.id} className="corporate-home-product-card" role="listitem">
+        <Link
+          key={product.id}
+          href={`/products/${product.id}`}
+          className="corporate-home-product-card"
+          role="listitem"
+        >
           <div className="corporate-home-product-thumbnail" aria-hidden={!product.thumbnail}>
             {product.thumbnail ? (
               <Image
                 src={product.thumbnail}
                 alt={`${product.title}の画面`}
-                width={1306}
-                height={740}
+                width={product.thumbnailWidth ?? 1306}
+                height={product.thumbnailHeight ?? 740}
                 className="corporate-home-product-thumbnail-image"
               />
             ) : null}
           </div>
-          <Link href={`/products/${product.id}`} className="corporate-home-product-card-link">
+          <div className="corporate-home-product-card-body">
             <h3>{product.title}</h3>
             <p>{product.summary}</p>
-            <strong>詳しく見る</strong>
-          </Link>
-        </article>
+            <div className="corporate-home-product-card-footer">
+              <strong>詳しく見る</strong>
+              <span className="corporate-product-category">{product.category}</span>
+            </div>
+          </div>
+        </Link>
       ))}
     </div>
   );

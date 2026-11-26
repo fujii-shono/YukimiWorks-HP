@@ -22,9 +22,8 @@ import { getXPostCharacterCount, isXPostTooLong, MAX_X_POST_CHARACTERS } from '@
 
 const adminSections = [
   { id: 'messages', label: 'メッセージ' },
-  { id: 'portfolio', label: 'ポートフォリオ' },
-  { id: 'works', label: '成果物' },
-  { id: 'diary', label: '日記' },
+  { id: 'works', label: '作品' },
+  { id: 'goods', label: 'グッズ' },
   { id: 'news', label: 'ニュース' },
   { id: 'analytics', label: 'アクセス分析' },
 ] as const;
@@ -59,7 +58,7 @@ function getXPostStatusLabel(message: FirebaseMessage) {
   return 'X投稿待ち';
 }
 
-export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admin' | '/back-alley/admin' }) {
+export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admin' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { firebaseUser, profile, loading, profileLoading } = useFirebaseAuth();
@@ -350,7 +349,7 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
   }
 
   if (activeSection !== 'messages') {
-    return <AdminContentManager kind={activeSection as 'portfolio' | 'works' | 'diary' | 'news'} onBack={backToDashboard} />;
+    return <AdminContentManager kind={activeSection as 'works' | 'goods' | 'news'} onBack={backToDashboard} />;
   }
 
   return (
@@ -397,7 +396,7 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
                 {message.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               </time>
               <p>{message.body}</p>
-              <span>{message.audience === 'r18' ? '裏ページ R18用' : message.audience === 'back-alley' ? '裏ページ用' : '表用'}</span>
+              <span>{message.audience === 'r18' ? 'R18' : message.audience === 'back-alley' ? '旧裏ページ用（非公開）' : '通常公開'}</span>
               <span>
                 {message.images.length > 0 ? `画像 ${message.images.length}枚` : '画像なし'}
               </span>
@@ -448,12 +447,8 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
             disabled={existingImages.length >= MAX_MESSAGE_IMAGES}
           />
 
-          <label className="admin-x-post-toggle" htmlFor="admin-message-back-alley">
-            <input id="admin-message-back-alley" type="checkbox" checked={audience !== 'front'} onChange={(event) => setAudience(event.target.checked ? 'back-alley' : 'front')} />
-            裏ページ用のメッセージにする
-          </label>
           <label className="admin-x-post-toggle" htmlFor="admin-message-r18">
-              <input id="admin-message-r18" type="checkbox" checked={audience === 'r18'} onChange={(event) => setAudience(event.target.checked ? 'r18' : 'back-alley')} />
+              <input id="admin-message-r18" type="checkbox" checked={audience === 'r18'} onChange={(event) => setAudience(event.target.checked ? 'r18' : 'front')} />
               R18メッセージにする
           </label>
 

@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import type { AppService } from '@/data/appServices';
+import { appInquiryTypes, type AppService } from '@/data/appServices';
 import { appInquirySchema, type AppInquiryInput } from '@/lib/validations';
 
 export function CorporateAppInquiryForm({ services }: { services: AppService[] }) {
@@ -15,7 +15,7 @@ export function CorporateAppInquiryForm({ services }: { services: AppService[] }
     formState: { errors, isSubmitting },
   } = useForm<AppInquiryInput>({
     resolver: zodResolver(appInquirySchema),
-    defaultValues: { service: '', email: '', message: '' },
+    defaultValues: { service: undefined, inquiryType: undefined, email: '', message: '' },
   });
 
   const submit = handleSubmit(async (values) => {
@@ -59,6 +59,16 @@ export function CorporateAppInquiryForm({ services }: { services: AppService[] }
           ))}
         </select>
         {errors.service ? <small className="corporate-field-error">{errors.service.message}</small> : null}
+      </label>
+      <label>
+        <span>お問い合わせ種別 <strong>必須</strong></span>
+        <select {...register('inquiryType')}>
+          <option value="">選択してください</option>
+          {appInquiryTypes.map((inquiryType) => (
+            <option key={inquiryType.value} value={inquiryType.value}>{inquiryType.label}</option>
+          ))}
+        </select>
+        {errors.inquiryType ? <small className="corporate-field-error">{errors.inquiryType.message}</small> : null}
       </label>
       <label>
         <span>メールアドレス <strong>必須</strong></span>

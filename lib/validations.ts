@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { appInquiryTypeValues, appServiceValues } from '@/data/appServices';
 
 const emailField = z
   .string()
@@ -15,7 +16,12 @@ export const inquirySchema = z.object({
 });
 
 export const appInquirySchema = z.object({
-  service: z.string().min(1, '対象サービスを選択してください。'),
+  service: z.enum(appServiceValues, {
+    errorMap: () => ({ message: '対象サービスを選択してください。' }),
+  }),
+  inquiryType: z.enum(appInquiryTypeValues, {
+    errorMap: () => ({ message: 'お問い合わせ種別を選択してください。' }),
+  }),
   email: emailField,
   message: z.string().min(1, 'お問い合わせ内容を入力してください。'),
 });

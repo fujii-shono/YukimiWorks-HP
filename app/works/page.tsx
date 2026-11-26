@@ -2,10 +2,11 @@ import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { WorkCard } from '@/components/ui/WorkCard';
+import { R18WorksSection } from '@/components/works/R18WorksSection';
 import { workCategoryLabels, type WorkCategory } from '@/data/works';
 import { getAllWorks } from '@/lib/firebase/content.server';
 
-const allCategories: WorkCategory[] = ['contents', 'tools', 'apps'];
+const allCategories: WorkCategory[] = ['games', 'cg', 'other'];
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export default async function WorksPage({
 
   return (
     <SiteFrame>
-      <RetroPanel title="成果物" titleAside="Works" contentClassName="listing-panel-body">
+      <RetroPanel title="作品" titleAside="Works" contentClassName="listing-panel-body">
         <div className="filter-tabs">
           <Link href="/works" className={!validCategory ? 'active' : undefined}>
             すべて
@@ -42,9 +43,10 @@ export default async function WorksPage({
             ))}
           </div>
         ) : (
-          <p className="empty-state">該当する成果物はありません</p>
+          <p className="empty-state">該当する作品はありません</p>
         )}
       </RetroPanel>
+      <R18WorksSection />
     </SiteFrame>
   );
 }

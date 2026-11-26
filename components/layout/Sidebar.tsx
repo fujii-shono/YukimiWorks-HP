@@ -1,30 +1,24 @@
 'use client';
 import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { LoginEntryButton } from '@/components/auth/AccountControls';
 import { WhatsNewPanel, type WhatsNewItem } from '@/components/layout/WhatsNewPanel';
-import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { MessagePanel } from '@/components/ui/MessagePanel';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
-import { diaryEntries, getDiaryDate, getDiaryId, isDiaryPublished } from '@/data/diary';
 import { newsItems } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { cn } from '@/lib/format';
 
 const navItems = [
-  { href: '/circle', label: 'Top', icon: '⌂', iconImage: '/icons/default/top.png' },
-  { href: '/circle/about', label: 'About', icon: '❄', iconImage: null },
-  { href: '/works', label: 'Works', icon: '❄', iconImage: null },
-  { href: '/portfolio', label: 'Portfolio', icon: '❄', iconImage: null },
-  { href: '/diary', label: 'Diary', icon: '❄', iconImage: null },
-  { href: '/news', label: 'News', icon: '❄', iconImage: null },
-  { href: '/messages', label: 'Message', icon: '❄', iconImage: null },
-  { href: '/links', label: 'Link', icon: '❄', iconImage: null },
-  { href: '/circle/contact', label: 'Contact', icon: '❄', iconImage: null },
+  { href: '/circle', label: 'TOP', iconImage: '/icons/default/top.png' },
+  { href: '/news', label: 'ニュース', iconImage: '/icons/default/apps.png' },
+  { href: '/works', label: '作品', iconImage: '/icons/default/contents.png' },
+  { href: '/goods', label: 'グッズ', iconImage: '/icons/user/coin.png' },
+  { href: '/messages', label: 'メッセージ', iconImage: '/icons/default/x.png' },
 ] as const;
 
 const crackerPieces = Array.from({ length: 18 }, (_, index) => index);
@@ -36,18 +30,8 @@ type CounterMilestone = {
 };
 
 function getLatestUpdates(now: Date | null): WhatsNewItem[] {
-  const diaryUpdates: WhatsNewItem[] = now
-    ? diaryEntries
-        .filter((entry) => isDiaryPublished(entry, now))
-        .map((entry) => ({
-          id: `diary-${getDiaryId(entry)}`,
-          title: `日記「${entry.title}」を追加しました`,
-          date: getDiaryDate(entry),
-          href: `/diary/${getDiaryId(entry)}`,
-        }))
-    : [];
-
-  return [...newsItems.map((item) => ({ ...item, href: item.href ?? `/news/${item.id}` })), ...diaryUpdates]
+  if (!now) return [];
+  return newsItems.map((item) => ({ ...item, href: item.href ?? `/news/${item.id}` }))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 3);
 }
@@ -71,8 +55,6 @@ function isCounterMilestone(value: unknown): value is CounterMilestone {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { firebaseUser, profile, loading: authLoading, profileLoading, configured, error: authError, signIn, updateBackAlleyConfirmation } = useFirebaseAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [counterDisplay, setCounterDisplay] = useState<string>(siteConfig.decorativeCounter);
   const [counterMessage, setCounterMessage] = useState<string | null>(null);
@@ -80,10 +62,6 @@ export function Sidebar() {
   const [isCounterPressed, setIsCounterPressed] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const [firebaseUpdates, setFirebaseUpdates] = useState<WhatsNewItem[] | null>(null);
-  const [backAlleyConfirmationOpen, setBackAlleyConfirmationOpen] = useState(false);
-  const [backAlleyLoginOpen, setBackAlleyLoginOpen] = useState(false);
-  const [backAlleyConfirmationSaving, setBackAlleyConfirmationSaving] = useState(false);
-  const [backAlleyConfirmationError, setBackAlleyConfirmationError] = useState<string | null>(null);
   const counterClickTimestamps = useRef<number[]>([]);
   const counterMessageTimer = useRef<number | null>(null);
   const counterAnimationTimer = useRef<number | null>(null);
@@ -92,37 +70,6 @@ export function Sidebar() {
   const counterCharacterSrc = sleepMode ? '/character/sleeping.png' : '/character/default.png';
   const counterCharacterMask = event === 'sleep-warning' ? '/effects/eyes.png' : counterCharacterSrc;
   const absentLabel = event === 'lunch' ? '食事中' : event === 'late-night-away' ? '....' : 'お出かけ中';
-
-  const openBackAlley = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    if (!firebaseUser) {
-      setBackAlleyLoginOpen(true);
-      return;
-    }
-    if (profileLoading || !profile) return;
-    if (profile.backAlleyConfirmed) {
-      router.push('/back-alley');
-      return;
-    }
-    setBackAlleyConfirmationError(null);
-    setBackAlleyConfirmationOpen(true);
-  };
-
-  useEffect(() => {
-    if (!backAlleyLoginOpen || !firebaseUser || profileLoading || !profile) return;
-    setBackAlleyLoginOpen(false);
-    if (profile.backAlleyConfirmed) router.push('/back-alley');
-    else setBackAlleyConfirmationOpen(true);
-  }, [backAlleyLoginOpen, firebaseUser, profile, profileLoading, router]);
-
-  const confirmBackAlley = () => {
-    setBackAlleyConfirmationSaving(true);
-    setBackAlleyConfirmationError(null);
-    void updateBackAlleyConfirmation(true)
-      .then(() => router.push('/back-alley'))
-      .catch(() => setBackAlleyConfirmationError('確認状態を保存できませんでした。'))
-      .finally(() => setBackAlleyConfirmationSaving(false));
-  };
 
   const clearCounterTimers = useCallback(() => {
     if (counterMessageTimer.current !== null) {
@@ -304,19 +251,15 @@ export function Sidebar() {
             const isActive = item.href === '/circle' ? pathname === '/circle' : pathname.startsWith(item.href);
             return (
               <Link key={item.href} className={cn('nav-link', isActive && 'active')} href={item.href}>
-                {item.iconImage ? (
-                  <SleepWarningImage
-                    src={item.iconImage}
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="nav-mark-image pixel-image"
-                    unoptimized
-                    draggable={false}
-                  />
-                ) : (
-                  <span className="nav-mark">{item.icon}</span>
-                )}
+                <SleepWarningImage
+                  src={item.iconImage}
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="nav-mark-image pixel-image"
+                  unoptimized
+                  draggable={false}
+                />
                 {item.label}
                 {isActive ? (
                   <span className="current-mark" aria-hidden="true">
@@ -330,29 +273,6 @@ export function Sidebar() {
       </section>
 
       <WhatsNewPanel items={latestNews} historyHref="/news" LinkComponent={Link} />
-
-      {pathname !== '/bokin' ? (
-        <Link className="donation-sidebar-banner" href="/bokin" aria-label="募金ページへ移動する">
-          <span
-            className="pixel-tint-frame pixel-tint-frame-banner"
-            style={{ '--pixel-mask': 'url("/bokin/header.png")' } as CSSProperties}
-          >
-            <Image
-              src="/bokin/header.png"
-              alt=""
-              width={4000}
-              height={1000}
-              className="donation-sidebar-banner-image"
-              unoptimized
-            />
-          </span>
-        </Link>
-      ) : null}
-
-      <Link className="back-alley-entry-banner" href="/back-alley" aria-label="裏ページへ移動する" onClick={openBackAlley}>
-        裏ページ
-      </Link>
-     
 
       <MessagePanel />
 
@@ -422,37 +342,6 @@ export function Sidebar() {
         <p>Since {siteConfig.since}</p>
       </section>
       </aside>
-
-      {backAlleyLoginOpen ? (
-        <div className="modal-overlay" onMouseDown={() => setBackAlleyLoginOpen(false)}>
-          <section className="modal-panel modal-panel-small" role="dialog" aria-modal="true" aria-labelledby="back-alley-login-title" onMouseDown={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setBackAlleyLoginOpen(false)}>×</button>
-            <h2 id="back-alley-login-title">裏ページ</h2>
-            <p>この先の閲覧にはログインが必要です。</p>
-            {!configured ? <p className="form-error">Firebaseが設定されていません。</p> : null}
-            {authError ? <p className="form-error">{authError}</p> : null}
-            <div className="back-alley-gate-actions">
-              <button type="button" className="pixel-button" autoFocus disabled={!configured || authLoading} onClick={() => void signIn()}>Googleでログイン</button>
-              <button type="button" onClick={() => setBackAlleyLoginOpen(false)}>戻る</button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {backAlleyConfirmationOpen ? (
-        <div className="modal-overlay" onMouseDown={() => setBackAlleyConfirmationOpen(false)}>
-          <section className="modal-panel modal-panel-small" role="dialog" aria-modal="true" aria-labelledby="back-alley-confirm-title" onMouseDown={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setBackAlleyConfirmationOpen(false)}>×</button>
-            <h2 id="back-alley-confirm-title">裏ページへ入りますか？</h2>
-            <p>裏ページでは少しニッチな作品を扱っています。大丈夫ですか？</p>
-            {backAlleyConfirmationError ? <p className="form-error">{backAlleyConfirmationError}</p> : null}
-            <div className="back-alley-gate-actions">
-              <button type="button" className="pixel-button" autoFocus disabled={backAlleyConfirmationSaving} onClick={confirmBackAlley}>{backAlleyConfirmationSaving ? '保存中…' : '大丈夫です'}</button>
-              <button type="button" disabled={backAlleyConfirmationSaving} onClick={() => setBackAlleyConfirmationOpen(false)}>戻る</button>
-            </div>
-          </section>
-        </div>
-      ) : null}
 
       <AnimatePresence>
         {counterMilestone ? (

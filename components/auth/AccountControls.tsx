@@ -12,7 +12,7 @@ const OPEN_ACCOUNT_EVENT = 'yukimi:open-account';
 export function LoginEntryButton() {
   const pathname = usePathname();
   const { firebaseUser, profile, loading } = useFirebaseAuth();
-  const adminHref = pathname.startsWith('/back-alley') ? '/back-alley/admin' : '/admin';
+  const adminHref = '/admin';
 
   if (!loading && firebaseUser && profile?.role === 'admin') {
     return (
@@ -158,11 +158,12 @@ export function AccountControls() {
   const isAdmin = profile?.role === 'admin';
   const hasBlueTicket = profile?.tickets.includes('blue') || false;
   const hasNightTicket = profile?.tickets.includes('night') || false;
-  const adminHref = pathname.startsWith('/back-alley') ? '/back-alley/admin' : '/admin';
+  const adminHref = '/admin';
   const isCorporatePage =
     pathname === '/' ||
     pathname === '/about' ||
     pathname === '/contact' ||
+    pathname.startsWith('/contact/') ||
     pathname.startsWith('/products') ||
     pathname.startsWith('/kakaritsuke');
 
@@ -171,7 +172,7 @@ export function AccountControls() {
   return (
     <>
       {!loading && firebaseUser && profile ? (
-        <div className={`account-status${pathname.startsWith('/back-alley') ? ' back-alley-account-status' : ''}`} aria-label="ログイン中のアカウント情報">
+        <div className="account-status" aria-label="ログイン中のアカウント情報">
           <span className="account-welcome">
             ようこそ {isAdmin ? '管理者' : ''}{profile.displayName}さん
           </span>

@@ -1,4 +1,3 @@
-import { portfolioItems } from '@/data/portfolio';
 import { works } from '@/data/works';
 
 export type NewsMedia = {
@@ -14,7 +13,7 @@ export type NewsBodySegment =
   | { type: 'media'; src: string; mediaType: 'image' | 'video'; alt?: string };
 
 export type NewsCategory = 'event' | 'announcement' | 'release' | 'other';
-export type NewsSource = 'manual' | 'work' | 'portfolio';
+export type NewsSource = 'manual' | 'work';
 
 export type News = {
   id: string;
@@ -64,7 +63,7 @@ export const newsCategoryLabels: Record<NewsCategory, string> = {
 
 export const manualNews: News[] = [
   {
-    id: 'announcement-bokinpage-launch',
+    id: 'release-rikuari-payment',
     title: 'リクありに決済機能を追加しました',
     date: '2026-09-22',
     category: 'release',
@@ -83,33 +82,6 @@ export const manualNews: News[] = [
     ],
     seoTitle: 'リクありに決済機能を追加しました | YukimiWorks',
     seoDescription: 'リクありに決済機能を追加しました',
-    featured: true,
-  },
-  {
-    id: 'announcement-bokinpage-launch',
-    title: '「天使の羽募金」を開始いたしました',
-    date: '2026-07-31',
-    category: 'announcement',
-    thumbnail: '/bokin/header.png',
-    body: [
-      {
-        type: 'text',
-        value:
-          'いつも利用してくださる皆様へ。\nこのサービスを今後も継続するため、「天使の羽募金」を開始いたしました。\n\nご支援いただいた方には、ささやかなお礼としておみくじも提供しております。',
-      },
-      {
-        type: 'link',
-        label: '天使の羽募金',
-        href: '/bokin',
-      },
-      {
-        type: 'text',
-        value:
-          '今後、会員限定のゲーム・コンテンツなども増やしていく予定です。\n開発にご協力いただけると幸いです。',
-      },
-    ],
-    seoTitle: '「天使の羽募金」を開始いたしました | YukimiWorks',
-    seoDescription: '「天使の羽募金」を開始いたしました',
     featured: true,
   },
   {
@@ -159,12 +131,12 @@ export const manualNews: News[] = [
       {
         type: 'text',
         value:
-          'ゲーム作品はPortfolioページ内の「ゲーム」カテゴリで公開しています。\n\nHTMLアートやイラストとあわせて、Portfolioページからまとめてご覧ください。',
+          'ゲーム作品はWorksページ内の「ゲーム」カテゴリで公開しています。',
       },
       {
         type: 'link',
-        label: 'Portfolioのゲーム一覧へ',
-        href: '/portfolio?category=game',
+        label: 'ゲーム作品一覧へ',
+        href: '/works?category=games',
       },
     ],
     seoTitle: 'Gamesカテゴリを追加しました | YukimiWorks',
@@ -210,7 +182,6 @@ export const manualNews: News[] = [
 const sourceRank: Record<NewsSource, number> = {
   manual: 0,
   work: 1,
-  portfolio: 2,
 };
 
 function createWorkNews(items: typeof works): News[] {
@@ -218,7 +189,7 @@ function createWorkNews(items: typeof works): News[] {
   .filter((work) => Boolean(work.date))
   .map((work) => ({
     id: `work-${work.id}`,
-    title: `成果物「${work.title}」を追加しました`,
+    title: `作品「${work.title}」を追加しました`,
     date: work.date as string,
     category: 'other',
     thumbnail: work.thumbnail,
@@ -228,38 +199,12 @@ function createWorkNews(items: typeof works): News[] {
   }));
 }
 
-const getPortfolioThumbnail = (item: (typeof portfolioItems)[number]) => {
-  if (item.content.kind === 'image') return item.content.src;
-  if (item.content.kind === 'video') return item.content.poster;
-  return item.content.thumbnail ?? '';
-};
-
-export function getPortfolioNewsTitle(title: string) {
-  return `ポートフォリオ「${title}」を追加しました`;
-}
-
-function createPortfolioNews(items: typeof portfolioItems): News[] {
-  return items
-  .filter((item) => Boolean(item.date))
-  .map((item) => ({
-    id: `portfolio-${item.id}`,
-    title: getPortfolioNewsTitle(item.title),
-    date: item.date as string,
-    category: 'other',
-    thumbnail: getPortfolioThumbnail(item),
-    href: item.href,
-    source: 'portfolio',
-    publishedAt: item.publishedAt,
-  }));
-}
-
 export const news: News[] = manualNews;
 
-export function buildNewsItems(manualItems: News[], workItems = works, portfolio = portfolioItems): News[] {
+export function buildNewsItems(manualItems: News[], workItems = works): News[] {
   return [
     ...manualItems.map((item) => ({ ...item, source: item.source ?? 'manual' as const })),
     ...createWorkNews(workItems),
-    ...createPortfolioNews(portfolio),
   ].sort((a, b) => {
   const dateOrder = (b.publishedAt ?? b.date).localeCompare(a.publishedAt ?? a.date);
   if (dateOrder !== 0) return dateOrder;

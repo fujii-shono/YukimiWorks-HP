@@ -10,7 +10,7 @@ export type WorkBodySegment =
   | { type: 'link'; label: string; href: string }
   | { type: 'media'; src: string; mediaType: 'image' | 'video'; alt?: string };
 
-export type WorkCategory = 'contents' | 'tools' | 'apps';
+export type WorkCategory = 'games' | 'cg' | 'other';
 
 export type Work = {
   id: string;
@@ -30,9 +30,9 @@ export type Work = {
 };
 
 export const workCategoryLabels: Record<WorkCategory, string> = {
-  contents: 'コンテンツ',
-  tools: 'ツール開発',
-  apps: 'アプリサービス',
+  games: 'ゲーム',
+  cg: 'CG集',
+  other: 'その他',
 };
 
 export function getWorkPlainText(work: Pick<Work, 'title' | 'body'>) {
@@ -53,175 +53,14 @@ export function getWorkDescription(work: Pick<Work, 'title' | 'body'>) {
 
 export const works: Work[] = [
   {
-    id: 'odai-maker',
-    title: 'お題メーカー',
+    id: 'sample-game',
+    title: 'サンプル作品',
     body:
-      'イラスト制作のきっかけになるお題をランダムに抽選できます。\n\n毎週月曜日には、みんなで楽しめる「今週のお題」を更新します。',
-    category: 'tools',
-    tags: ['便利ツール', 'イラスト'],
-    thumbnail: '',
-    date: '2026-10-06',
-    featured: true,
-  },
-  {
-    id: 'xnocount',
-    title: 'Xのいいね数を消すやつ',
-    body: [
-      {
-        type: 'text',
-        value:
-          '「Xのいいね数を消すやつ」は名前の通りXのいいね数やリポスト数・フォロワー数などの表示を消す、ブラウザ拡張機能です。\n\n承認欲求を無効化し、穏やかなSNSとしてXを利用できます。',
-      },
-      {
-        type: 'link',
-        label: 'Chrome板',
-        href: 'https://chromewebstore.google.com/detail/xのいいね数を消すやつ/ggfmlifppcafahejkkbpdlopkjolegea?authuser=0&hl=ja&pli=1',
-      },
-      {
-        type: 'link',
-        label: 'iOS・Safari板',
-        href: 'https://apps.apple.com/app/sns%E3%81%AE%E3%81%84%E3%81%84%E3%81%AD%E6%95%B0%E3%82%92%E6%B6%88%E3%81%99%E3%82%84%E3%81%A4/id6808113264',
-      },
-    ],
-    category: 'tools',
-    tags: ['拡張機能'],
-    thumbnail: '/works/xnocount/hero.jpeg',
-    media: [{ type: 'image', src: '/works/xnocount/hero.jpeg', alt: 'サービス紹介' }],
-    date: '2026-09-11',
-    featured: true,
-  },
-  {
-    id: 'rikuari',
-    title: 'リクあり',
-    body: [
-      {
-        type: 'text',
-        value:
-          'リクありはクリエイターのポートフォリオ・依頼募集から見積もり書の簡単作成にスケジュール管理まですべて入ったサービスです。\n\nクラウドソーシングと異なり、SNSでもメールでも企業様相手でも、あらゆる場面で依頼のやり取りを効率化します。',
-      },
-      {
-        type: 'link',
-        label: 'リクあり',
-        href: 'https://rikuari.com',
-      },
-    ],
-    category: 'apps',
-    tags: ['webサービス'],
-    thumbnail: '/works/rikuari/hero.png',
-    media: [{ type: 'image', src: '/works/rikuari/hero.png', alt: 'サービス紹介' }],
-    date: '2026-08-31',
-    featured: true,
-  },
-  {
-    id: 'rss-matome-web',
-    title: 'RSSまとめ',
-    body: [
-      {
-        type: 'text',
-        value:
-          'RSSまとめはRSS機能を使いニュースサイトやyoutubeチャンネルを購読・共有できるサービスです。\n\nRSSリンクをフォローしてニュースを発掘したり、リアクションや評価をすることで記事への反応を共有できます。',
-      },
-      {
-        type: 'link',
-        label: 'サービスリンク',
-        href: 'https://rss-matome.com',
-      },
-    ],
-    category: 'apps',
-    tags: ['webサービス'],
-    thumbnail: '/works/rss-matome/hero.png',
-    media: [{ type: 'image', src: '/works/rss-matome/hero.png', alt: 'サービス紹介' }],
-    date: '2026-07-30',
-    featured: true,
-  },
-  {
-    id: 'acrylic-keychain-tool',
-    title: 'アクキーシミュレーター',
-    body:
-      '透過PNGを読み込むと、アクキーっぽい画像を作成できます。\n\n雰囲気を確認するためのツールなので、細かなカット指定はできません。',
-    category: 'tools',
-    tags: ['便利ツール', 'ブラウザ'],
-    thumbnail: '/works/Acrylic/thumbnail.png',
-    date: '2026-07-22',
-    featured: true,
-  },
-  // {
-  //   id: 'pixel-guide-collection',
-  //   title: 'ピクセルガイド集',
-  //   body: [
-  //     {
-  //       type: 'text',
-  //       value:
-  //         'レトロWeb、ピクセル表現、懐かしいUIをテーマにした読み物シリーズです。\n\n企画、執筆、構成、公開までを一貫して担当し、小さな発見がある読み心地を目指しました。',
-  //     },
-  //     {
-  //       type: 'link',
-  //       label: '紹介ページを見る',
-  //       href: 'https://example.com/pixel-guide',
-  //     },
-  //   ],
-  //   category: 'contents',
-  //   tags: ['記事', '企画', 'レトロ'],
-  //   thumbnail: '/works/placeholder.svg',
-  //   media: [{ type: 'image', src: '/works/placeholder.svg', alt: 'ピクセルガイド集のダミー画像' }],
-  //   featured: true,
-  // },
-  // {
-  //   id: 'mini-ops-tool',
-  //   title: 'Mini Ops Tool',
-  //   body:
-  //     'フォーム入力、一覧確認、定型処理を一つにまとめた軽量ツールです。\n\n操作を迷わせないこと、導入コストを低く抑えることを重視しました。',
-  //   category: 'tools',
-  //   tags: ['ツール', '業務効率化'],
-  //   thumbnail: '/works/placeholder.svg',
-  //   media: [{ type: 'image', src: '/works/placeholder.svg', alt: 'Mini Ops Tool のダミー画像' }],
-  // },
-  {
-    id: 'tarif-web',
-    title: 'Tarif -オンライン料金表-',
-    body: [
-      {
-        type: 'strikethrough',
-        value:
-          'Tarif(タリフ)はオンライン上で料金表を作りURLで共有できるサービスです。\n\n共有した料金表からそのまま見積書を作成できます。',
-      },
-      {
-        type: 'link',
-        label: 'リクありとしてリニューアルしました',
-        href: '/works/rikuari',
-      },
-    ],
-    category: 'apps',
-    tags: ['webサービス'],
-    thumbnail: '/works/tarif/hero.png',
-    media: [{ type: 'image', src: '/works/tarif/hero.png', alt: 'サービス紹介' }],
-    date: '2026-07-14',
-    featured: true,
-  },
-  {
-    id: 'cocoa-app',
-    title: 'Cocoa',
-    body: [
-      {
-        type: 'text',
-        value:
-          'Cocoa は撮った写真をSNSのように管理し楽しめるアプリです。\n\n昔の写真が定期的にリポップし、過去の思い出に浸ることができます。',
-      },
-      {
-        type: 'link',
-        label: 'アプリ紹介',
-        href: 'https://yukimi-works.co.jp/cocoa',
-      },
-      {
-        type: 'link',
-        label: 'プライバシーポリシー',
-        href: 'https://yukimi-works.co.jp/cocoa/privacy-policy',
-      },
-    ],
-    category: 'apps',
-    tags: ['スマホアプリ', 'iOS'],
-    thumbnail: '/works/cocoa/hero.png',
-    media: [{ type: 'image', src: '/works/cocoa/hero.png', alt: 'アプリ紹介' }],
+      'ゲームやCG集など、サークル「溶けたアイス」の作品をここで紹介します。\n\nこの項目は表示確認用のサンプルです。',
+    category: 'games',
+    tags: ['サンプル'],
+    thumbnail: '/works/placeholder.svg',
+    media: [{ type: 'image', src: '/works/placeholder.svg', alt: 'サンプル作品の画像' }],
     featured: true,
   },
 ];

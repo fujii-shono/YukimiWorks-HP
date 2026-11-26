@@ -1,22 +1,18 @@
 import type { Metadata } from 'next';
 import { SiteFrame } from '@/components/layout/SiteFrame';
-import { LinkPanel } from '@/components/sections/LinkPanel';
-import { PortfolioPreviewSection } from '@/components/sections/PortfolioPreviewSection';
+import { CircleLatestSections } from '@/components/sections/CircleLatestSections';
 import { WelcomeSection } from '@/components/sections/WelcomeSection';
-import { WorksCategoryLinks } from '@/components/sections/WorksCategoryLinks';
 
 export const metadata: Metadata = {
-  title: 'YukimiWorks Circle | 制作活動',
-  description: 'YukimiWorksのイラスト、同人活動、ツール、ミニゲームなどを紹介するサークルサイトです。',
+  title: '溶けたアイス | サークルサイト',
+  description: 'サークル「溶けたアイス」のイベント参加、グッズ、ゲーム制作情報をまとめたサイトです。',
 };
 
 export default function CircleHomePage() {
   return (
     <SiteFrame>
       <WelcomeSection />
-      <PortfolioPreviewSection />
-      <WorksCategoryLinks />
-      <LinkPanel />
+      <CircleLatestSections />
     </SiteFrame>
   );
 }

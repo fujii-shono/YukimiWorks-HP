@@ -64,8 +64,8 @@ export function MessagePanel({ includeBackAlley = false, href = '/messages' }: {
         <span className="title-deco" aria-hidden="true">
           ❄
         </span>
-          <Link href={href} className="window-title-link">
-          Message
+        <Link href={href} className="window-title-link">
+          メッセージ
         </Link>
         <span className="title-deco" aria-hidden="true">
           ❄

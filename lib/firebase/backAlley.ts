@@ -52,7 +52,7 @@ function parseLockedItem(snapshot: QueryDocumentSnapshot<DocumentData>): Firebas
 export function subscribeToBackAlleyPortfolio(
   onItems: (items: FirebaseBackAlleyPortfolioItem[]) => void,
   onError?: () => void,
-  options: { includeScheduled?: boolean; includeR18?: boolean; lockedR18?: boolean } = {},
+  options: { includeScheduled?: boolean; includeR18?: boolean; lockedR18?: boolean; r18Only?: boolean } = {},
 ) {
   const services = getFirebaseServices();
   if (!services) { onItems([]); return () => {}; }
@@ -62,10 +62,10 @@ export function subscribeToBackAlleyPortfolio(
   const makeQuery = (name: string) => options.includeScheduled
     ? query(collection(services.db, name), orderBy('publishedAt', 'desc'))
     : query(collection(services.db, name), where('publishedAt', '<=', Timestamp.now()), orderBy('publishedAt', 'desc'));
-  const unsubscribes = [onSnapshot(makeQuery('backAlleyPortfolioItems'), (snapshot) => {
-    regular = snapshot.docs.map((item) => parseItem(item, false)).filter((item): item is FirebaseBackAlleyPortfolioItem => item !== null);
-    publish();
-  }, () => onError?.())];
+  const unsubscribes = options.r18Only ? [] : [onSnapshot(makeQuery('backAlleyPortfolioItems'), (snapshot) => {
+      regular = snapshot.docs.map((item) => parseItem(item, false)).filter((item): item is FirebaseBackAlleyPortfolioItem => item !== null);
+      publish();
+    }, () => onError?.())];
   if (options.includeR18) {
     unsubscribes.push(onSnapshot(makeQuery('backAlleyR18PortfolioItems'), (snapshot) => {
       restricted = snapshot.docs.map((item) => parseItem(item, true)).filter((item): item is FirebaseBackAlleyPortfolioItem => item !== null);

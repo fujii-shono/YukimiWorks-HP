@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { appInquiryTypes, appServices } from '@/data/appServices';
 import { sendMail } from '@/lib/mailer';
 import { escapeHtml } from '@/lib/format';
 import { appInquirySchema } from '@/lib/validations';
@@ -16,12 +17,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: '入力内容を確認してください。' }, { status: 400 });
   }
 
-  const { service, email, message } = parsed.data;
+  const { service, inquiryType, email, message } = parsed.data;
+  const serviceLabel = appServices.find((item) => item.value === service)?.label ?? service;
+  const inquiryTypeLabel = appInquiryTypes.find((item) => item.value === inquiryType)?.label ?? inquiryType;
   const result = await sendMail({
     to,
-    subject: `【アプリお問い合わせ】${service} へのお問い合わせ`,
+    subject: `【アプリお問い合わせ】${serviceLabel} / ${inquiryTypeLabel}`,
     html: `
-      <p><strong>対象サービス:</strong> ${escapeHtml(service)}</p>
+      <p><strong>対象サービス:</strong> ${escapeHtml(serviceLabel)}</p>
+      <p><strong>お問い合わせ種別:</strong> ${escapeHtml(inquiryTypeLabel)}</p>
       <p><strong>メール:</strong> ${escapeHtml(email)}</p>
       <p><strong>お問い合わせ内容:</strong><br>${escapeHtml(message)}</p>
     `,

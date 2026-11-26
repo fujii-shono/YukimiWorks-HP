@@ -3,9 +3,21 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/back-alley/:path*',
+        source: '/works/r18/:path*',
         headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
       },
+    ];
+  },
+  async redirects() {
+    return [
+      { source: '/circle/about', destination: '/circle', permanent: true },
+      { source: '/circle/contact', destination: '/circle', permanent: true },
+      { source: '/portfolio/:path*', destination: '/works', permanent: true },
+      { source: '/diary/:path*', destination: '/news', permanent: true },
+      { source: '/links', destination: '/circle', permanent: true },
+      { source: '/bokin', destination: '/messages', permanent: false },
+      { source: '/back-alley/portfolio/:id', destination: '/works/r18/:id', permanent: true },
+      { source: '/back-alley/:path*', destination: '/works', permanent: true },
     ];
   },
   images: {

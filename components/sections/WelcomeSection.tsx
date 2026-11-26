@@ -2,9 +2,8 @@ import { RetroPanel } from '@/components/panels/RetroPanel';
 import { WelcomeCharacter } from '@/components/welcome/WelcomeCharacter';
 
 const defaultWelcomeCopy = [
-  'YukimiWorksのホームページへようこそ。',
-  '当サイトでは小さなコンテンツから大きなサービスまで、',
-  'たくさんのアイデアを形にし、残しています。',
+  'サークル「溶けたアイス」へようこそ',
+  'イベント参加・グッズ・ゲーム制作の情報をまとめています',
 ];
 
 export function WelcomeSection({ copy = defaultWelcomeCopy }: { copy?: string[] }) {

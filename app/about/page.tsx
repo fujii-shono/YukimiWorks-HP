@@ -35,7 +35,7 @@ export default function AboutPage() {
           </div>
           <dl className="corporate-company-list">
             <div><dt>会社名</dt><dd>合同会社YukimiWorks</dd></div>
-            <div><dt>代表者</dt><dd>藤井 翔之</dd></div>
+            <div><dt>代表者</dt><dd>ゆきみ</dd></div>
             <div><dt>所在地</dt><dd>神奈川県横浜市西区浅間町1丁目4番3号 ウィザードビル402</dd></div>
             <div><dt>設立年月日</dt><dd>2026年1月29日</dd></div>
             <div>

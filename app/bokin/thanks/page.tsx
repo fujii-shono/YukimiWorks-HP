@@ -71,10 +71,10 @@ export default async function BokinThanksPage({
   }>;
 }) {
   const sessionId = (await searchParams).session_id;
-  if (!sessionId) redirect('/bokin');
+  if (!sessionId) redirect('/messages');
 
   const session = await getPaidDonationSession(sessionId);
-  if (!session) redirect('/bokin');
+  if (!session) redirect('/messages');
 
   const omikuji = chooseOmikuji(session.id);
   const amount = session.amount_total ?? 0;
@@ -88,8 +88,8 @@ export default async function BokinThanksPage({
           <p className="bokin-omikuji-label">{omikuji.label}</p>
           <p>{omikuji.message}</p>
         </div>
-        <Link href="/bokin" className="bokin-return-link">
-          募金ページへ戻る
+        <Link href="/messages" className="bokin-return-link">
+          メッセージへ戻る
         </Link>
       </RetroPanel>
     </SiteFrame>

@@ -23,15 +23,17 @@ import type {
   FirebaseContentMedia,
   FirebaseContentBodySegment,
   FirebaseDiaryEntry,
+  FirebaseGoodsItem,
   FirebaseNews,
   FirebasePortfolioItem,
   FirebaseWork,
 } from '@/lib/firebase/types';
 
-export type ContentKind = 'portfolio' | 'works' | 'diary' | 'news';
+export type ContentKind = 'portfolio' | 'works' | 'goods' | 'diary' | 'news';
 export type FirebaseContentByKind = {
   portfolio: FirebasePortfolioItem;
   works: FirebaseWork;
+  goods: FirebaseGoodsItem;
   diary: FirebaseDiaryEntry;
   news: FirebaseNews;
 };
@@ -39,6 +41,7 @@ export type FirebaseContentByKind = {
 export const contentCollectionNames: Record<ContentKind, string> = {
   portfolio: 'portfolioItems',
   works: 'works',
+  goods: 'goods',
   diary: 'diaryEntries',
   news: 'news',
 };
@@ -98,9 +101,13 @@ function parseContent<K extends ContentKind>(kind: K, snapshot: QueryDocumentSna
     return { ...base, description: data.description, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), media, thumbnail, featured: data.featured === true } as FirebaseContentByKind[K];
   }
   if (kind === 'works') {
-    if (typeof data.body !== 'string' || !['contents', 'tools', 'apps'].includes(data.category) || !Array.isArray(data.tags) || !Array.isArray(data.media)) return null;
+    if (typeof data.body !== 'string' || !['games', 'cg', 'other'].includes(data.category) || !Array.isArray(data.tags) || !Array.isArray(data.media)) return null;
     const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
     return { ...base, body: data.body, bodySegments, category: data.category, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), url: optionalString(data, 'url'), featured: data.featured === true } as FirebaseContentByKind[K];
+  }
+  if (kind === 'goods') {
+    if (typeof data.description !== 'string') return null;
+    return { ...base, description: data.description, image: isMedia(data.image) && data.image.type === 'image' ? data.image : undefined } as FirebaseContentByKind[K];
   }
   if (kind === 'diary') {
     if (typeof data.body !== 'string' || !['chat', 'report', 'development', 'behind-the-scenes', 'content-creation-tips'].includes(data.category)) return null;
@@ -202,6 +209,10 @@ export function getContentMedia(kind: ContentKind, item: FirebaseContentByKind[C
     const diary = item as FirebaseDiaryEntry;
     const bodyMedia = diary.bodySegments.flatMap((segment) => segment.type === 'media' ? [segment.media] : []);
     return [...(diary.eyecatch ? [diary.eyecatch] : []), ...bodyMedia].filter((media, index, all) => all.findIndex((candidate) => candidate.path === media.path) === index);
+  }
+  if (kind === 'goods') {
+    const goods = item as FirebaseGoodsItem;
+    return goods.image ? [goods.image] : [];
   }
   const rich = item as FirebaseWork | FirebaseNews;
   const bodyMedia = rich.bodySegments.flatMap((segment) => segment.type === 'media' ? [segment.media] : []);

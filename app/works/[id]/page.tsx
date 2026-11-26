@@ -72,7 +72,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ id:
     <SiteFrame>
       <section className="window-panel single-panel-body detail-panel">
         <Link href="/works" className="back-link">
-          &larr; 制作実績一覧へ戻る
+          &larr; 作品一覧へ戻る
         </Link>
         <div className="page-intro">
           <h2>{work.title}</h2>

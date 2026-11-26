@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
-import { CorporateBanner } from '@/components/corporate/CorporateBanner';
 import { CorporateLayout } from '@/components/corporate/CorporateLayout';
 
 export const metadata: Metadata = {
@@ -11,18 +11,23 @@ export const metadata: Metadata = {
 const examples = [
   {
     title: 'Excel集計・報告書自動作成',
+    icon: '/icons/kakaritsuke/01-excel-report.svg',
   },
   {
     title: '二段階認証実装などセキュリティ強化対応',
+    icon: '/icons/kakaritsuke/02-two-factor.svg',
   },
   {
     title: 'AI電話対応システム',
+    icon: '/icons/kakaritsuke/03-ai-phone.svg',
   },
   {
     title: 'アプリサービスのMCP対応',
+    icon: '/icons/kakaritsuke/04-mcp.svg',
   },
   {
     title: 'ローカルLLMによる業務システム',
+    icon: '/icons/kakaritsuke/05-local-llm.svg',
   },
 ] as const;
 
@@ -50,12 +55,33 @@ const plans = [
 export default function KakaritsukePage() {
   return (
     <CorporateLayout>
-      <CorporateBanner priority />
-
-      <section className="kakaritsuke-hero">
-        <div className="corporate-container kakaritsuke-hero-content">
-          <h1>会社に、いつでも相談できる開発室を。</h1>
-          <p>かかりつけ開発室は、<br />システムの改修から新しいサービスの開発まで<br />継続的に支援する月額制サービスです。</p>
+      <section className="kakaritsuke-banner" aria-labelledby="kakaritsuke-title">
+        <div className="kakaritsuke-banner-copy">
+          <h1 id="kakaritsuke-title">
+            <span className="kakaritsuke-title-mark-frame" aria-hidden="true">
+              <Image
+                src="/brand/kakaritsuke-open-door.png"
+                alt=""
+                width={1254}
+                height={1254}
+                className="kakaritsuke-title-mark"
+              />
+            </span>
+            <span>かかりつけ開発室</span>
+          </h1>
+          <p>会社に、いつでも相談できる開発室を。</p>
+          <p>システムの改修から新しいサービスの開発まで、継続的に支援する月額制サービスです。</p>
+        </div>
+        <div className="kakaritsuke-banner-media">
+          <Image
+            src="/brand/kakaritsuke-banner.png"
+            alt="オフィスでクリップボードを手に相談内容を確認する開発担当者"
+            width={1774}
+            height={887}
+            className="kakaritsuke-banner-image"
+            priority
+            sizes="(max-width: 720px) 100vw, 50vw"
+          />
         </div>
       </section>
 
@@ -70,11 +96,21 @@ export default function KakaritsukePage() {
         <div className="corporate-container kakaritsuke-content">
           <div className="corporate-section-heading"><h2>開発事例</h2></div>
           <div className="kakaritsuke-example-list">
-            {examples.map((example) => (
-              <article key={example.title}>
-                <div role="img" aria-label={`${example.title}の画像は準備中です`}><span>画像準備中</span></div>
-                <h3>{example.title}</h3>
-              </article>
+            {[examples.slice(0, 3), examples.slice(3)].map((row, index) => (
+              <div className="kakaritsuke-example-row" key={index}>
+                {row.map((example) => (
+                  <article key={example.title}>
+                    <Image
+                      src={example.icon}
+                      alt=""
+                      width={48}
+                      height={48}
+                      className="kakaritsuke-example-icon"
+                    />
+                    <h3>{example.title}</h3>
+                  </article>
+                ))}
+              </div>
             ))}
           </div>
         </div>
@@ -99,7 +135,7 @@ export default function KakaritsukePage() {
       <section className="corporate-cta-section">
         <div className="corporate-container kakaritsuke-content">
           <h2>まずはご相談から</h2>
-          <Link href="/contact" className="corporate-button">かかりつけ開発室で相談する。</Link>
+          <Link href="/contact/development" className="corporate-button">かかりつけ開発室で相談する。</Link>
         </div>
       </section>
     </CorporateLayout>

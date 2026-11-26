@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTimeTheme } from '@/components/theme/TimeThemeProvider';
 import { FormModal } from '@/components/ui/FormModal';
-import type { AppService } from '@/data/appServices';
+import { appInquiryTypes, type AppService } from '@/data/appServices';
 import { appInquirySchema, type AppInquiryInput } from '@/lib/validations';
 
 export function AppServiceForm({ services }: { services: AppService[] }) {
@@ -22,7 +22,7 @@ export function AppServiceForm({ services }: { services: AppService[] }) {
     formState: { errors, isSubmitting },
   } = useForm<AppInquiryInput>({
     resolver: zodResolver(appInquirySchema),
-    defaultValues: { service: '', email: '', message: '' },
+    defaultValues: { service: undefined, inquiryType: undefined, email: '', message: '' },
   });
 
   const submitForm = handleSubmit(async (values) => {
@@ -80,6 +80,18 @@ export function AppServiceForm({ services }: { services: AppService[] }) {
             ))}
           </select>
           {errors.service ? <span className="field-error">{errors.service.message}</span> : null}
+        </label>
+        <label>
+          お問い合わせ種別
+          <select {...register('inquiryType')}>
+            <option value="">選択してください</option>
+            {appInquiryTypes.map((inquiryType) => (
+              <option key={inquiryType.value} value={inquiryType.value}>
+                {inquiryType.label}
+              </option>
+            ))}
+          </select>
+          {errors.inquiryType ? <span className="field-error">{errors.inquiryType.message}</span> : null}
         </label>
         <label>
           メールアドレス

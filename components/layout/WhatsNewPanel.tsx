@@ -19,7 +19,7 @@ export function WhatsNewPanel({ items, historyHref, LinkComponent = Link }: What
     <section className="window-panel news-panel">
       <h2 className="window-title">
         <span className="title-deco" aria-hidden="true">❄</span>
-        <LinkComponent href={historyHref} className="window-title-link">What&apos;s New</LinkComponent>
+        <LinkComponent href={historyHref} className="window-title-link">新着</LinkComponent>
         <span className="title-deco" aria-hidden="true">❄</span>
       </h2>
       <div className="sidebar-content">

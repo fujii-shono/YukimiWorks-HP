@@ -106,13 +106,26 @@ export type FirebaseWork = {
   title: string;
   body: string;
   bodySegments: FirebaseContentBodySegment[];
-  category: 'contents' | 'tools' | 'apps';
+  category: 'games' | 'cg' | 'other';
   tags: string[];
   thumbnail?: FirebaseContentMedia;
   media: FirebaseContentMedia[];
   publishedAt: Timestamp;
   url?: string;
   featured: boolean;
+  seoTitle?: string;
+  seoDescription?: string;
+  noIndex: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+export type FirebaseGoodsItem = {
+  id: string;
+  title: string;
+  description: string;
+  image?: FirebaseContentMedia;
+  publishedAt: Timestamp;
   seoTitle?: string;
   seoDescription?: string;
   noIndex: boolean;
@@ -152,4 +165,4 @@ export type FirebaseNews = {
   updatedAt?: Timestamp;
 };
 
-export type FirebaseContentRecord = FirebasePortfolioItem | FirebaseWork | FirebaseDiaryEntry | FirebaseNews;
+export type FirebaseContentRecord = FirebasePortfolioItem | FirebaseWork | FirebaseGoodsItem | FirebaseDiaryEntry | FirebaseNews;

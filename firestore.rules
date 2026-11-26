@@ -48,12 +48,6 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.adultConfirmed == true;
     }
 
-    function isBackAlleyConfirmed() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.backAlleyConfirmed == true;
-    }
-
     function validImage(image) {
       return image is map
         && image.keys().hasOnly(['url', 'path', 'alt'])
@@ -190,19 +184,19 @@ service cloud.firestore {
     }
 
     match /backAlleyMessages/{messageId} {
-      allow read: if isBackAlleyConfirmed() || isAdmin();
+      allow read: if isAdmin();
       allow create, update: if isAdmin() && validMessage(request.resource.data) && request.resource.data.audience == 'back-alley';
       allow delete: if isAdmin();
     }
 
     match /backAlleyR18Messages/{messageId} {
-      allow read: if (isBackAlleyConfirmed() && isAdultConfirmed()) || isAdmin();
+      allow read: if isAdultConfirmed() || isAdmin();
       allow create, update: if isAdmin() && validMessage(request.resource.data) && request.resource.data.audience == 'r18';
       allow delete: if isAdmin();
     }
 
     match /backAlleyPortfolioItems/{itemId} {
-      allow read: if isBackAlleyConfirmed() || isAdmin();
+      allow read: if isAdmin();
       allow create, update: if isAdmin()
         && request.resource.data.keys().hasOnly(['title', 'description', 'tags', 'image', 'publishedAt', 'featured', 'createdAt', 'updatedAt'])
         && request.resource.data.title is string
@@ -226,7 +220,7 @@ service cloud.firestore {
     }
 
     match /backAlleyR18PortfolioItems/{itemId} {
-      allow read: if (isBackAlleyConfirmed() && isAdultConfirmed()) || isAdmin();
+      allow read: if isAdultConfirmed() || isAdmin();
       allow create, update: if isAdmin()
         && request.resource.data.keys().hasOnly(['title', 'description', 'tags', 'image', 'interaction', 'r18', 'publishedAt', 'featured', 'createdAt', 'updatedAt'])
         && request.resource.data.title is string
@@ -243,7 +237,7 @@ service cloud.firestore {
     }
 
     match /backAlleyR18Index/{itemId} {
-      allow read: if isBackAlleyConfirmed() || isAdmin();
+      allow read: if isAdmin();
       allow create, update: if isAdmin()
         && request.resource.data.keys().hasOnly(['title', 'description', 'publishedAt', 'featured', 'updatedAt'])
         && request.resource.data.title is string
@@ -301,13 +295,24 @@ service cloud.firestore {
         && request.resource.data.body.size() <= 50000
         && request.resource.data.bodySegments is list
         && request.resource.data.bodySegments.size() <= 50
-        && request.resource.data.category in ['contents', 'tools', 'apps']
+        && request.resource.data.category in ['games', 'cg', 'other']
         && request.resource.data.tags is list
         && request.resource.data.tags.size() <= 30
         && (request.resource.data.thumbnail == null || validContentMedia(request.resource.data.thumbnail))
         && validContentMediaList(request.resource.data.media)
         && (request.resource.data.url == null || (request.resource.data.url is string && request.resource.data.url.size() <= 2048))
         && request.resource.data.featured is bool;
+      allow delete: if isAdmin();
+    }
+
+    match /goods/{itemId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['title', 'description', 'image', 'publishedAt', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && validContentCommon(request.resource.data)
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 5000
+        && (request.resource.data.image == null || (validContentMedia(request.resource.data.image) && request.resource.data.image.type == 'image'));
       allow delete: if isAdmin();
     }
 

@@ -16,6 +16,14 @@ type StoredBodySegment =
   | { type: 'link'; label: string; href: string }
   | { type: 'media'; media: StoredMedia };
 
+export type GoodsItem = {
+  id: string;
+  title: string;
+  description: string;
+  image?: { src: string; alt: string };
+  publishedAt: string;
+};
+
 function timestampDate(value: unknown): Date | null {
   if (!value || typeof value !== 'object' || !('toDate' in value) || typeof (value as AdminTimestamp).toDate !== 'function') return null;
   const date = (value as AdminTimestamp).toDate();
@@ -86,7 +94,7 @@ export async function getAllWorks(): Promise<Work[]> {
   const firebaseItems = documents.flatMap((document): Work[] => {
     const data = document.data();
     const publishedAt = timestampDate(data.publishedAt);
-    if (!publishedAt || typeof data.title !== 'string' || typeof data.body !== 'string' || !['contents', 'tools', 'apps'].includes(String(data.category))) return [];
+    if (!publishedAt || typeof data.title !== 'string' || typeof data.body !== 'string' || !['games', 'cg', 'other'].includes(String(data.category))) return [];
     const thumbnail = isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail.url : '';
     const media = Array.isArray(data.media) ? data.media.filter(isMedia).map((item) => ({ type: item.type, src: item.url, alt: item.alt || undefined })) : [];
     const storedSegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, 50) : [];
@@ -94,6 +102,19 @@ export async function getAllWorks(): Promise<Work[]> {
     return [{ id: document.id, title: data.title, body, category: data.category as Work['category'], tags: strings(data.tags), thumbnail, ...(storedSegments.length ? {} : { media }), date: tokyoDate(publishedAt), publishedAt: publishedAt.toISOString(), url: optionalString(data.url), featured: data.featured === true, seoTitle: optionalString(data.seoTitle), seoDescription: optionalString(data.seoDescription), noIndex: data.noIndex === true }];
   });
   return mergeById(works, firebaseItems, (item) => item.publishedAt ?? item.date ?? '');
+}
+
+export async function getAllGoods(): Promise<GoodsItem[]> {
+  const documents = await getDocuments('goods');
+  return documents.flatMap((document): GoodsItem[] => {
+    const data = document.data();
+    const publishedAt = timestampDate(data.publishedAt);
+    if (!publishedAt || typeof data.title !== 'string' || typeof data.description !== 'string') return [];
+    const image = isMedia(data.image) && data.image.type === 'image'
+      ? { src: data.image.url, alt: data.image.alt || `${data.title}の画像` }
+      : undefined;
+    return [{ id: document.id, title: data.title, description: data.description, image, publishedAt: publishedAt.toISOString() }];
+  });
 }
 
 export async function getAllPortfolioItems(): Promise<PortfolioItem[]> {
@@ -145,6 +166,6 @@ export async function getAllManualNews(): Promise<News[]> {
 }
 
 export async function getAllNewsItems() {
-  const [manualItems, workItems, portfolio] = await Promise.all([getAllManualNews(), getAllWorks(), getAllPortfolioItems()]);
-  return buildNewsItems(manualItems, workItems, portfolio);
+  const [manualItems, workItems] = await Promise.all([getAllManualNews(), getAllWorks()]);
+  return buildNewsItems(manualItems, workItems);
 }

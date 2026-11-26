@@ -103,6 +103,10 @@
   background: #fff;
 }
 
+.corporate-header a:hover {
+  color: var(--corporate-ink);
+}
+
 .corporate-header-inner {
   display: flex;
   width: min(1280px, calc(100% - 48px));

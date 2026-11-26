@@ -8,12 +8,13 @@ export type AppInquiryType = {
   label: string;
 };
 
-export const appServiceValues = ['portlink', 'mega'] as const;
+export const appServiceValues = ['portlink', 'mega', 'other'] as const;
 export const appInquiryTypeValues = ['bug', 'request', 'question'] as const;
 
 export const appServices: AppService[] = [
   { value: 'portlink', label: 'PORTLINK' },
   { value: 'mega', label: 'MEGA製作所' },
+  { value: 'other', label: 'その他' },
 ];
 
 export const appInquiryTypes: AppInquiryType[] = [

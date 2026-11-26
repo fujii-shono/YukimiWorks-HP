@@ -1764,6 +1764,7 @@ export type AppService = {
 export const appServices: AppService[] = [
   { value: 'portlink', label: 'PORTLINK' },
   { value: 'mega', label: 'MEGA製作所' },
+  { value: 'other', label: 'その他' },
 ];
 ```
 

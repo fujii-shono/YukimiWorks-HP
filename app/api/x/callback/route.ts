@@ -4,7 +4,7 @@ import { exchangeXAuthorizationCode, getXConfig, saveXConnection } from '@/lib/x
 export const runtime = 'nodejs';
 
 function adminRedirect(request: NextRequest, status: 'connected' | 'error') {
-  return new URL(`/admin?section=messages&x=${status}`, request.nextUrl.origin);
+  return new URL(`/circle/admin?section=messages&x=${status}`, request.nextUrl.origin);
 }
 
 function clearOauthCookies(response: NextResponse) {

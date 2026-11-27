@@ -3,14 +3,14 @@ import { AdminPagePanel } from '@/components/admin/AdminPagePanel';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 
 export const metadata: Metadata = {
-  title: '管理画面 | YukimiWorks',
+  title: '管理画面 | 溶けたアイス',
   robots: { index: false, follow: false },
 };
 
 export default function AdminPage() {
   return (
     <SiteFrame>
-      <AdminPagePanel basePath="/admin" />
+      <AdminPagePanel basePath="/circle/admin" />
     </SiteFrame>
   );
 }

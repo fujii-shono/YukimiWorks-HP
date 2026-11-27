@@ -12,7 +12,7 @@ const OPEN_ACCOUNT_EVENT = 'yukimi:open-account';
 export function LoginEntryButton() {
   const pathname = usePathname();
   const { firebaseUser, profile, loading } = useFirebaseAuth();
-  const adminHref = '/admin';
+  const adminHref = '/circle/admin';
 
   if (!loading && firebaseUser && profile?.role === 'admin') {
     return (
@@ -158,7 +158,7 @@ export function AccountControls() {
   const isAdmin = profile?.role === 'admin';
   const hasBlueTicket = profile?.tickets.includes('blue') || false;
   const hasNightTicket = profile?.tickets.includes('night') || false;
-  const adminHref = '/admin';
+  const adminHref = '/circle/admin';
   const isCorporatePage =
     pathname === '/' ||
     pathname === '/about' ||

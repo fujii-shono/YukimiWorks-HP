@@ -49,7 +49,7 @@ function initialPublishedAt() {
   return toTokyoDateTimeInput(new Date());
 }
 
-export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admin' }) {
+export function AdminMessageManager({ basePath = '/circle/admin' }: { basePath?: '/circle/admin' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { firebaseUser, profile, loading, profileLoading } = useFirebaseAuth();

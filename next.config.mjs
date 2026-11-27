@@ -10,6 +10,7 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      { source: '/admin', destination: '/circle/admin', permanent: true },
       { source: '/works/odai-maker', destination: '/circle/odai-maker', permanent: true },
       { source: '/circle/about', destination: '/circle', permanent: true },
       { source: '/circle/contact', destination: '/circle', permanent: true },

@@ -3443,3 +3443,40 @@
 - メニューや一覧データは変更せず、新しい導線を作らない
 - お題生成テスト、lint、型チェック、production buildを実行する
 - ブラウザ確認はユーザーの許可が必要なため未実施とする
+
+## 2026年11月27日 サークル管理画面のURL移転
+
+### 対応する仕様
+
+- サークル用コンテンツの管理画面は`/circle/admin`を正式URLとする
+- 旧`/admin`はクエリパラメータを維持して`/circle/admin`へ恒久転送する
+
+### 実装方針
+
+- 管理画面本体を`app/circle/admin/page.tsx`へ移し、管理画面内のURL状態も新URLを正本とする
+- `next.config.mjs`に旧URLの恒久転送を定義し、ブックマークと旧導線を切らさない
+- アカウント導線とX OAuth完了後の戻り先を新URLへ統一する
+
+### 変更予定のファイルと理由
+
+- `SPEC.md`, `README.md`, `plan.md` — 正式URLと移行方針、ローカル運用手順を明文化するため
+- `app/circle/admin/page.tsx`, `app/admin/page.tsx`, `next.config.mjs` — 管理画面を移転し、旧URLを恒久転送にするため
+- `components/admin/AdminPagePanel.tsx`, `components/admin/AdminMessageManager.tsx` — 画面内のクエリ遷移を新URLにするため
+- `components/auth/AccountControls.tsx`, `app/api/x/callback/route.ts` — 管理者導線と外部認証後の戻り先を新URLにするため
+
+### 影響範囲
+
+- 管理画面のURL、管理者向けリンク、X OAuthの完了後遷移
+- Firebaseの管理者権限検証、Firestore / Storageルール、管理機能本体は変更しない
+
+### 検証方法
+
+- `/admin`から`/circle/admin`への恒久転送とクエリ維持をbuild結果と設定で確認する
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- コード検索で、転送元定義以外の運用中`/admin`導線が残っていないことを確認する
+
+### 懸念点・制約
+
+- ブラウザ確認はユーザーの許可が必要なため、許可がない場合は未実施とする

@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { AdminMessageManager } from '@/components/admin/AdminMessageManager';
 
-export function AdminPagePanel({ basePath }: { basePath: '/admin' }) {
+export function AdminPagePanel({ basePath }: { basePath: '/circle/admin' }) {
   return (
     <section className="window-panel admin-panel">
       <h1 className="window-title">

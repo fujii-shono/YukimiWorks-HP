@@ -3027,15 +3027,13 @@ textarea {
 
 .site-links-list {
   display: grid;
-  gap: 16px;
+  gap: 10px;
   width: min(100%, 760px);
   margin: 0 auto;
 }
 
 .site-link-item {
-  padding: 14px 16px;
-  border: 1px solid var(--site-border);
-  background: var(--site-surface);
+  padding: 0;
 }
 
 .site-link-item.has-banner {

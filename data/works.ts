@@ -52,6 +52,7 @@ export function getWorkDescription(work: Pick<Work, 'title' | 'body'>) {
 }
 
 export const works: Work[] = [
+  /*
   {
     id: 'sample-game',
     title: 'サンプル作品',
@@ -63,4 +64,5 @@ export const works: Work[] = [
     media: [{ type: 'image', src: '/works/placeholder.svg', alt: 'サンプル作品の画像' }],
     featured: true,
   },
+  */
 ];

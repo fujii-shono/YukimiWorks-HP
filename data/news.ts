@@ -62,6 +62,7 @@ export const newsCategoryLabels: Record<NewsCategory, string> = {
 };
 
 export const manualNews: News[] = [
+  /*
   {
     id: 'release-rikuari-payment',
     title: 'リクありに決済機能を追加しました',
@@ -84,6 +85,8 @@ export const manualNews: News[] = [
     seoDescription: 'リクありに決済機能を追加しました',
     featured: true,
   },
+  */
+  /*
   {
     id: 'release-acrylic-keychain-svg',
     title: '「アクキーシミュレーター」にSVG作成機能を追加しました',
@@ -116,6 +119,8 @@ export const manualNews: News[] = [
     seoDescription: '「アクキーシミュレーター」にSVG作成機能を追加しました',
     featured: true,
   },
+  */
+  /*
   {
     id: 'announcement-gamespage-launch',
     title: '「ゲーム」カテゴリを追加しました',
@@ -143,6 +148,7 @@ export const manualNews: News[] = [
     seoDescription: 'Gamesカテゴリを追加しました。',
     featured: true,
   },
+  */
   // {
   //   id: 'release-tarif-beta',
   //   title: 'Tarifベータ版を公開しました',
@@ -165,6 +171,7 @@ export const manualNews: News[] = [
   //   seoDescription: 'オンライン料金表サービスTarifを公開しました。料金表・見積もり書作成ならTarif。',
   //   featured: true,
   // },
+  /*
   {
     id: 'announcement-sample-site-launch',
     title: 'YukimiWorks コーポレートサイトを公開しました',
@@ -177,6 +184,7 @@ export const manualNews: News[] = [
     seoDescription: 'YukimiWorksの公式コーポレートサイトを公開しました。制作実績・会社情報・お問い合わせはこちらから。',
     featured: true,
   },
+  */
 ];
 
 const sourceRank: Record<NewsSource, number> = {

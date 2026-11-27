@@ -101,9 +101,9 @@ function parseContent<K extends ContentKind>(kind: K, snapshot: QueryDocumentSna
     return { ...base, description: data.description, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), media, thumbnail, featured: data.featured === true } as FirebaseContentByKind[K];
   }
   if (kind === 'works') {
-    if (typeof data.body !== 'string' || !['games', 'cg', 'other'].includes(data.category) || !Array.isArray(data.tags) || !Array.isArray(data.media)) return null;
+    if (typeof data.body !== 'string' || !Array.isArray(data.tags) || !Array.isArray(data.media)) return null;
     const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
-    return { ...base, body: data.body, bodySegments, category: data.category, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), url: optionalString(data, 'url'), featured: data.featured === true } as FirebaseContentByKind[K];
+    return { ...base, body: data.body, bodySegments, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), url: optionalString(data, 'url'), featured: data.featured === true } as FirebaseContentByKind[K];
   }
   if (kind === 'goods') {
     const legacyDescription = typeof data.description === 'string' ? data.description : '';
@@ -120,9 +120,9 @@ function parseContent<K extends ContentKind>(kind: K, snapshot: QueryDocumentSna
     const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
     return { ...base, body: data.body, bodySegments, category: data.category, eyecatch: isMedia(data.eyecatch) && data.eyecatch.type === 'image' ? data.eyecatch : undefined } as FirebaseContentByKind[K];
   }
-  if (typeof data.body !== 'string' || !['event', 'announcement', 'release', 'other'].includes(data.category) || !Array.isArray(data.media)) return null;
+  if (typeof data.body !== 'string' || !Array.isArray(data.media)) return null;
   const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
-  return { ...base, body: data.body, bodySegments, category: data.category, thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), featured: data.featured === true } as FirebaseContentByKind[K];
+  return { ...base, body: data.body, bodySegments, thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), featured: data.featured === true } as FirebaseContentByKind[K];
 }
 
 export function subscribeToFirebaseContent<K extends ContentKind>(kind: K, onItems: (items: FirebaseContentByKind[K][]) => void, onError?: () => void): Unsubscribe {
@@ -188,12 +188,13 @@ export async function saveFirebaseContent(kind: ContentKind, id: string | undefi
       const migratedValue: Record<string, unknown> = { ...previousSnapshot.data(), ...storedValue };
       if (kind === 'news') delete migratedValue.summary;
       if (kind === 'works') delete migratedValue.description;
+      if (kind === 'news' || kind === 'works') delete migratedValue.category;
       if (kind === 'portfolio') delete migratedValue.image;
       transaction.set(recordRef, migratedValue);
       transaction.delete(previousRef);
     });
   } else {
-    await setDoc(recordRef, { ...storedValue, ...(kind === 'news' ? { summary: deleteField() } : {}), ...(kind === 'works' ? { description: deleteField() } : {}), ...(kind === 'portfolio' ? { image: deleteField() } : {}) }, { merge: true });
+    await setDoc(recordRef, { ...storedValue, ...(kind === 'news' ? { summary: deleteField(), category: deleteField() } : {}), ...(kind === 'works' ? { description: deleteField(), category: deleteField() } : {}), ...(kind === 'portfolio' ? { image: deleteField() } : {}) }, { merge: true });
   }
   return recordRef.id;
 }

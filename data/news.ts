@@ -12,14 +12,12 @@ export type NewsBodySegment =
   | { type: 'link'; label: string; href: string }
   | { type: 'media'; src: string; mediaType: 'image' | 'video'; alt?: string };
 
-export type NewsCategory = 'event' | 'announcement' | 'release' | 'other';
 export type NewsSource = 'manual' | 'work';
 
 export type News = {
   id: string;
   title: string;
   date: string;
-  category: NewsCategory;
   thumbnail: string;
   href?: string;
   source?: NewsSource;
@@ -54,20 +52,12 @@ export function getNewsDescription(article: Pick<News, 'title' | 'body'>) {
   return getNewsPlainText(article).replace(/\s+/g, ' ').slice(0, 160);
 }
 
-export const newsCategoryLabels: Record<NewsCategory, string> = {
-  event: 'イベント',
-  announcement: 'お知らせ',
-  release: 'リリース情報',
-  other: 'その他',
-};
-
 export const manualNews: News[] = [
   /*
   {
     id: 'release-rikuari-payment',
     title: 'リクありに決済機能を追加しました',
     date: '2026-09-22',
-    category: 'release',
     thumbnail: '/works/rikuari/hero.png',
     body: [
       {
@@ -91,7 +81,6 @@ export const manualNews: News[] = [
     id: 'release-acrylic-keychain-svg',
     title: '「アクキーシミュレーター」にSVG作成機能を追加しました',
     date: '2026-07-27',
-    category: 'release',
     thumbnail: '/news/20260727-171550.png',
     body: [
       {
@@ -120,40 +109,10 @@ export const manualNews: News[] = [
     featured: true,
   },
   */
-  /*
-  {
-    id: 'announcement-gamespage-launch',
-    title: '「ゲーム」カテゴリを追加しました',
-    date: '2026-07-19',
-    category: 'announcement',
-    thumbnail: '',
-    body: [
-      {
-        type: 'strikethrough',
-        value:
-          'YukimiWorksにGamesページを追加しました。\n\nGamesページには、HTMLで作成したシンプルなゲームを追加していきます。\nネタ系から本格的に遊べるものまで思いついたアイデアを試していくので、ぜひ遊んでみてください。',
-      },
-      {
-        type: 'text',
-        value:
-          'ゲーム作品はWorksページ内の「ゲーム」カテゴリで公開しています。',
-      },
-      {
-        type: 'link',
-        label: 'ゲーム作品一覧へ',
-        href: '/works?category=games',
-      },
-    ],
-    seoTitle: 'Gamesカテゴリを追加しました | YukimiWorks',
-    seoDescription: 'Gamesカテゴリを追加しました。',
-    featured: true,
-  },
-  */
   // {
   //   id: 'release-tarif-beta',
   //   title: 'Tarifベータ版を公開しました',
   //   date: '2026-07-14',
-  //   category: 'release',
   //   thumbnail: '/tarif/hero.png',
   //   body: [
   //     {
@@ -176,7 +135,6 @@ export const manualNews: News[] = [
     id: 'announcement-sample-site-launch',
     title: 'YukimiWorks コーポレートサイトを公開しました',
     date: '2026-07-13',
-    category: 'announcement',
     thumbnail: '',
     body:
       'YukimiWorksのコーポレートサイトを本日公開しました。\n\n制作実績・会社概要・お問い合わせフォームなどをご用意しています。\nご不明な点やご依頼はお問い合わせフォームよりお気軽にご連絡ください。',
@@ -199,7 +157,6 @@ function createWorkNews(items: typeof works): News[] {
     id: `work-${work.id}`,
     title: `作品「${work.title}」を追加しました`,
     date: work.date as string,
-    category: 'other',
     thumbnail: work.thumbnail,
     href: `/works/${work.id}`,
     source: 'work',

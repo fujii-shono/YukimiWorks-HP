@@ -5,7 +5,7 @@ import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { SleepWarningImage } from '@/components/ui/SleepWarningImage';
 import { RichBody } from '@/components/ui/RichBody';
 import { formatJapaneseDate } from '@/lib/format';
-import { getNewsDescription, getNewsPlainText, getNewsThumbnail, manualNews, newsCategoryLabels } from '@/data/news';
+import { getNewsDescription, getNewsPlainText, getNewsThumbnail, manualNews } from '@/data/news';
 import { siteConfig } from '@/data/siteConfig';
 import { getAllManualNews } from '@/lib/firebase/content.server';
 
@@ -79,9 +79,7 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ id:
         </Link>
         <div className="page-intro">
           <h2>{article.title}</h2>
-          <p>
-            {formatJapaneseDate(article.date)} / {newsCategoryLabels[article.category]}
-          </p>
+          <p>{formatJapaneseDate(article.date)}</p>
           <hr />
         </div>
         <SleepWarningImage src={getNewsThumbnail(article)} alt={`${article.title}のサムネイル`} width={560} height={315} className="detail-eyecatch" />

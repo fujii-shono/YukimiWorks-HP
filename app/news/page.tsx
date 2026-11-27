@@ -1,43 +1,19 @@
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
-import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { NewsCard } from '@/components/ui/NewsCard';
-import { newsCategoryLabels, type NewsCategory } from '@/data/news';
 import { getAllNewsItems } from '@/lib/firebase/content.server';
-
-const allCategories: NewsCategory[] = ['event', 'announcement', 'release', 'other'];
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ category?: string }>;
-}) {
-  const resolvedSearchParams = await searchParams;
+export default async function NewsPage() {
   const newsItems = await getAllNewsItems();
-  const validCategory = allCategories.includes(resolvedSearchParams?.category as NewsCategory)
-    ? (resolvedSearchParams?.category as NewsCategory)
-    : null;
-  const visibleCategories = allCategories.filter((category) => newsItems.some((item) => item.category === category));
-  const filteredNews = validCategory ? newsItems.filter((item) => item.category === validCategory) : newsItems;
 
   return (
     <SiteFrame>
       <RetroPanel title="お知らせ" titleAside="News" contentClassName="listing-panel-body">
-        <div className="filter-tabs">
-          <Link href="/news" className={!validCategory ? 'active' : undefined}>
-            すべて
-          </Link>
-          {visibleCategories.map((category) => (
-            <Link key={category} href={`/news?category=${category}`} className={validCategory === category ? 'active' : undefined}>
-              {newsCategoryLabels[category]}
-            </Link>
-          ))}
-        </div>
-        {filteredNews.length ? (
+        {newsItems.length ? (
           <div className="card-grid">
-            {filteredNews.map((article) => (
+            {newsItems.map((article) => (
               <NewsCard key={article.id} article={article} />
             ))}
           </div>

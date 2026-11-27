@@ -291,13 +291,12 @@ service cloud.firestore {
     match /works/{itemId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['title', 'body', 'bodySegments', 'category', 'tags', 'thumbnail', 'media', 'publishedAt', 'url', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['title', 'body', 'bodySegments', 'tags', 'thumbnail', 'media', 'publishedAt', 'url', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
         && validContentCommon(request.resource.data)
         && request.resource.data.body is string
         && request.resource.data.body.size() <= 50000
         && request.resource.data.bodySegments is list
         && request.resource.data.bodySegments.size() <= 50
-        && request.resource.data.category in ['games', 'cg', 'other']
         && request.resource.data.tags is list
         && request.resource.data.tags.size() <= 30
         && (request.resource.data.thumbnail == null || validContentMedia(request.resource.data.thumbnail))
@@ -365,13 +364,12 @@ service cloud.firestore {
     match /news/{itemId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['title', 'body', 'bodySegments', 'category', 'thumbnail', 'media', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['title', 'body', 'bodySegments', 'thumbnail', 'media', 'publishedAt', 'featured', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
         && validContentCommon(request.resource.data)
         && request.resource.data.body is string
         && request.resource.data.body.size() <= 100000
         && request.resource.data.bodySegments is list
         && request.resource.data.bodySegments.size() <= 50
-        && request.resource.data.category in ['event', 'announcement', 'release', 'other']
         && (request.resource.data.thumbnail == null || validContentMedia(request.resource.data.thumbnail))
         && validContentMediaList(request.resource.data.media)
         && request.resource.data.featured is bool;

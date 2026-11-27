@@ -5410,27 +5410,6 @@ html[data-event='sleep-warning'] .pixel-tint-frame::after {
   border-top: 1px solid color-mix(in srgb, var(--site-border) 45%, transparent);
 }
 
-.filter-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 26px;
-}
-
-.filter-tabs a {
-  padding: 7px 14px;
-  border: 1px solid var(--site-border);
-  background: var(--site-surface-soft);
-  font-family: var(--font-pixel);
-  text-decoration: none;
-}
-
-.filter-tabs a.active {
-  color: var(--site-surface);
-  background: var(--site-accent);
-}
-
 .card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

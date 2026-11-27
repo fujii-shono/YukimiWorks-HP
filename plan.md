@@ -1,5 +1,48 @@
 # 裏ページ・成人確認・非公開素材対応
 
+## 追加対応: リンク集導線と作品・ニュース一覧の統合
+
+### 対応する仕様
+
+- リンク集の左メニューアイコンを`/icons/sweets/contents.png`へ変更し、右側メイン領域の専用リンク集ページへ遷移させる
+- 作品とニュースのカテゴリー、および「すべて」を含むカテゴリー絞り込みを廃止する
+- 通常作品とR18作品を同じ作品一覧内へ表示する
+
+### 実装方針
+
+- 既存の`/links`を他ページと共通の`SiteFrame`内にある専用ページとして維持し、サイドバーのアイコンだけを指定素材へ変更する
+- 作品・ニュースの型、管理フォーム、Firestore保存値、公開カード・詳細からカテゴリーを削除する
+- 既存Firestore文書にカテゴリーが残っていても読み込めるようにし、作品・ニュースを次回保存した際は旧カテゴリーを削除する
+- R18の取得条件と保護画像処理は維持し、通常作品を受け取るクライアント側一覧コンポーネントでR18カードを同じグリッドへ追加する
+
+### 変更予定のファイルと理由
+
+- `SPEC.md`, `plan.md`: 今回の表示・データ仕様と移行方針を記録するため
+- `components/layout/Sidebar.tsx`, `app/links/page.tsx`: 指定アイコンを反映し、既存のリンク集専用ページ構造を確認するため
+- `app/works/page.tsx`, `components/works/WorksGrid.tsx`, `components/works/R18WorksSection.tsx`, `components/ui/WorkCard.tsx`: 通常・R18作品を単一一覧へ統合し、カテゴリー表示を削除するため
+- `app/news/page.tsx`, `app/news/[id]/page.tsx`, `components/ui/NewsCard.tsx`: 絞り込みとカテゴリー表示を削除するため
+- `data/works.ts`, `data/news.ts`, `lib/firebase/types.ts`, `lib/firebase/content.ts`, `lib/firebase/content.server.ts`: 作品・ニュースのカテゴリーをデータモデルから削除するため
+- `components/admin/AdminContentManager.tsx`, `firestore.rules`: 管理フォームと保存ルールからカテゴリーを削除するため
+- `app/globals.css`: 使用されなくなる絞り込みタブのスタイルを削除するため
+
+### 影響範囲
+
+- サークルサイトの左メニュー、リンク集、作品一覧・詳細、ニュース一覧・詳細、管理画面
+- Firestoreの`works`・`news`文書
+- R18作品の取得権限と保護Storageは変更しない
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- コード検索で作品・ニュースのカテゴリーUIと`?category=`導線が残っていないことを確認する
+
+### 懸念点・制約
+
+- ブラウザ確認はユーザー許可が必要なため、許可がない場合は未実施として報告する
+- Firebase Rulesはデプロイ後に本番へ反映される
+
 ## 追加対応: グッズ・作品・リンク集の管理
 
 ### 対応する仕様

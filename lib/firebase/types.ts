@@ -95,7 +95,6 @@ export type FirebaseWork = {
   title: string;
   body: string;
   bodySegments: FirebaseContentBodySegment[];
-  category: 'games' | 'cg' | 'other';
   tags: string[];
   thumbnail?: FirebaseContentMedia;
   media: FirebaseContentMedia[];
@@ -156,7 +155,6 @@ export type FirebaseNews = {
   title: string;
   body: string;
   bodySegments: FirebaseContentBodySegment[];
-  category: 'event' | 'announcement' | 'release' | 'other';
   thumbnail?: FirebaseContentMedia;
   media: FirebaseContentMedia[];
   publishedAt: Timestamp;

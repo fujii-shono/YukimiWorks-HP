@@ -30,9 +30,7 @@ const staticContentIds = {
   works: new Set(works.map((item) => item.id)),
 };
 const categories = {
-  works: [['games', 'ゲーム'], ['cg', 'CG集'], ['other', 'その他']],
   diary: [['chat', '雑談'], ['report', '報告'], ['development', '開発日誌'], ['behind-the-scenes', '制作秘話'], ['content-creation-tips', 'コンテンツ制作の極意']],
-  news: [['event', 'イベント'], ['announcement', 'お知らせ'], ['release', 'リリース情報'], ['other', 'その他']],
 } as const;
 
 function toTokyoInput(date: Date) {
@@ -121,7 +119,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
   const requiresPrimary = kind === 'portfolio' || backAlley;
   const supportsCustomUrlId = kind === 'portfolio' || kind === 'works' || kind === 'goods';
   const supportsRichBody = kind === 'works' || kind === 'goods' || kind === 'diary' || kind === 'news';
-  const categoryOptions = kind === 'portfolio' || kind === 'goods' ? [] : categories[kind as keyof typeof categories];
+  const categoryOptions = kind === 'diary' ? categories.diary : [];
   const now = Date.now();
 
   const reset = () => {
@@ -163,7 +161,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       setBodyBlocks(initialBodyBlocks());
     } else if (kind === 'works') {
       const record = item as FirebaseWork;
-      setForm({ ...emptyForm(), ...common, category: record.category, tags: record.tags.join(', '), featured: record.featured });
+      setForm({ ...emptyForm(), ...common, tags: record.tags.join(', '), featured: record.featured });
       setPrimary(record.thumbnail);
       setBodyBlocks(getBodyBlocks(record));
     } else if (kind === 'goods') {
@@ -178,7 +176,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       setBodyBlocks(getBodyBlocks(record));
     } else {
       const record = item as FirebaseNews;
-      setForm({ ...emptyForm(), ...common, category: record.category, featured: record.featured });
+      setForm({ ...emptyForm(), ...common, featured: record.featured });
       setPrimary(record.thumbnail);
       setBodyBlocks(getBodyBlocks(record));
     }
@@ -377,10 +375,10 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       const common = { title: form.title, publishedAt: fromTokyoInput(form.publishedAt), seoTitle: form.seoTitle.trim() || null, seoDescription: form.seoDescription.trim() || null, noIndex: form.noIndex };
       let value: Record<string, unknown> & { title: string; publishedAt: Date };
       if (kind === 'portfolio') value = { ...common, description: form.description.trim(), tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), media: resolvedPrimary, thumbnail: resolvedPrimary?.type === 'video' ? resolvedPortfolioThumbnail : null, featured: form.featured };
-      else if (kind === 'works') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), thumbnail: resolvedPrimary ?? null, media: resolvedMedia, url: null, featured: form.featured };
+      else if (kind === 'works') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), thumbnail: resolvedPrimary ?? null, media: resolvedMedia, url: null, featured: form.featured };
       else if (kind === 'goods') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, description: fallbackBody, thumbnail: resolvedPrimary ?? null, image: null, media: resolvedMedia };
       else if (kind === 'diary') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, eyecatch: resolvedPrimary ?? null };
-      else value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, thumbnail: resolvedPrimary ?? null, media: resolvedMedia, featured: form.featured };
+      else value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, thumbnail: resolvedPrimary ?? null, media: resolvedMedia, featured: form.featured };
       await saveFirebaseContent(kind, recordId, value, !editing, editing?.id);
       const replacedPrimary = newPrimary && primary ? [primary] : [];
       const replacedPortfolioThumbnail = newPortfolioThumbnail && portfolioThumbnail ? [portfolioThumbnail] : [];

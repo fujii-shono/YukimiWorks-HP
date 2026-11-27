@@ -32,11 +32,3 @@ export async function startXConnection(user: User) {
 export async function disconnectX(user: User) {
   await xApiRequest(user, '/api/x/status', { method: 'DELETE' });
 }
-
-export async function postSavedMessageToX(user: User, messageId: string) {
-  return xApiRequest(user, '/api/x/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messageId }),
-  }) as Promise<{ postId: string; alreadyPosted: boolean; dryRun?: boolean }>;
-}

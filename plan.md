@@ -1,5 +1,85 @@
 # 裏ページ・成人確認・非公開素材対応
 
+## 追加対応: グッズ・作品・リンク集の管理
+
+### 対応する仕様
+
+- 作品とグッズを管理画面から更新し、一覧用サムネイルと文章・画像・リンクの本文ブロックを設定できるようにする
+- 左メニューへ「リンク集」を追加し、リンク名、URL、任意の横長バナー、表示順を管理画面から設定できるようにする
+- リンク集では通常リンクは名前を、バナーリンクはバナーと名前の両方をクリック可能にする
+
+### 実装方針
+
+- 作品で使用中の本文ブロック編集・保存・表示処理をグッズへ拡張し、`/goods/[id]`で詳細を表示する
+- リンクはFirestoreの`links`コレクション、バナーはStorageの`content/links/{id}/`へ保存する
+- バナー選択時は3:1のプレビュー内で画像をドラッグし、選択した位置をCanvasで実画像へ反映してからアップロードする
+- リンク集の管理UIは内容が異なるため、既存の汎用コンテンツ管理とは分離した専用コンポーネントにする
+
+### 変更予定のファイルと理由
+
+- `SPEC.md`, `plan.md`: 今回の表示・管理仕様と実装方針を記録するため
+- `components/admin/AdminContentManager.tsx`, `lib/firebase/content.ts`, `lib/firebase/types.ts`: グッズを本文ブロックとサムネイルへ対応させるため
+- `app/goods/page.tsx`, `app/goods/[id]/page.tsx`, `lib/firebase/content.server.ts`: グッズ一覧から詳細へ遷移し、本文を表示するため
+- `components/admin/AdminLinkManager.tsx`, `components/admin/BannerCropper.tsx`, `lib/firebase/links.ts`: リンクのCRUDとドラッグ式バナートリミングを提供するため
+- `app/links/page.tsx`, `components/layout/Sidebar.tsx`, `app/globals.css`: リンク集の公開表示とメニュー導線を追加するため
+- `firestore.rules`, `storage.rules`: リンクデータとバナー保存を管理者に限定するため
+
+### 影響範囲
+
+- サークルサイトのグッズ一覧・詳細、作品管理、リンク集、左メニュー、管理画面
+- Firestoreの`goods`・`links`とStorageの`content/goods/`・`content/links/`
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- Firebase Emulatorでグッズ本文とリンクの新規登録・編集・削除、バナー位置調整、公開表示を確認する
+
+### 懸念点・制約
+
+- Firebase Rulesはデプロイ後に本番へ反映される
+- 既存グッズ文書は`description`と`image`を後方互換で読み取り、新形式で保存した後は本文ブロックとサムネイルを正本とする
+
+## 追加対応: メッセージのX連携・R18廃止と左メニュー上揃え
+
+### 対応する仕様
+
+- メッセージは通常公開だけを扱い、管理画面とクイック投稿からX連携・R18設定を削除する
+- 左メニューの項目を余計な上下余白なしで上揃えにする
+
+### 実装方針
+
+- メッセージの保存先を`messages`へ固定し、X投稿状態と公開先分岐を新規保存データから削除する
+- 既存の通常メッセージに残るX関連フィールドは編集保存時に削除し、旧裏・R18コレクションは公開画面と管理画面から購読しない
+- X投稿のサーバー基盤は週次お題投稿でも使用しているため、今回の対象であるメッセージ連携UI・呼び出しだけを削除する
+- `.sidebar-nav`の固定最小高さと中央揃えを解除し、上揃えにする
+
+### 変更予定のファイルと理由
+
+- `components/admin/AdminMessageManager.tsx`, `components/messages/QuickMessageComposer.tsx`: X連携・R18の入力と投稿処理を削除するため
+- `lib/firebase/messages.ts`, `lib/firebase/types.ts`, `components/messages/usePublicMessages.ts`: 通常メッセージだけを保存・購読するため
+- `firestore.rules`, `storage.rules`: 新規メッセージを通常公開形式だけに制限するため
+- `app/globals.css`: 左メニューを上揃えにするため
+
+### 影響範囲
+
+- 管理画面と公開メッセージ画面の追加・編集・一覧
+- Firestoreの`messages`とStorageの`messages/`
+- デスクトップとモバイルの左メニュー
+
+### 検証方法
+
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+- `npm run build`
+- 管理画面とメッセージ画面で通常メッセージの追加・編集・削除を確認する
+
+### 懸念点・制約
+
+- 旧裏・R18メッセージ文書とStorage素材は自動削除せず、公開・管理対象から外す
+- 週次お題のX投稿はメッセージ機能と別用途のため維持する
+
 ## 追加対応: SafariでのFirebase初期化・購読停止からの復旧
 
 ### 対応する仕様

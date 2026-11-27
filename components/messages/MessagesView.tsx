@@ -232,8 +232,8 @@ function SupportReplyModal({
   );
 }
 
-export function MessagesView({ includeBackAlley = false }: { includeBackAlley?: boolean }) {
-  const { now, posts, firebaseError, retryFirebaseMessages } = usePublicMessages(includeBackAlley);
+export function MessagesView() {
+  const { now, posts, firebaseError, retryFirebaseMessages } = usePublicMessages();
   const { firebaseUser, loading, profile, profileLoading } = useFirebaseAuth();
   const [activeTab, setActiveTab] = useState<MessageTab>('messages');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -408,7 +408,7 @@ export function MessagesView({ includeBackAlley = false }: { includeBackAlley?: 
             +
           </button>
         ) : null}
-        {composerOpen && !poweredOff ? <QuickMessageComposer initialAudience={includeBackAlley ? 'back-alley' : 'front'} onClose={() => setComposerOpen(false)} /> : null}
+        {composerOpen && !poweredOff ? <QuickMessageComposer onClose={() => setComposerOpen(false)} /> : null}
         {replyingTo && firebaseUser && !poweredOff ? (
           <SupportReplyModal
             post={replyingTo}

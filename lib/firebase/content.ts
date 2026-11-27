@@ -106,8 +106,14 @@ function parseContent<K extends ContentKind>(kind: K, snapshot: QueryDocumentSna
     return { ...base, body: data.body, bodySegments, category: data.category, tags: data.tags.filter((tag: unknown) => typeof tag === 'string'), thumbnail: isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail : undefined, media: data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA), url: optionalString(data, 'url'), featured: data.featured === true } as FirebaseContentByKind[K];
   }
   if (kind === 'goods') {
-    if (typeof data.description !== 'string') return null;
-    return { ...base, description: data.description, image: isMedia(data.image) && data.image.type === 'image' ? data.image : undefined } as FirebaseContentByKind[K];
+    const legacyDescription = typeof data.description === 'string' ? data.description : '';
+    const body = typeof data.body === 'string' ? data.body : legacyDescription;
+    const bodySegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, MAX_CONTENT_BODY_SEGMENTS) : [];
+    const thumbnail = isMedia(data.thumbnail) && data.thumbnail.type === 'image'
+      ? data.thumbnail
+      : isMedia(data.image) && data.image.type === 'image' ? data.image : undefined;
+    const media = Array.isArray(data.media) ? data.media.filter(isMedia).slice(0, MAX_CONTENT_MEDIA) : [];
+    return { ...base, body, bodySegments, description: legacyDescription || body, thumbnail, image: thumbnail, media } as FirebaseContentByKind[K];
   }
   if (kind === 'diary') {
     if (typeof data.body !== 'string' || !['chat', 'report', 'development', 'behind-the-scenes', 'content-creation-tips'].includes(data.category)) return null;
@@ -140,7 +146,7 @@ export function validateContentFiles(files: File[], existingCount: number, image
   }
 }
 
-export async function uploadContentFiles(kind: ContentKind, recordId: string, files: File[], imageOnly = false) {
+export async function uploadContentFiles(kind: ContentKind | 'links', recordId: string, files: File[], imageOnly = false) {
   const services = getFirebaseServices();
   if (!services) throw new Error('Firebase が設定されていません。');
   validateContentFiles(files, 0, imageOnly);
@@ -212,7 +218,9 @@ export function getContentMedia(kind: ContentKind, item: FirebaseContentByKind[C
   }
   if (kind === 'goods') {
     const goods = item as FirebaseGoodsItem;
-    return goods.image ? [goods.image] : [];
+    const bodyMedia = goods.bodySegments.flatMap((segment) => segment.type === 'media' ? [segment.media] : []);
+    return [...(goods.thumbnail ? [goods.thumbnail] : []), ...goods.media, ...bodyMedia]
+      .filter((media, index, all) => all.findIndex((candidate) => candidate.path === media.path) === index);
   }
   const rich = item as FirebaseWork | FirebaseNews;
   const bodyMedia = rich.bodySegments.flatMap((segment) => segment.type === 'media' ? [segment.media] : []);

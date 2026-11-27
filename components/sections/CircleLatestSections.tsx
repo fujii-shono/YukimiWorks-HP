@@ -21,9 +21,9 @@ export async function CircleLatestSections() {
   }));
   const latestGoods: CircleLatestItem[] = goods.map((item) => ({
     id: item.id,
-    href: '/goods',
+    href: `/goods/${item.id}`,
     title: item.title,
-    image: item.image ?? { src: placeholderImage, alt: `${item.title}のサムネイル` },
+    image: { src: item.thumbnail || placeholderImage, alt: `${item.title}のサムネイル` },
   }));
 
   return (

@@ -32,22 +32,11 @@ export type FirebaseMessageImage = {
   alt: string;
 };
 
-export type MessageAudience = 'front' | 'back-alley' | 'r18';
-
-export type XPostStatus = 'not_requested' | 'pending' | 'posting' | 'posted' | 'failed' | 'skipped_too_long';
-
 export type FirebaseMessage = {
   id: string;
   body: string;
   authorName?: string;
   images: FirebaseMessageImage[];
-  audience: MessageAudience;
-  postToX: boolean;
-  xPostStatus: XPostStatus;
-  xPostId?: string;
-  xPostError?: string;
-  xPostAttemptedAt?: Timestamp;
-  xPostedAt?: Timestamp;
   publishedAt: Timestamp;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -123,12 +112,26 @@ export type FirebaseWork = {
 export type FirebaseGoodsItem = {
   id: string;
   title: string;
+  body: string;
+  bodySegments: FirebaseContentBodySegment[];
   description: string;
+  thumbnail?: FirebaseContentMedia;
   image?: FirebaseContentMedia;
+  media: FirebaseContentMedia[];
   publishedAt: Timestamp;
   seoTitle?: string;
   seoDescription?: string;
   noIndex: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+export type FirebaseSiteLink = {
+  id: string;
+  label: string;
+  url: string;
+  banner?: FirebaseContentMedia;
+  order: number;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };

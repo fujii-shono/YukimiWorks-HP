@@ -64,7 +64,7 @@ function initialBodyBlocks(): AdminBodyBlock[] {
   return [{ id: 'initial-body-text', type: 'text', value: '' }];
 }
 
-function getBodyBlocks(record: FirebaseWork | FirebaseDiaryEntry | FirebaseNews): AdminBodyBlock[] {
+function getBodyBlocks(record: FirebaseWork | FirebaseGoodsItem | FirebaseDiaryEntry | FirebaseNews): AdminBodyBlock[] {
   if (record.bodySegments.length) {
     return record.bodySegments.map((segment) => {
       if (segment.type === 'text') return { id: bodyBlockId(), type: 'text', value: segment.value };
@@ -120,7 +120,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
 
   const requiresPrimary = kind === 'portfolio' || backAlley;
   const supportsCustomUrlId = kind === 'portfolio' || kind === 'works' || kind === 'goods';
-  const supportsRichBody = kind === 'works' || kind === 'diary' || kind === 'news';
+  const supportsRichBody = kind === 'works' || kind === 'goods' || kind === 'diary' || kind === 'news';
   const categoryOptions = kind === 'portfolio' || kind === 'goods' ? [] : categories[kind as keyof typeof categories];
   const now = Date.now();
 
@@ -168,9 +168,9 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       setBodyBlocks(getBodyBlocks(record));
     } else if (kind === 'goods') {
       const record = item as FirebaseGoodsItem;
-      setForm({ ...emptyForm(), ...common, description: record.description });
-      setPrimary(record.image);
-      setBodyBlocks(initialBodyBlocks());
+      setForm({ ...emptyForm(), ...common });
+      setPrimary(record.thumbnail);
+      setBodyBlocks(getBodyBlocks(record));
     } else if (kind === 'diary') {
       const record = item as FirebaseDiaryEntry;
       setForm({ ...emptyForm(), ...common, category: record.category });
@@ -238,7 +238,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     if (!file) return;
     try {
       const existingCount = bodyBlocks.filter((block) => block.type === 'media' && block.id !== blockId).length;
-      validateContentFiles([file], existingCount, false);
+      validateContentFiles([file], existingCount, kind === 'goods');
       const currentBlock = bodyBlocks.find((block) => block.id === blockId);
       if (currentBlock?.type === 'media' && currentBlock.media) {
         setRemovedMedia((current) => current.some((item) => item.path === currentBlock.media?.path) ? current : [...current, currentBlock.media as FirebaseContentMedia]);
@@ -364,7 +364,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         } else {
           let resolvedMedia = block.media;
           if (block.file) {
-            const uploadedFiles = await uploadContentFiles(kind, recordId, [block.file]);
+            const uploadedFiles = await uploadContentFiles(kind, recordId, [block.file], kind === 'goods');
             uploaded.push(...uploadedFiles);
             resolvedMedia = uploadedFiles[0] ? { ...uploadedFiles[0], alt: `${form.title}の${uploadedFiles[0].type === 'video' ? '動画' : '画像'}` } : undefined;
           }
@@ -378,7 +378,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
       let value: Record<string, unknown> & { title: string; publishedAt: Date };
       if (kind === 'portfolio') value = { ...common, description: form.description.trim(), tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), media: resolvedPrimary, thumbnail: resolvedPrimary?.type === 'video' ? resolvedPortfolioThumbnail : null, featured: form.featured };
       else if (kind === 'works') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean), thumbnail: resolvedPrimary ?? null, media: resolvedMedia, url: null, featured: form.featured };
-      else if (kind === 'goods') value = { ...common, description: form.description.trim(), image: resolvedPrimary ?? null };
+      else if (kind === 'goods') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, description: fallbackBody, thumbnail: resolvedPrimary ?? null, image: null, media: resolvedMedia };
       else if (kind === 'diary') value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, eyecatch: resolvedPrimary ?? null };
       else value = { ...common, body: fallbackBody, bodySegments: resolvedBodySegments, category: form.category, thumbnail: resolvedPrimary ?? null, media: resolvedMedia, featured: form.featured };
       await saveFirebaseContent(kind, recordId, value, !editing, editing?.id);
@@ -461,9 +461,9 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
     <div className="admin-message-manager">
       <div className="admin-subpage-header"><h2>{editing || editingBackAlley ? `${labels[kind]}編集` : `新しい${labels[kind]}`}</h2><button type="button" onClick={() => { reset(); setMode('list'); }} disabled={busy || preparingPrimary}>一覧へ戻る</button></div>
       <form className="admin-message-form admin-content-form" onSubmit={submit}>
-        {supportsCustomUrlId ? <><label htmlFor="content-url-id">URL ID（/{kind === 'works' ? 'works' : 'portfolio'}/ の後ろ、任意）</label><input id="content-url-id" value={form.urlId} maxLength={80} disabled={Boolean(editingBackAlley)} autoCapitalize="none" spellCheck={false} onChange={(event) => update('urlId', event.target.value)} placeholder="空欄の場合は番号を自動付与" /><p className="admin-content-thumbnail-note">未入力で保存すると、未使用の番号を自動で付与します。手入力では半角小文字の英数字とハイフンを使用できます。変更すると以前のURLは使えなくなります。</p></> : null}
+        {supportsCustomUrlId ? <><label htmlFor="content-url-id">URL ID（/{kind === 'works' ? 'works' : kind === 'goods' ? 'goods' : 'portfolio'}/ の後ろ、任意）</label><input id="content-url-id" value={form.urlId} maxLength={80} disabled={Boolean(editingBackAlley)} autoCapitalize="none" spellCheck={false} onChange={(event) => update('urlId', event.target.value)} placeholder="空欄の場合は番号を自動付与" /><p className="admin-content-thumbnail-note">未入力で保存すると、未使用の番号を自動で付与します。手入力では半角小文字の英数字とハイフンを使用できます。変更すると以前のURLは使えなくなります。</p></> : null}
         <label htmlFor="content-title">タイトル</label><input id="content-title" value={form.title} maxLength={120} required onChange={(event) => update('title', event.target.value)} />
-        {kind === 'portfolio' || kind === 'goods' || backAlley ? <><label htmlFor="content-description">説明</label><textarea id="content-description" value={form.description} rows={4} required onChange={(event) => update('description', event.target.value)} /></> : null}
+        {kind === 'portfolio' || backAlley ? <><label htmlFor="content-description">説明</label><textarea id="content-description" value={form.description} rows={4} required onChange={(event) => update('description', event.target.value)} /></> : null}
         {supportsRichBody && !backAlley ? (
           <fieldset className="admin-body-editor">
             <legend>本文（文章・外部リンク・メディア）</legend>
@@ -489,8 +489,8 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
                 {block.type === 'media' ? (
                   <div className="admin-body-media-field">
                     {block.media ? <a href={block.media.url} target="_blank" rel="noreferrer">登録済み{block.media.type === 'video' ? '動画' : '画像'}</a> : null}
-                    <label htmlFor={`content-body-media-${block.id}`}>{block.media ? '差し替える' : '画像・動画を選択'}</label>
-                    <input id={`content-body-media-${block.id}`} type="file" accept="image/*,video/*" required={!block.media && !block.file} onChange={(event) => chooseBodyMedia(block.id, event.target.files?.[0])} />
+                    <label htmlFor={`content-body-media-${block.id}`}>{block.media ? '差し替える' : kind === 'goods' ? '画像を選択' : '画像・動画を選択'}</label>
+                    <input id={`content-body-media-${block.id}`} type="file" accept={kind === 'goods' ? 'image/*' : 'image/*,video/*'} required={!block.media && !block.file} onChange={(event) => chooseBodyMedia(block.id, event.target.files?.[0])} />
                     {block.file ? <span>{block.file.name}</span> : null}
                   </div>
                 ) : null}
@@ -513,7 +513,7 @@ export function AdminContentManager({ kind, onBack }: { kind: Exclude<ContentKin
         {newPrimary ? <p>{preparingPrimary ? 'ファイルを準備中…' : newPrimary.name}</p> : null}
         {kind === 'portfolio' && !backAlley && (newPrimary?.type.startsWith('video/') || (!newPrimary && primary?.type === 'video')) ? <><label htmlFor="content-portfolio-thumbnail">動画サムネイル画像</label><input id="content-portfolio-thumbnail" type="file" accept="image/*" required={!portfolioThumbnail && !newPortfolioThumbnail} disabled={busy} onChange={(event) => choosePortfolioThumbnail(event.target.files?.[0])} /><p className="admin-content-thumbnail-note">一覧・トップ・SNS共有で表示する画像です。</p>{portfolioThumbnail ? <div className="admin-media-row"><a href={portfolioThumbnail.url} target="_blank" rel="noreferrer">登録済みサムネイル</a><button type="button" onClick={() => removePortfolioThumbnail(portfolioThumbnail)}>削除</button></div> : null}{newPortfolioThumbnail ? <p>{newPortfolioThumbnail.name}</p> : null}</> : null}
         {kind === 'works' && !editing && !editingBackAlley ? <label className="admin-x-post-toggle"><input type="checkbox" checked={r18} onChange={(event) => { setR18(event.target.checked); setBackAlley(event.target.checked); }} />R18作品にする</label> : null}
-        {kind !== 'diary' ? <label className="admin-x-post-toggle"><input type="checkbox" checked={form.featured} onChange={(event) => update('featured', event.target.checked)} />注目表示</label> : null}
+        {kind === 'portfolio' || kind === 'works' || kind === 'news' ? <label className="admin-x-post-toggle"><input type="checkbox" checked={form.featured} onChange={(event) => update('featured', event.target.checked)} />注目表示</label> : null}
         {!backAlley ? <details><summary>SEO設定（任意）</summary><div className="admin-content-seo"><label htmlFor="content-seo-title">SEOタイトル</label><input id="content-seo-title" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} /><label htmlFor="content-seo-description">SEO説明</label><textarea id="content-seo-description" rows={3} value={form.seoDescription} onChange={(event) => update('seoDescription', event.target.value)} /><label className="admin-x-post-toggle"><input type="checkbox" checked={form.noIndex} onChange={(event) => update('noIndex', event.target.checked)} />検索結果に掲載しない</label></div></details> : null}
         {error ? <p className="form-error">{error}</p> : null}<div className="admin-form-actions"><button type="submit" className="pixel-button" disabled={busy || preparingPrimary}>{busy ? '保存中…' : preparingPrimary ? 'ファイルを準備中…' : '保存'}</button></div>
       </form>

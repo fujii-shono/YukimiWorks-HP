@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
 import { AdminTrafficAnalytics } from '@/components/admin/AdminTrafficAnalytics';
 import { AdminContentManager } from '@/components/admin/AdminContentManager';
+import { AdminLinkManager } from '@/components/admin/AdminLinkManager';
 import { TrackingLinkBuilder } from '@/components/admin/TrackingLinkBuilder';
 import { ProtectedImage } from '@/components/back-alley/ProtectedImage';
 import {
@@ -17,20 +18,18 @@ import {
   subscribeToFirebaseMessages,
 } from '@/lib/firebase/messages';
 import type { FirebaseMessage, FirebaseMessageImage } from '@/lib/firebase/types';
-import { disconnectX, getXStatus, postSavedMessageToX, startXConnection } from '@/lib/x/client';
-import { getXPostCharacterCount, isXPostTooLong, MAX_X_POST_CHARACTERS } from '@/lib/x/characters';
 
 const adminSections = [
   { id: 'messages', label: 'メッセージ' },
   { id: 'works', label: '作品' },
   { id: 'goods', label: 'グッズ' },
+  { id: 'links', label: 'リンク集' },
   { id: 'news', label: 'ニュース' },
   { id: 'analytics', label: 'アクセス分析' },
 ] as const;
 
 type AdminSection = (typeof adminSections)[number]['id'];
 type MessageView = 'list' | 'new' | 'edit';
-type XConnectionStatus = { configured: boolean; connected: boolean; username?: string; dryRun?: boolean };
 
 function toTokyoDateTimeInput(date: Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -50,14 +49,6 @@ function initialPublishedAt() {
   return toTokyoDateTimeInput(new Date());
 }
 
-function getXPostStatusLabel(message: FirebaseMessage) {
-  if (!message.postToX) return null;
-  if (message.xPostStatus === 'posted') return 'X投稿済み';
-  if (message.xPostStatus === 'skipped_too_long') return '長文のため投稿しませんでした';
-  if (message.xPostStatus === 'failed') return 'X投稿失敗';
-  return 'X投稿待ち';
-}
-
 export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admin' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,13 +59,9 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
   const [existingImages, setExistingImages] = useState<FirebaseMessageImage[]>([]);
   const [removedImages, setRemovedImages] = useState<FirebaseMessageImage[]>([]);
   const [newFiles, setNewFiles] = useState<File[]>([]);
-  const [postToX, setPostToX] = useState(false);
-  const [audience, setAudience] = useState<'front' | 'back-alley' | 'r18'>('front');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [xConnection, setXConnection] = useState<XConnectionStatus | null>(null);
-  const [xConnectionBusy, setXConnectionBusy] = useState(false);
   const hydratedFormKey = useRef<string | null>(null);
   const bodyInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -93,37 +80,13 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
         : 'list';
   const editingId = messageView === 'edit' ? requestedEditingId : null;
   const newFilePreviews = useMemo(() => newFiles.map((file) => ({ file, url: URL.createObjectURL(file) })), [newFiles]);
-  const xPostCharacterCount = useMemo(() => getXPostCharacterCount(body.trim()), [body]);
-  const xPostTooLong = postToX && isXPostTooLong(body.trim());
-  const editingMessage = editingId ? messages.find((message) => message.id === editingId) : undefined;
 
   useEffect(() => () => newFilePreviews.forEach(({ url }) => URL.revokeObjectURL(url)), [newFilePreviews]);
 
   useEffect(() => {
     if (!isAdmin || activeSection !== 'messages') return;
-    return subscribeToFirebaseMessages(setMessages, () => setError('メッセージ一覧を読み込めませんでした。'), true, true);
+    return subscribeToFirebaseMessages(setMessages, () => setError('メッセージ一覧を読み込めませんでした。'));
   }, [activeSection, isAdmin]);
-
-  useEffect(() => {
-    if (!firebaseUser || !isAdmin || activeSection !== 'messages') return;
-    let active = true;
-    void getXStatus(firebaseUser)
-      .then((status) => {
-        if (active) setXConnection(status);
-      })
-      .catch((statusError) => {
-        if (active) setError(statusError instanceof Error ? statusError.message : 'X接続状態を確認できませんでした。');
-      });
-    return () => {
-      active = false;
-    };
-  }, [activeSection, firebaseUser, isAdmin, searchParams]);
-
-  useEffect(() => {
-    const xResult = searchParams.get('x');
-    if (xResult === 'connected') setNotice('Xアカウントを接続しました。');
-    if (xResult === 'error') setError('Xアカウントを接続できませんでした。設定を確認して再度お試しください。');
-  }, [searchParams]);
 
   useEffect(() => {
     if (loading || profileLoading) return;
@@ -144,8 +107,6 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
       setExistingImages(message.images);
       setRemovedImages([]);
       setNewFiles([]);
-      setPostToX(message.postToX);
-      setAudience(message.audience);
       setError(null);
     } else {
       setBody('');
@@ -153,8 +114,6 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
       setExistingImages([]);
       setRemovedImages([]);
       setNewFiles([]);
-      setPostToX(false);
-      setAudience('front');
       setError(null);
     }
 
@@ -168,8 +127,6 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
     setExistingImages([]);
     setRemovedImages([]);
     setNewFiles([]);
-    setPostToX(false);
-    setAudience('front');
     setError(null);
   };
 
@@ -234,70 +191,23 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
     setError(null);
     setNotice(null);
     try {
-      if (postToX && !xPostTooLong && !xConnection?.connected) {
-        throw new Error('先にXアカウントを接続してください。');
-      }
-      const savedMessage = await saveFirebaseMessage({
+      await saveFirebaseMessage({
         id: editingId || undefined,
         body,
         authorName: profile?.displayName ?? '管理者',
         publishedAt: new Date(`${publishedAt}:00+09:00`),
         existingImages,
         newFiles,
-        postToX,
-        audience,
-        previousAudience: editingMessage?.audience,
-        skipXPostForLength: xPostTooLong,
-        retrySkippedXPost: Boolean(!xPostTooLong && editingMessage?.xPostStatus === 'skipped_too_long'),
       });
       if (removedImages.length > 0) await deleteMessageImages(removedImages);
-      let nextNotice = editingId ? 'メッセージを更新しました。' : 'メッセージを追加しました。';
-      let xPostError: string | null = null;
-      if (xPostTooLong) {
-        nextNotice += ' 長文のためXには投稿しませんでした。';
-      } else if (postToX && firebaseUser) {
-        try {
-          const result = await postSavedMessageToX(firebaseUser, savedMessage.id);
-          nextNotice += result.alreadyPosted ? ' Xには投稿済みです。' : result.dryRun ? ' テスト設定によりX投稿済みとして記録しました。' : ' Xにも投稿しました。';
-        } catch (postError) {
-          xPostError = postError instanceof Error ? postError.message : 'Xへの投稿に失敗しました。';
-        }
-      }
+      const nextNotice = editingId ? 'メッセージを更新しました。' : 'メッセージを追加しました。';
       resetForm();
       setNotice(nextNotice);
-      if (xPostError) setError(`メッセージは保存しましたが、Xへ投稿できませんでした：${xPostError}`);
       router.push(`${basePath}?section=messages`);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'メッセージを保存できませんでした。');
     } finally {
       setBusy(false);
-    }
-  };
-
-  const connectXAccount = async () => {
-    if (!firebaseUser) return;
-    setXConnectionBusy(true);
-    setError(null);
-    try {
-      await startXConnection(firebaseUser);
-    } catch (connectError) {
-      setError(connectError instanceof Error ? connectError.message : 'X接続を開始できませんでした。');
-      setXConnectionBusy(false);
-    }
-  };
-
-  const disconnectXAccount = async () => {
-    if (!firebaseUser || !window.confirm('Xアカウントの接続を解除しますか？')) return;
-    setXConnectionBusy(true);
-    setError(null);
-    try {
-      await disconnectX(firebaseUser);
-      setXConnection({ configured: true, connected: false });
-      setNotice('Xアカウントの接続を解除しました。');
-    } catch (disconnectError) {
-      setError(disconnectError instanceof Error ? disconnectError.message : 'Xアカウントの接続を解除できませんでした。');
-    } finally {
-      setXConnectionBusy(false);
     }
   };
 
@@ -348,6 +258,10 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
     return <AdminTrafficAnalytics onBack={backToDashboard} />;
   }
 
+  if (activeSection === 'links') {
+    return <AdminLinkManager onBack={backToDashboard} />;
+  }
+
   if (activeSection !== 'messages') {
     return <AdminContentManager kind={activeSection as 'works' | 'goods' | 'news'} onBack={backToDashboard} />;
   }
@@ -358,27 +272,6 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
         <h2>メッセージ</h2>
         <button type="button" onClick={backToDashboard} disabled={busy}>管理項目へ戻る</button>
       </div>
-
-      <section className="admin-x-connection" aria-label="Xアカウント接続">
-        <div>
-          <h3>X連携</h3>
-          {!xConnection ? <p>接続状態を確認しています…</p> : null}
-          {xConnection && !xConnection.configured ? <p>X APIの環境変数が未設定です。</p> : null}
-          {xConnection?.dryRun ? <p><strong>ドライラン中</strong> — X APIを呼ばず投稿済みとして記録します。</p> : null}
-          {xConnection?.configured && xConnection.connected && !xConnection.dryRun ? (
-            <p><strong>@{xConnection.username}</strong> に、チェックしたメッセージを保存時に投稿します。</p>
-          ) : null}
-          {xConnection?.configured && !xConnection.connected ? <p>Xアカウントは未接続です。</p> : null}
-        </div>
-        {xConnection?.configured && xConnection.connected && !xConnection.dryRun ? (
-          <button type="button" onClick={() => void disconnectXAccount()} disabled={busy || xConnectionBusy}>接続解除</button>
-        ) : null}
-        {xConnection?.configured && !xConnection.connected ? (
-          <button type="button" className="pixel-button" onClick={() => void connectXAccount()} disabled={busy || xConnectionBusy}>
-            {xConnectionBusy ? '接続中…' : 'Xアカウントを接続'}
-          </button>
-        ) : null}
-      </section>
 
       {messageView === 'list' ? (
         <section className="admin-message-list" aria-label="登録済みメッセージ">
@@ -391,12 +284,10 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
           {messages.length === 0 ? <p>登録済みメッセージはありません。</p> : null}
           {messages.map((message) => (
             <article key={message.id}>
-              {getXPostStatusLabel(message) ? <span className="admin-message-x-status">{getXPostStatusLabel(message)}</span> : null}
               <time dateTime={message.publishedAt.toDate().toISOString()}>
                 {message.publishedAt.toDate().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               </time>
               <p>{message.body}</p>
-              <span>{message.audience === 'r18' ? 'R18' : message.audience === 'back-alley' ? '旧裏ページ用（非公開）' : '通常公開'}</span>
               <span>
                 {message.images.length > 0 ? `画像 ${message.images.length}枚` : '画像なし'}
               </span>
@@ -446,27 +337,6 @@ export function AdminMessageManager({ basePath = '/admin' }: { basePath?: '/admi
             onChange={selectFiles}
             disabled={existingImages.length >= MAX_MESSAGE_IMAGES}
           />
-
-          <label className="admin-x-post-toggle" htmlFor="admin-message-r18">
-              <input id="admin-message-r18" type="checkbox" checked={audience === 'r18'} onChange={(event) => setAudience(event.target.checked ? 'r18' : 'front')} />
-              R18メッセージにする
-          </label>
-
-          <label className="admin-x-post-toggle" htmlFor="admin-message-post-to-x">
-            <input
-              id="admin-message-post-to-x"
-              type="checkbox"
-              checked={postToX}
-              onChange={(event) => setPostToX(event.target.checked)}
-            />
-            Xにも投稿する（保存時に即時投稿）
-          </label>
-          {postToX ? (
-            <p className={xPostTooLong ? 'form-error admin-x-length-note' : 'admin-x-length-note'}>
-              X投稿換算: {xPostCharacterCount} / {MAX_X_POST_CHARACTERS}文字（URLは1件23文字として換算）
-              {xPostTooLong ? '。上限を超えるため、保存してもXには投稿しません。' : ''}
-            </p>
-          ) : null}
 
           {existingImages.length > 0 || newFilePreviews.length > 0 ? (
             <div className="admin-image-grid">

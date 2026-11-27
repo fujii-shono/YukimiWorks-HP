@@ -1,15 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getFirebaseAdminServices } from '@/lib/firebase/admin';
-import { associateTrackingLinks } from '@/lib/analytics/tracking';
 import { isXPostTooLong } from '@/lib/x/characters';
 
 const X_API_ORIGIN = 'https://api.x.com';
 const X_AUTHORIZE_URL = 'https://x.com/i/oauth2/authorize';
 const X_TOKEN_URL = `${X_API_ORIGIN}/2/oauth2/token`;
-const X_SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access', 'media.write'];
-const X_IMAGE_LIMIT_BYTES = 5 * 1024 * 1024;
-const POSTING_LOCK_MILLISECONDS = 5 * 60 * 1000;
+const X_SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'];
 
 type XConfig = {
   clientId: string;
@@ -32,22 +29,6 @@ type XConnection = {
   userId: string;
   username: string;
 };
-
-type MessageImage = {
-  url?: string;
-  path?: string;
-};
-
-type MessageForX = {
-  body: string;
-  images: MessageImage[];
-  postToX: boolean;
-  xPostStatus?: string;
-  xPostId?: string | null;
-  xPostAttemptedAt?: Timestamp | null;
-};
-
-type XMediaCategory = 'tweet_image' | 'tweet_gif';
 
 function parseResponseError(payload: unknown, fallback: string) {
   if (!payload || typeof payload !== 'object') return fallback;
@@ -207,55 +188,11 @@ async function getValidXAccessToken() {
   return refreshed.access_token;
 }
 
-export function getXMediaCategory(imageBuffer: Buffer, contentType?: string): XMediaCategory {
-  const normalizedContentType = contentType?.split(';')[0].trim().toLowerCase();
-  const gifSignature = imageBuffer.subarray(0, 6).toString('ascii');
-  return normalizedContentType === 'image/gif' || gifSignature === 'GIF87a' || gifSignature === 'GIF89a'
-    ? 'tweet_gif'
-    : 'tweet_image';
-}
-
-async function uploadImageToX(accessToken: string, image: MessageImage) {
-  let imageBuffer: Buffer;
-  let contentType: string | undefined;
-  if (image.url) {
-    const imageResponse = await fetch(image.url, { cache: 'no-store' });
-    if (!imageResponse.ok) throw new Error('投稿画像をFirebase Storageから取得できませんでした。');
-    contentType = imageResponse.headers.get('content-type')?.split(';')[0].trim();
-    if (!contentType?.startsWith('image/')) throw new Error('Xへ投稿できない画像形式です。');
-    imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-  } else if (image.path) {
-    const { storage } = getFirebaseAdminServices();
-    const imageFile = storage.bucket().file(image.path);
-    const [downloadResult, metadataResult] = await Promise.all([imageFile.download(), imageFile.getMetadata()]);
-    [imageBuffer] = downloadResult;
-    contentType = metadataResult[0].contentType;
-  } else {
-    throw new Error('投稿画像の保存先が正しくありません。');
-  }
-  if (imageBuffer.byteLength > X_IMAGE_LIMIT_BYTES) throw new Error('Xへ投稿する画像は1枚5MB以下にしてください。');
-
-  const mediaCategory = getXMediaCategory(imageBuffer, contentType);
-
-  const response = await fetch(`${X_API_ORIGIN}/2/media/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ media: imageBuffer.toString('base64'), media_category: mediaCategory }),
-    cache: 'no-store',
-  });
-  const payload = await readJson(response);
-  if (!response.ok) throw new Error(parseResponseError(payload, 'Xへ画像をアップロードできませんでした。'));
-  const mediaId = (payload as { data?: { id?: unknown } } | null)?.data?.id;
-  if (typeof mediaId !== 'string') throw new Error('Xから画像IDが返されませんでした。');
-  return mediaId;
-}
-
-async function createXPost(accessToken: string, body: string, images: MessageImage[]) {
-  const mediaIds = await Promise.all(images.slice(0, 4).map((image) => uploadImageToX(accessToken, image)));
+async function createXPost(accessToken: string, body: string) {
   const response = await fetch(`${X_API_ORIGIN}/2/tweets`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: body, ...(mediaIds.length > 0 ? { media: { media_ids: mediaIds } } : {}) }),
+    body: JSON.stringify({ text: body }),
     cache: 'no-store',
   });
   const payload = await readJson(response);
@@ -270,80 +207,5 @@ export async function postTextToX(body: string) {
   if (!text) throw new Error('Xへ投稿する本文が空です。');
   if (isXPostTooLong(text)) throw new Error('Xへ投稿する本文が文字数上限を超えています。');
   const accessToken = await getValidXAccessToken();
-  return createXPost(accessToken, text, []);
-}
-
-export async function postFirebaseMessageToX(messageId: string) {
-  const { db } = getFirebaseAdminServices();
-  const frontRef = db.collection('messages').doc(messageId);
-  const backRef = db.collection('backAlleyMessages').doc(messageId);
-  const r18Ref = db.collection('backAlleyR18Messages').doc(messageId);
-  const messageRef = (await frontRef.get()).exists ? frontRef : (await backRef.get()).exists ? backRef : r18Ref;
-
-  const claimed = await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(messageRef);
-    if (!snapshot.exists) throw new Error('メッセージが見つかりません。');
-    const message = snapshot.data() as MessageForX;
-    if (!message.postToX) throw new Error('X投稿が選択されていません。');
-    if (message.xPostStatus === 'posted' && message.xPostId) return null;
-    if (
-      message.xPostStatus === 'posting' &&
-      message.xPostAttemptedAt instanceof Timestamp &&
-      message.xPostAttemptedAt.toMillis() > Date.now() - POSTING_LOCK_MILLISECONDS
-    ) {
-      throw new Error('このメッセージはXへ投稿処理中です。');
-    }
-    if (typeof message.body !== 'string' || !Array.isArray(message.images)) throw new Error('メッセージ形式が正しくありません。');
-    if (isXPostTooLong(message.body)) {
-      transaction.update(messageRef, {
-        xPostStatus: 'skipped_too_long',
-        xPostError: null,
-        xPostAttemptedAt: Timestamp.now(),
-      });
-      return 'skipped_too_long' as const;
-    }
-    const images = message.images.filter(
-      (image): image is MessageImage => Boolean(image && typeof image === 'object' && (typeof image.url === 'string' || typeof image.path === 'string')),
-    );
-    transaction.update(messageRef, {
-      xPostStatus: 'posting',
-      xPostError: null,
-      xPostAttemptedAt: Timestamp.now(),
-    });
-    return { body: message.body, images };
-  });
-
-  if (!claimed) {
-    const snapshot = await messageRef.get();
-    return { alreadyPosted: true, postId: snapshot.data()?.xPostId as string };
-  }
-
-  if (claimed === 'skipped_too_long') return { alreadyPosted: false, skippedTooLong: true };
-
-  try {
-    await associateTrackingLinks(messageId, claimed.body);
-    if (isXPostDryRun()) {
-      const postId = `dry-run-${messageId}`;
-      await messageRef.update({
-        xPostStatus: 'posted',
-        xPostId: postId,
-        xPostError: null,
-        xPostedAt: Timestamp.now(),
-      });
-      return { alreadyPosted: false, postId, dryRun: true };
-    }
-    const accessToken = await getValidXAccessToken();
-    const postId = await createXPost(accessToken, claimed.body, claimed.images);
-    await messageRef.update({
-      xPostStatus: 'posted',
-      xPostId: postId,
-      xPostError: null,
-      xPostedAt: Timestamp.now(),
-    });
-    return { alreadyPosted: false, postId };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Xへの投稿に失敗しました。';
-    await messageRef.update({ xPostStatus: 'failed', xPostError: message.slice(0, 500) });
-    throw error;
-  }
+  return createXPost(accessToken, text);
 }

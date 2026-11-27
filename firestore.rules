@@ -122,6 +122,18 @@ service cloud.firestore {
         && (media.size() < 8 || validContentMedia(media[7]));
     }
 
+    function validContentImageList(media) {
+      return validContentMediaList(media)
+        && (media.size() < 1 || media[0].type == 'image')
+        && (media.size() < 2 || media[1].type == 'image')
+        && (media.size() < 3 || media[2].type == 'image')
+        && (media.size() < 4 || media[3].type == 'image')
+        && (media.size() < 5 || media[4].type == 'image')
+        && (media.size() < 6 || media[5].type == 'image')
+        && (media.size() < 7 || media[6].type == 'image')
+        && (media.size() < 8 || media[7].type == 'image');
+    }
+
     function validContentCommon(data) {
       return data.title is string
         && data.title.size() >= 1
@@ -136,8 +148,7 @@ service cloud.firestore {
 
     function validMessage(data) {
       return data.keys().hasOnly([
-          'body', 'authorName', 'images', 'audience', 'postToX', 'publishedAt', 'createdAt', 'updatedAt',
-          'xPostStatus', 'xPostId', 'xPostError', 'xPostAttemptedAt', 'xPostedAt'
+          'body', 'authorName', 'images', 'publishedAt', 'createdAt', 'updatedAt'
         ])
         && data.body is string
         && data.body.size() >= 1
@@ -146,13 +157,6 @@ service cloud.firestore {
         && data.authorName.size() >= 1
         && data.authorName.size() <= 30
         && validImages(data.images)
-        && data.audience in ['front', 'back-alley', 'r18']
-        && data.postToX is bool
-        && (!('xPostStatus' in data) || data.xPostStatus in ['not_requested', 'pending', 'posting', 'posted', 'failed', 'skipped_too_long'])
-        && (!('xPostId' in data) || data.xPostId == null || data.xPostId is string)
-        && (!('xPostError' in data) || data.xPostError == null || (data.xPostError is string && data.xPostError.size() <= 500))
-        && (!('xPostAttemptedAt' in data) || data.xPostAttemptedAt == null || data.xPostAttemptedAt is timestamp)
-        && (!('xPostedAt' in data) || data.xPostedAt == null || data.xPostedAt is timestamp)
         && data.publishedAt is timestamp
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -179,19 +183,17 @@ service cloud.firestore {
 
     match /messages/{messageId} {
       allow read: if true;
-      allow create, update: if isAdmin() && validMessage(request.resource.data) && request.resource.data.audience == 'front';
+      allow create, update: if isAdmin() && validMessage(request.resource.data);
       allow delete: if isAdmin();
     }
 
     match /backAlleyMessages/{messageId} {
-      allow read: if isAdmin();
-      allow create, update: if isAdmin() && validMessage(request.resource.data) && request.resource.data.audience == 'back-alley';
+      allow read, create, update: if false;
       allow delete: if isAdmin();
     }
 
     match /backAlleyR18Messages/{messageId} {
-      allow read: if isAdultConfirmed() || isAdmin();
-      allow create, update: if isAdmin() && validMessage(request.resource.data) && request.resource.data.audience == 'r18';
+      allow read, create, update: if false;
       allow delete: if isAdmin();
     }
 
@@ -308,11 +310,41 @@ service cloud.firestore {
     match /goods/{itemId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['title', 'description', 'image', 'publishedAt', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['title', 'body', 'bodySegments', 'description', 'thumbnail', 'image', 'media', 'publishedAt', 'seoTitle', 'seoDescription', 'noIndex', 'createdAt', 'updatedAt'])
         && validContentCommon(request.resource.data)
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 50000
+        && request.resource.data.bodySegments is list
+        && request.resource.data.bodySegments.size() <= 50
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 5000
-        && (request.resource.data.image == null || (validContentMedia(request.resource.data.image) && request.resource.data.image.type == 'image'));
+        && (request.resource.data.thumbnail == null || (validContentMedia(request.resource.data.thumbnail) && request.resource.data.thumbnail.type == 'image'))
+        && request.resource.data.image == null
+        && validContentImageList(request.resource.data.media);
+      allow delete: if isAdmin();
+    }
+
+    match /links/{itemId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['label', 'url', 'banner', 'order', 'createdAt', 'updatedAt'])
+        && request.resource.data.label is string
+        && request.resource.data.label.size() >= 1
+        && request.resource.data.label.size() <= 120
+        && request.resource.data.url is string
+        && request.resource.data.url.size() >= 1
+        && request.resource.data.url.size() <= 2048
+        && request.resource.data.url.matches('(https?://.*|/.*)')
+        && request.resource.data.order is int
+        && request.resource.data.order >= -9999
+        && request.resource.data.order <= 9999
+        && (request.resource.data.banner == null || (
+          validContentMedia(request.resource.data.banner)
+          && request.resource.data.banner.type == 'image'
+          && request.resource.data.banner.path.matches('content/links/' + itemId + '/.*')
+        ))
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
       allow delete: if isAdmin();
     }
 

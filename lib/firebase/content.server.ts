@@ -19,9 +19,21 @@ type StoredBodySegment =
 export type GoodsItem = {
   id: string;
   title: string;
-  description: string;
-  image?: { src: string; alt: string };
+  body: WorkBodySegment[] | string;
+  thumbnail: string;
+  media: Work['media'];
   publishedAt: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  noIndex?: boolean;
+};
+
+export type PublicSiteLink = {
+  id: string;
+  label: string;
+  url: string;
+  banner?: { src: string; alt: string };
+  order: number;
 };
 
 function timestampDate(value: unknown): Date | null {
@@ -109,12 +121,47 @@ export async function getAllGoods(): Promise<GoodsItem[]> {
   return documents.flatMap((document): GoodsItem[] => {
     const data = document.data();
     const publishedAt = timestampDate(data.publishedAt);
-    if (!publishedAt || typeof data.title !== 'string' || typeof data.description !== 'string') return [];
-    const image = isMedia(data.image) && data.image.type === 'image'
-      ? { src: data.image.url, alt: data.image.alt || `${data.title}の画像` }
-      : undefined;
-    return [{ id: document.id, title: data.title, description: data.description, image, publishedAt: publishedAt.toISOString() }];
+    if (!publishedAt || typeof data.title !== 'string') return [];
+    const legacyDescription = typeof data.description === 'string' ? data.description : '';
+    const storedSegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, 50) : [];
+    const body = storedSegments.length ? storedSegments.map(toPublicBodySegment) as WorkBodySegment[] : typeof data.body === 'string' ? data.body : legacyDescription;
+    const thumbnailMedia = isMedia(data.thumbnail) && data.thumbnail.type === 'image'
+      ? data.thumbnail
+      : isMedia(data.image) && data.image.type === 'image' ? data.image : null;
+    const media = Array.isArray(data.media)
+      ? data.media.filter(isMedia).map((item) => ({ type: item.type, src: item.url, alt: item.alt || undefined }))
+      : [];
+    return [{
+      id: document.id,
+      title: data.title,
+      body,
+      thumbnail: thumbnailMedia?.url ?? '',
+      media,
+      publishedAt: publishedAt.toISOString(),
+      seoTitle: optionalString(data.seoTitle),
+      seoDescription: optionalString(data.seoDescription),
+      noIndex: data.noIndex === true,
+    }];
   });
+}
+
+export async function getAllSiteLinks(): Promise<PublicSiteLink[]> {
+  noStore();
+  try {
+    const { db } = getFirebaseAdminServices();
+    const snapshot = await db.collection('links').orderBy('order', 'asc').get();
+    return snapshot.docs.flatMap((document): PublicSiteLink[] => {
+      const data = document.data();
+      if (typeof data.label !== 'string' || typeof data.url !== 'string' || !isSafeLinkHref(data.url)) return [];
+      const banner = isMedia(data.banner) && data.banner.type === 'image'
+        ? { src: data.banner.url, alt: data.banner.alt || `${data.label}のバナー` }
+        : undefined;
+      return [{ id: document.id, label: data.label, url: data.url, banner, order: typeof data.order === 'number' ? data.order : 0 }];
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') console.warn('[firebase-content] links could not be loaded', error);
+    return [];
+  }
 }
 
 export async function getAllPortfolioItems(): Promise<PortfolioItem[]> {

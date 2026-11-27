@@ -41,10 +41,7 @@ service firebase.storage {
     }
 
     match /protected/back-alley/messages/{messageId}/{fileName} {
-      allow read: if isAdmin();
-      allow create, update: if isAdmin()
-        && request.resource.size <= 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+      allow read, create, update: if false;
       allow delete: if isAdmin();
     }
 
@@ -58,10 +55,7 @@ service firebase.storage {
     }
 
     match /protected/back-alley/r18/messages/{messageId}/{fileName} {
-      allow read: if isAdultConfirmed() || isAdmin();
-      allow create, update: if isAdmin()
-        && request.resource.size <= 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+      allow read, create, update: if false;
       allow delete: if isAdmin();
     }
 

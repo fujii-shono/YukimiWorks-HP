@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RetroPanel } from '@/components/panels/RetroPanel';
+import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { getAllGoods } from '@/lib/firebase/content.server';
 
 export const metadata: Metadata = {
@@ -19,15 +20,14 @@ export default async function GoodsPage() {
         {goods.length ? (
           <div className="card-grid">
             {goods.map((item) => (
-              <article className="retro-card" key={item.id}>
-                {item.image ? (
-                  <Image src={item.image.src} alt={item.image.alt} width={560} height={315} className="retro-card-image" unoptimized />
+              <Link href={`/goods/${item.id}`} className="retro-card" key={item.id}>
+                {item.thumbnail ? (
+                  <Image src={item.thumbnail} alt={`${item.title}のサムネイル`} width={560} height={315} className="retro-card-image" unoptimized />
                 ) : null}
                 <div className="retro-card-body">
                   <h2>{item.title}</h2>
-                  <p>{item.description}</p>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         ) : (

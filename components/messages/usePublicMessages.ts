@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { messagePosts, type MessagePost, type MessageSupportReply } from '@/data/messages';
-import { getProtectedMediaUrl, subscribeToFirebaseMessages } from '@/lib/firebase/messages';
-import { useFirebaseAuth } from '@/components/auth/FirebaseAuthProvider';
+import { subscribeToFirebaseMessages } from '@/lib/firebase/messages';
 
 function getTokyoDateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -81,8 +80,7 @@ export function publishSupportReply(messageId: string, reply: MessageSupportRepl
   window.dispatchEvent(new CustomEvent(SUPPORT_REPLY_SAVED_EVENT, { detail: { messageId, reply } }));
 }
 
-export function usePublicMessages(includeBackAlley = false) {
-  const { firebaseUser, profile } = useFirebaseAuth();
+export function usePublicMessages() {
   const [now, setNow] = useState<Date | null>(null);
   const [donationPosts, setDonationPosts] = useState<MessagePost[]>([]);
   const [firebasePosts, setFirebasePosts] = useState<MessagePost[]>([]);
@@ -149,7 +147,6 @@ export function usePublicMessages(includeBackAlley = false) {
   }, []);
 
   useEffect(() => {
-    const objectUrls: string[] = [];
     let active = true;
     let receivedMessages = false;
     const timeout = window.setTimeout(() => {
@@ -166,26 +163,20 @@ export function usePublicMessages(includeBackAlley = false) {
           body: message.body,
           authorName: message.authorName,
           icon: { src: '/logo/yukimi_works_favicon.png', alt: 'YukimiWorks' },
-          images: await Promise.all(message.images.map(async (image) => {
-            if (image.url) return { src: image.url, alt: image.alt };
-            const src = await getProtectedMediaUrl(image.path);
-            objectUrls.push(src);
-            return { src, alt: image.alt };
-          })),
+          images: message.images.flatMap((image) => image.url ? [{ src: image.url, alt: image.alt }] : []),
         }))).then((posts) => { if (active) setFirebasePosts(posts); }).catch(() => {
           if (active) setFirebaseError('メッセージの画像を読み込めませんでした。通信状態を確認して、再読み込みしてください。');
         });
     }, () => {
       window.clearTimeout(timeout);
       setFirebaseError('メッセージを読み込めませんでした。通信状態を確認して、再読み込みしてください。');
-    }, includeBackAlley, Boolean(firebaseUser && profile?.adultConfirmed));
+    });
     return () => {
       active = false;
       window.clearTimeout(timeout);
       unsubscribe();
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [firebaseAttempt, firebaseUser, includeBackAlley, profile?.adultConfirmed]);
+  }, [firebaseAttempt]);
 
   useEffect(() => {
     const onMessageSaved = (event: Event) => {

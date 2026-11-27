@@ -18,6 +18,7 @@ const navItems = [
   { href: '/news', label: 'ニュース', iconImage: '/icons/default/apps.png' },
   { href: '/works', label: '作品', iconImage: '/icons/default/contents.png' },
   { href: '/goods', label: 'グッズ', iconImage: '/icons/user/coin.png' },
+  { href: '/links', label: 'リンク集', iconImage: '/icons/default/sns.png' },
   { href: '/messages', label: 'メッセージ', iconImage: '/icons/default/x.png' },
 ] as const;
 

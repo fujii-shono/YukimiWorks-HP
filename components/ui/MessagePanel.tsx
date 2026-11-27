@@ -10,11 +10,11 @@ import { cn } from '@/lib/format';
 const RAINBOW_SHINE_ACTIVE_MS = 1_800;
 const RAINBOW_SHINE_WAIT_MS = 1_000;
 
-export function MessagePanel({ includeBackAlley = false, href = '/messages' }: { includeBackAlley?: boolean; href?: string }) {
+export function MessagePanel({ href = '/messages' }: { href?: string }) {
   const [rainbowShineActive, setRainbowShineActive] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string; body: string } | null>(null);
 
-  const { now, posts, firebaseError, retryFirebaseMessages } = usePublicMessages(includeBackAlley);
+  const { now, posts, firebaseError, retryFirebaseMessages } = usePublicMessages();
 
   useEffect(() => {
     let activeTimer: number | null = null;

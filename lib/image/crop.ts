@@ -1,5 +1,6 @@
 const THUMBNAIL_ASPECT_RATIO = 16 / 9;
 const MAX_THUMBNAIL_WIDTH = 1600;
+const BANNER_ASPECT_RATIO = 3;
 
 function extensionForMimeType(mimeType: string) {
   if (mimeType === 'image/png') return 'png';
@@ -34,8 +35,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string) {
   });
 }
 
-/** 一覧カードと同じ 16:9 の中心トリミング画像を作成する。 */
-export async function cropImageToThumbnail(file: File) {
+async function cropImage(file: File, aspectRatio: number, positionX: number, positionY: number) {
   const { image, release } = await loadImage(file);
 
   try {
@@ -43,16 +43,16 @@ export async function cropImageToThumbnail(file: File) {
     if (!naturalWidth || !naturalHeight) throw new Error('画像サイズを取得できませんでした。');
 
     const sourceAspectRatio = naturalWidth / naturalHeight;
-    const sourceWidth = sourceAspectRatio > THUMBNAIL_ASPECT_RATIO
-      ? naturalHeight * THUMBNAIL_ASPECT_RATIO
+    const sourceWidth = sourceAspectRatio > aspectRatio
+      ? naturalHeight * aspectRatio
       : naturalWidth;
-    const sourceHeight = sourceAspectRatio > THUMBNAIL_ASPECT_RATIO
+    const sourceHeight = sourceAspectRatio > aspectRatio
       ? naturalHeight
-      : naturalWidth / THUMBNAIL_ASPECT_RATIO;
-    const sourceX = (naturalWidth - sourceWidth) / 2;
-    const sourceY = (naturalHeight - sourceHeight) / 2;
+      : naturalWidth / aspectRatio;
+    const sourceX = (naturalWidth - sourceWidth) * Math.min(100, Math.max(0, positionX)) / 100;
+    const sourceY = (naturalHeight - sourceHeight) * Math.min(100, Math.max(0, positionY)) / 100;
     const outputWidth = Math.min(MAX_THUMBNAIL_WIDTH, Math.round(sourceWidth));
-    const outputHeight = Math.round(outputWidth / THUMBNAIL_ASPECT_RATIO);
+    const outputHeight = Math.round(outputWidth / aspectRatio);
     const canvas = document.createElement('canvas');
     canvas.width = outputWidth;
     canvas.height = outputHeight;
@@ -67,4 +67,14 @@ export async function cropImageToThumbnail(file: File) {
   } finally {
     release();
   }
+}
+
+/** 一覧カードと同じ 16:9 の中心トリミング画像を作成する。 */
+export function cropImageToThumbnail(file: File) {
+  return cropImage(file, THUMBNAIL_ASPECT_RATIO, 50, 50);
+}
+
+/** リンク集用の3:1バナーを指定位置でトリミングする。 */
+export function cropImageToBanner(file: File, positionX: number, positionY: number) {
+  return cropImage(file, BANNER_ASPECT_RATIO, positionX, positionY);
 }

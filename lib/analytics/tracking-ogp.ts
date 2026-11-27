@@ -3,8 +3,12 @@ import { siteConfig } from '@/data/siteConfig';
 const BOT_PATTERN = /bot|crawler|spider|preview|twitterbot|facebookexternalhit|slackbot|discordbot|whatsapp|telegrambot|embedly|quora link preview/i;
 const OGP_FETCH_TIMEOUT_MS = 4_000;
 const OGP_RESOLVE_HEADER = 'x-yukimi-ogp-resolve';
-const DEFAULT_TITLE = 'YukimiWorks | アプリ・コンテンツ制作';
-const DEFAULT_IMAGE_PATH = '/logo/open_graph.png';
+const CORPORATE_TITLE = 'YukimiWorks | 自社プロダクト・開発支援';
+const CORPORATE_IMAGE_PATH = '/brand/yukimi-works-og.webp';
+const CIRCLE_TITLE = '同人サークル 溶けたアイス';
+const CIRCLE_DESCRIPTION = 'サークル「溶けたアイス」のイベント参加、グッズ、ゲーム制作情報をまとめたサイトです。';
+const CIRCLE_IMAGE_PATH = '/logo/toketa-ice-og.webp';
+const CIRCLE_PATHS = ['/circle', '/works', '/news', '/goods', '/messages', '/bokin'] as const;
 
 type OgpMetadata = {
   title: string;
@@ -56,11 +60,16 @@ function getDocumentTitle(html: string) {
   return match ? decodeHtmlEntities(match[1].replace(/\s+/g, ' ').trim()) : null;
 }
 
-function defaultMetadata(baseUrl: URL): OgpMetadata {
+function isCirclePath(pathname: string) {
+  return CIRCLE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+function defaultMetadata(baseUrl: URL, destinationUrl?: URL): OgpMetadata {
+  const circle = destinationUrl ? isCirclePath(destinationUrl.pathname) : false;
   return {
-    title: DEFAULT_TITLE,
-    description: siteConfig.description,
-    image: new URL(DEFAULT_IMAGE_PATH, baseUrl).toString(),
+    title: circle ? CIRCLE_TITLE : CORPORATE_TITLE,
+    description: circle ? CIRCLE_DESCRIPTION : siteConfig.description,
+    image: new URL(circle ? CIRCLE_IMAGE_PATH : CORPORATE_IMAGE_PATH, baseUrl).toString(),
   };
 }
 
@@ -75,14 +84,14 @@ function allowedOrigins(requestUrl: URL) {
 }
 
 export async function resolveTrackingOgp(destination: string, requestUrl: URL): Promise<OgpMetadata> {
-  const fallback = defaultMetadata(requestUrl);
   let destinationUrl: URL;
   try {
     destinationUrl = new URL(destination);
   } catch {
-    return fallback;
+    return defaultMetadata(requestUrl);
   }
 
+  const fallback = defaultMetadata(requestUrl, destinationUrl);
   const origins = allowedOrigins(requestUrl);
   if (!['http:', 'https:'].includes(destinationUrl.protocol) || !origins.has(destinationUrl.origin)) return fallback;
   if (destinationUrl.pathname.startsWith('/go/')) return fallback;

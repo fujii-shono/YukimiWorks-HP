@@ -105,13 +105,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'YukimiWorks | 自社プロダクト・開発支援',
     description: siteConfig.description,
-    images: [{ url: '/brand/corporate-hero.webp' }],
+    images: [{ url: '/brand/yukimi-works-og.webp', width: 1200, height: 630, alt: 'YukimiWorks' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'YukimiWorks | 自社プロダクト・開発支援',
     description: siteConfig.description,
-    images: ['/brand/corporate-hero.webp'],
+    images: ['/brand/yukimi-works-og.webp'],
   },
 };
 

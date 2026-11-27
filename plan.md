@@ -3253,3 +3253,39 @@
 - 正式表記で`X`、`Instagram`、`Threads`、`Bluesky`、`Misskey`を箇条書きにする
 - `data/corporateProducts.ts`に任意の対応SNS配列を追加し、共通個別LPがデータのある製品だけを表示する
 - 型チェック、lint、production buildと、PORTLINK以外に該当セクションが出ないことを検証する
+
+## 2026年11月26日 企業・サークルのOGPとfavicon分離
+
+### 対応する仕様
+
+- 企業ページは`/brand/yukimi-works-favicon.svg`と、ロゴの横に会社名を置いた軽量WebPのOGPを使用する
+- サークルページは`/logo/yukimi_works_favicon.png`と、昼テーマのヘッダーを再現した軽量WebPのOGPを使用する
+- 作品・記事詳細の個別OGPは維持する
+
+### 実装方針
+
+- OGP生成スクリプトで企業は既存SVGロゴを使い、サークルは支給スクリーンショットを中央トリミングして1200×630pxのWebPを生成する
+- 企業用メタデータはルートレイアウトで維持する
+- サークルの入口と既存URLの各セグメントに共通メタデータレイアウトを追加し、URLを変更せず継承先を分ける
+
+### 変更予定のファイルと理由
+
+- `SPEC.md`, `plan.md` — 用途別の画像と継承方針を明文化
+- `scripts/generate-ogp-images.mjs`, `scripts/assets/toketa-ice-og-source.png`, `package.json` — OGP画像の再生成手順とサークル画像の元データを定義
+- `public/brand/yukimi-works-og.webp`, `public/logo/toketa-ice-og.webp` — 用途別の既定OGP画像
+- `lib/siteMetadata.ts`, `app/layout.tsx` — 企業・サークルの共通メタデータを定義・適用
+- `lib/analytics/tracking-ogp.ts` — 計測URLのOGP取得失敗時もリンク先の用途に応じた画像を使用
+- `app/circle/layout.tsx`, `app/works/layout.tsx`, `app/news/layout.tsx`, `app/goods/layout.tsx`, `app/messages/layout.tsx`, `app/bokin/layout.tsx` — サークル側URLに共通設定を継承
+
+### 影響範囲
+
+- OGPとTwitter Cardの既定画像、faviconの継承
+- `/circle`、`/works`、`/news`、`/goods`、`/messages`、`/bokin`配下
+- 個別画像を持つ`/works/[id]`と`/news/[id]`のOGP画像は影響対象外
+
+### 検証方法
+
+- 生成画像の寸法、WebP形式、ファイル容量、表示内容を確認する
+- メタデータの継承と個別OGPの保持をコードとproduction buildで確認する
+- lint、TypeScript型チェック、production buildを実行する
+- ブラウザ確認は許可が必要なため行わず、生成画像はローカル画像検査で確認する

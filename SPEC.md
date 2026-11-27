@@ -55,6 +55,7 @@
 - 企業ページはトップ、各LP、フォームを白背景とし、交互の色面や区切り線でセクションを分けない。フッターのみ黒背景とし、ピンクから紫のロゴ色は文字、カードの輪郭、ボタンなど必要なアクセントに限定する
 - ロゴは`sample/20261119/yukimi_works.svg`をヘッダーで使い、名称`YukimiWorks`を併記する
 - ファビコンは`sample/20261119/yukimi_works_favicon.svg`を使用する
+- 企業ページのOGP画像は`/public/brand/yukimi-works-og.webp`を使用し、`yukimi-works.svg`のロゴと会社名を横並びで表示する
 - ヘッダーは企業ページ共通とし、事業内容、自社プロダクト、かかりつけ開発室、会社情報、開発相談への導線を置く
 - 企業ページのヘッダーはスクロール時も画面上端に固定し、本文の表示位置をずらさない
 - ブラウザのフォント設定を尊重する可読性の高いサンセリフ体を使用し、企業ページにはドット系フォントを強制しない
@@ -431,7 +432,7 @@ YukimiWorksのコーポレートホームページ。
 - メニュー展開中は必要に応じて背景スクロールをロックする
 - `aria-expanded`、`aria-controls`、フォーカス移動を実装する
 
-### ファビコン
+### サークル用ファビコン
 
 - `/public/logo/yukimi_works_favicon.png`を使用する
 
@@ -443,10 +444,10 @@ export const metadata: Metadata = {
 };
 ```
 
-### OGP設定
+### サークル用OGP設定
 
-- OGP画像には`/public/logo/open_graph.png`を使用する
-- OGP画像は新デザインに合わせ、アイスブルーの枠、ピクセルロゴ、サイト名で作り直す
+- OGP画像には`/public/logo/toketa-ice-og.webp`を使用する
+- 昼テーマのサークルヘッダーと同じ配色、ドット文字、ドット背景、文字配置で「同人サークル　溶けたアイス」を表示する
 
 ```ts
 export const metadata: Metadata = {
@@ -454,9 +455,9 @@ export const metadata: Metadata = {
     icon: '/logo/yukimi_works_favicon.png',
   },
   openGraph: {
-    title: 'YukimiWorks | アプリ・コンテンツ制作',
-    description: 'YukimiWorksの公式サイト',
-    images: [{ url: '/logo/open_graph.png' }],
+    title: '同人サークル 溶けたアイス',
+    description: 'サークル「溶けたアイス」のイベント参加、グッズ、ゲーム制作情報をまとめたサイトです。',
+    images: [{ url: '/logo/toketa-ice-og.webp' }],
   },
 };
 ```

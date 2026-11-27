@@ -54,7 +54,7 @@ test('SNS用ハッシュタグでは括弧を除去し、組み合わせ記号�
 test('週次X投稿へツールのURLを付ける', () => {
   assert.equal(
     buildWeeklyOdaiXPost('角×手紙', 'https://yukimiworks.com/'),
-    '今週のお題\n#角x手紙 #お題メーカー\nhttps://yukimiworks.com/works/odai-maker',
+    '今週のお題\n#角x手紙 #お題メーカー\nhttps://yukimiworks.com/circle/odai-maker',
   );
 });
 

@@ -5,11 +5,9 @@ import { SiteFrame } from '@/components/layout/SiteFrame';
 import { RestrictedLink as Link } from '@/components/ui/RestrictedLink';
 import { RichBody } from '@/components/ui/RichBody';
 import { AcrylicKeychainTool } from '@/components/works/AcrylicKeychainTool';
-import { OdaiMaker } from '@/components/works/OdaiMaker';
 import { siteConfig } from '@/data/siteConfig';
 import { getWorkDescription, works } from '@/data/works';
 import { getAllWorks } from '@/lib/firebase/content.server';
-import { getCurrentWeeklyOdai } from '@/lib/odai/weekly.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +62,6 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const work = (await getAllWorks()).find((item) => item.id === id);
   if (!work) notFound();
-  const weeklyOdai = work.id === 'odai-maker' ? await getCurrentWeeklyOdai() : null;
   const thumbnail = work.thumbnail.trim();
   const additionalMedia = work.media?.filter((media) => media.src !== thumbnail);
 
@@ -119,7 +116,6 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ id:
           </p>
         ) : null}
         {work.id === 'acrylic-keychain-tool' ? <AcrylicKeychainTool /> : null}
-        {work.id === 'odai-maker' ? <OdaiMaker weeklyOdai={weeklyOdai} /> : null}
       </section>
     </SiteFrame>
   );

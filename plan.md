@@ -3369,3 +3369,26 @@
 - メタデータの継承と個別OGPの保持をコードとproduction buildで確認する
 - lint、TypeScript型チェック、production buildを実行する
 - ブラウザ確認は許可が必要なため行わず、生成画像はローカル画像検査で確認する
+
+## 2026年11月27日 お題メーカーの復活と移転
+
+### 対応する仕様
+
+- 過去のお題メーカーを`/circle/odai-maker`に復活させる
+- 旧`/works/odai-maker`は新URLへ恒久転送する
+- サイト内にお題メーカーへの新しい導線は追加しない
+
+### 実装方針と変更予定ファイル
+
+- `app/circle/odai-maker/page.tsx` — 既存のお題生成UIと週次お題を使った独立ページを復活させる
+- `next.config.mjs` — 旧URLから新URLへ恒久転送する
+- `lib/odai/generator.ts`, `tests/odai/generator.test.ts`, `README.md` — 週次投稿と運用記載のURLを新URLへ揃える
+- `app/works/[id]/page.tsx` — 旧Works詳細に残るお題メーカー専用分岐を削除する
+- `SPEC.md`, `plan.md` — 正式URL、転送、導線非追加を明文化する
+
+### 影響範囲と検証方法
+
+- お題メーカーの公開URL、canonical、週次X投稿のURL、旧URLの転送が対象
+- メニューや一覧データは変更せず、新しい導線を作らない
+- お題生成テスト、lint、型チェック、production buildを実行する
+- ブラウザ確認はユーザーの許可が必要なため未実施とする

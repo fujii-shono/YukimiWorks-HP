@@ -1064,7 +1064,10 @@ export const works: Work[] = [
 
 ページファイルの新規作成・ルーティング設定等は一切不要。
 
-### お題メーカー（`/works/odai-maker`）
+### お題メーカー（`/circle/odai-maker`）
+
+- 旧URLの`/works/odai-maker`は`/circle/odai-maker`へ恒久転送する
+- サイト内のメニューやページ本文からお題メーカーへの導線は追加しない
 
 - `data/odai.json` の「ポーズ」「服装」「小物」「キャラクター」からお題を生成する
 - 60%は単一項目、40%は異なる2カテゴリの項目を`×`で結合する
@@ -1077,7 +1080,7 @@ export const works: Work[] = [
 - 週次お題はDiscord Webhookへ投稿し、Firestoreに投稿状態を保存して投稿済みの週をスキップする
 - 選ばれたお題をSNS用ハッシュタグへ整形し、組み合わせの`×`を`x`へ変換した`#選ばれたお題 #お題メーカー`を読み取り専用欄とボタンからコピーできるようにする
 - 週次お題はハッシュタグ付きでXへも投稿し、Firestoreに投稿状態と投稿IDを保存して投稿済みの週をスキップする
-- X投稿本文は「今週のお題」、お題ハッシュタグと`#お題メーカー`、`{siteUrl}/works/odai-maker`の順に改行して構成する
+- X投稿本文は「今週のお題」、お題ハッシュタグと`#お題メーカー`、`{siteUrl}/circle/odai-maker`の順に改行して構成する
 - Xへの週次自動投稿はVercel Productionかつ`X_WEEKLY_ODAI_ENABLED=true`の場合だけ有効とし、Preview・ローカル・`X_POST_DRY_RUN=true`ではX APIを呼ばない
 - Discord投稿とX投稿は独立して処理し、片方の失敗によってもう片方を中止しない
 - コピー結果とエラーは`aria-live="polite"`で通知する

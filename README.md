@@ -212,7 +212,7 @@ npm run firebase:deploy:rules
 
 ## お題メーカーの週次更新とDiscord投稿
 
-`/works/odai-maker` の今週のお題は、Firestoreの `odaiWeeklyTopics/{週ID}` から取得します。週IDは日本時間の月曜日を `YYYY-MM-DD` で表した値で、その週の表示期間は月曜日08:00から翌週月曜日07:59までです。
+`/circle/odai-maker` の今週のお題は、Firestoreの `odaiWeeklyTopics/{週ID}` から取得します。週IDは日本時間の月曜日を `YYYY-MM-DD` で表した値で、その週の表示期間は月曜日08:00から翌週月曜日07:59までです。
 
 ProductionではVercel Cronが `/api/cron/weekly-odai` を毎日08:00（日本時間）に呼びます。通常は月曜日に当週のお題を作成し、火曜日以降は同じ文書を維持したままDiscord未送信時の再試行だけを行います。月曜日の実行自体が失敗して文書が存在しない場合は、翌日の実行で当週分を補完生成します。Vercelへ次を設定してください。
 
@@ -227,7 +227,7 @@ X自動投稿は `VERCEL_ENV=production`、`X_WEEKLY_ODAI_ENABLED=true`、`X_POS
 ```text
 今週のお題
 #角x手紙 #お題メーカー
-https://yukimiworks.com/works/odai-maker
+https://yukimiworks.com/circle/odai-maker
 ```
 
 ### 今週のお題をFirebase Consoleから手動登録する

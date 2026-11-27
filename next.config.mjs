@@ -10,6 +10,7 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      { source: '/works/odai-maker', destination: '/circle/odai-maker', permanent: true },
       { source: '/circle/about', destination: '/circle', permanent: true },
       { source: '/circle/contact', destination: '/circle', permanent: true },
       { source: '/portfolio/:path*', destination: '/works', permanent: true },

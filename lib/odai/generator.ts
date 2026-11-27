@@ -104,6 +104,6 @@ export function buildOdaiHashtags(topic: string) {
 }
 
 export function buildWeeklyOdaiXPost(topic: string, siteUrl: string) {
-  const toolUrl = `${siteUrl.trim().replace(/\/+$/, '')}/works/odai-maker`;
+  const toolUrl = `${siteUrl.trim().replace(/\/+$/, '')}/circle/odai-maker`;
   return `今週のお題\n${buildOdaiHashtags(topic)}\n${toolUrl}`;
 }

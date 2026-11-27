@@ -15,7 +15,6 @@ const nextConfig = {
       { source: '/circle/contact', destination: '/circle', permanent: true },
       { source: '/portfolio/:path*', destination: '/works', permanent: true },
       { source: '/diary/:path*', destination: '/news', permanent: true },
-      { source: '/links', destination: '/circle', permanent: true },
       { source: '/bokin', destination: '/messages', permanent: false },
       { source: '/back-alley/portfolio/:id', destination: '/works/r18/:id', permanent: true },
       { source: '/back-alley/:path*', destination: '/works', permanent: true },

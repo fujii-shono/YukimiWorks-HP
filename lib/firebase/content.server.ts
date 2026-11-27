@@ -106,7 +106,15 @@ export async function getAllWorks(): Promise<Work[]> {
   const firebaseItems = documents.flatMap((document): Work[] => {
     const data = document.data();
     const publishedAt = timestampDate(data.publishedAt);
-    if (!publishedAt || typeof data.title !== 'string' || typeof data.body !== 'string') return [];
+    // 管理画面で扱えない旧形式・不完全な成果物は、公開一覧と作品由来ニュースの両方から除外する。
+    if (
+      !publishedAt
+      || typeof data.title !== 'string'
+      || typeof data.body !== 'string'
+      || typeof data.category === 'string'
+      || !Array.isArray(data.tags)
+      || !Array.isArray(data.media)
+    ) return [];
     const thumbnail = isMedia(data.thumbnail) && data.thumbnail.type === 'image' ? data.thumbnail.url : '';
     const media = Array.isArray(data.media) ? data.media.filter(isMedia).map((item) => ({ type: item.type, src: item.url, alt: item.alt || undefined })) : [];
     const storedSegments = Array.isArray(data.bodySegments) ? data.bodySegments.filter(isBodySegment).slice(0, 50) : [];
